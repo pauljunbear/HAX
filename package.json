@@ -1,0 +1,40 @@
+{
+  "name": "imager2",
+  "version": "1.0.0",
+  "description": "React-based image editing app with real-time artistic effects",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "keywords": [
+    "image",
+    "editing",
+    "effects",
+    "filters",
+    "react"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@react-three/drei": "^9.1.0",
+    "@react-three/fiber": "^9.1.0",
+    "@types/node": "^20.11.30",
+    "@types/react": "^18.2.67",
+    "@types/react-dom": "^18.2.22",
+    "autoprefixer": "^10.4.19",
+    "fabric": "^5.3.0",
+    "konva": "^9.3.6",
+    "next": "^14.2.0",
+    "p5": "^1.9.1",
+    "postcss": "^8.4.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-konva": "^18.2.10",
+    "tailwindcss": "^3.4.1",
+    "three": "^0.162.0",
+    "tsparticles": "^3.3.0",
+    "typescript": "^5.4.2"
+  }
+}
