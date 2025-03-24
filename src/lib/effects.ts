@@ -88,6 +88,35 @@ export const effectsConfig: Record<string, EffectConfig> = {
     category: 'Filters',
   },
   
+  // Color Effects
+  duotone: {
+    label: 'Duotone',
+    category: 'Color Effects',
+    settings: {
+      darkColor: {
+        label: 'Dark Tone',
+        min: 0,
+        max: 360,
+        default: 240,
+        step: 1,
+      },
+      lightColor: {
+        label: 'Light Tone',
+        min: 0,
+        max: 360,
+        default: 60,
+        step: 1,
+      },
+      intensity: {
+        label: 'Intensity',
+        min: 0,
+        max: 1,
+        default: 0.5,
+        step: 0.01,
+      },
+    },
+  },
+  
   // Blur & Sharpen
   blur: {
     label: 'Blur',
@@ -171,7 +200,197 @@ export const effectsConfig: Record<string, EffectConfig> = {
       },
     },
   },
+  halftone: {
+    label: 'Halftone',
+    category: 'Artistic',
+    settings: {
+      size: {
+        label: 'Dot Size',
+        min: 1,
+        max: 20,
+        default: 4,
+        step: 1,
+      },
+      spacing: {
+        label: 'Spacing',
+        min: 1,
+        max: 20,
+        default: 5,
+        step: 1,
+      },
+    },
+  },
+  dithering: {
+    label: 'Dithering',
+    category: 'Artistic',
+    settings: {
+      threshold: {
+        label: 'Threshold',
+        min: 0,
+        max: 1,
+        default: 0.5,
+        step: 0.01,
+      },
+    },
+  },
 };
+
+// Custom filters for effects not natively supported by Konva
+const customFilters = {
+  // Duotone implementation
+  duotone: (imageData: ImageData, settings: Record<string, number>) => {
+    const { data } = imageData;
+    const darkHue = settings.darkColor || 240;
+    const lightHue = settings.lightColor || 60;
+    const intensity = settings.intensity || 0.5;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      // Convert to grayscale first
+      const gray = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+      
+      // Map grayscale value to a position between dark and light color
+      const hue = gray < 0.5 
+        ? darkHue + (lightHue - darkHue) * (gray * 2) * intensity 
+        : lightHue;
+      
+      // Convert HSL to RGB
+      const saturation = 0.8;
+      const lightness = gray;
+      const [r, g, b] = hslToRgb(hue / 360, saturation, lightness);
+      
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+    }
+    
+    return imageData;
+  },
+  
+  // Halftone effect
+  halftone: (imageData: ImageData, settings: Record<string, number>) => {
+    const { data, width, height } = imageData;
+    const size = settings.size || 4;
+    const spacing = settings.spacing || 5;
+    const fullSize = size + spacing;
+    
+    // Create a new ImageData
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return imageData;
+    
+    tempCtx.putImageData(imageData, 0, 0);
+    tempCtx.fillStyle = 'white';
+    tempCtx.fillRect(0, 0, width, height);
+    
+    // Draw halftone pattern
+    for (let y = 0; y < height; y += fullSize) {
+      for (let x = 0; x < width; x += fullSize) {
+        const pixelIndex = (y * width + x) * 4;
+        if (pixelIndex >= data.length) continue;
+        
+        // Get the brightness of this region
+        const brightness = (data[pixelIndex] + data[pixelIndex + 1] + data[pixelIndex + 2]) / 3 / 255;
+        const dotSize = size * (1 - brightness);
+        
+        tempCtx.fillStyle = 'black';
+        tempCtx.beginPath();
+        tempCtx.arc(
+          x + fullSize / 2,
+          y + fullSize / 2,
+          dotSize / 2,
+          0,
+          Math.PI * 2
+        );
+        tempCtx.fill();
+      }
+    }
+    
+    // Copy back to original imageData
+    const processedData = tempCtx.getImageData(0, 0, width, height);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = processedData.data[i];
+    }
+    
+    return imageData;
+  },
+  
+  // Dithering effect (Floyd-Steinberg algorithm)
+  dithering: (imageData: ImageData, settings: Record<string, number>) => {
+    const { data, width, height } = imageData;
+    const threshold = settings.threshold || 0.5;
+    const thresholdValue = threshold * 255;
+    
+    // First convert to grayscale
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      data[i] = data[i + 1] = data[i + 2] = gray;
+    }
+    
+    // Copy the data to avoid modifying it while iterating
+    const newData = new Uint8ClampedArray(data);
+    
+    // Apply Floyd-Steinberg dithering
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const oldPixel = data[idx];
+        const newPixel = oldPixel < thresholdValue ? 0 : 255;
+        newData[idx] = newData[idx + 1] = newData[idx + 2] = newPixel;
+        
+        const error = oldPixel - newPixel;
+        
+        // Distribute error to neighboring pixels
+        if (x < width - 1) {
+          data[idx + 4] += error * 7 / 16;
+        }
+        if (y < height - 1) {
+          if (x > 0) {
+            data[idx + width * 4 - 4] += error * 3 / 16;
+          }
+          data[idx + width * 4] += error * 5 / 16;
+          if (x < width - 1) {
+            data[idx + width * 4 + 4] += error * 1 / 16;
+          }
+        }
+      }
+    }
+    
+    // Copy back the new data
+    for (let i = 0; i < data.length; i++) {
+      data[i] = newData[i];
+    }
+    
+    return imageData;
+  },
+};
+
+// Helper function to convert HSL to RGB
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  let r, g, b;
+
+  if (s === 0) {
+    r = g = b = l; // achromatic
+  } else {
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
 
 // Function to apply the selected effect with settings
 export const applyEffect = (
@@ -228,19 +447,40 @@ export const applyEffect = (
       return filters;
       
     case 'sepia':
-      // Sepia is a combination of filters
       filters.push(Konva.Filters.Sepia);
       return filters;
       
     case 'posterize':
-      // Custom implementation for posterize
       filters.push(Konva.Filters.Posterize);
+      return filters;
+      
+    case 'duotone':
+    case 'halftone':  
+    case 'dithering':
+      // For custom filters, we use Konva's custom filter mechanism
+      filters.push(customPixelManipulation);
       return filters;
       
     default:
       return [];
   }
 };
+
+// Custom filter function for pixel manipulation
+function customPixelManipulation(imageData: ImageData, context: any): ImageData {
+  const activeEffect = context.filter;
+  const settings = context.filterSettings || {};
+  
+  if (activeEffect === 'duotone' && customFilters.duotone) {
+    return customFilters.duotone(imageData, settings);
+  } else if (activeEffect === 'halftone' && customFilters.halftone) {
+    return customFilters.halftone(imageData, settings);
+  } else if (activeEffect === 'dithering' && customFilters.dithering) {
+    return customFilters.dithering(imageData, settings);
+  }
+  
+  return imageData;
+}
 
 // Function to get filter configuration for a specific effect
 export const getFilterConfig = (
@@ -290,6 +530,30 @@ export const getFilterConfig = (
       
     case 'posterize':
       config.levels = settings.levels ?? effectsConfig.posterize.settings?.levels.default ?? 4;
+      return config;
+      
+    case 'duotone':
+      config.filter = 'duotone';
+      config.filterSettings = {
+        darkColor: settings.darkColor ?? effectsConfig.duotone.settings?.darkColor.default ?? 240,
+        lightColor: settings.lightColor ?? effectsConfig.duotone.settings?.lightColor.default ?? 60,
+        intensity: settings.intensity ?? effectsConfig.duotone.settings?.intensity.default ?? 0.5,
+      };
+      return config;
+      
+    case 'halftone':
+      config.filter = 'halftone';
+      config.filterSettings = {
+        size: settings.size ?? effectsConfig.halftone.settings?.size.default ?? 4,
+        spacing: settings.spacing ?? effectsConfig.halftone.settings?.spacing.default ?? 5,
+      };
+      return config;
+      
+    case 'dithering':
+      config.filter = 'dithering';
+      config.filterSettings = {
+        threshold: settings.threshold ?? effectsConfig.dithering.settings?.threshold.default ?? 0.5,
+      };
       return config;
       
     default:
