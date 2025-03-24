@@ -6,6 +6,8 @@ const nextConfig = {
     config.resolve.fallback = { fs: false, path: false };
     return config;
   },
+  // Specify that we want to use our src directory structure
+  distDir: 'dist',
 };
 
 module.exports = nextConfig;
