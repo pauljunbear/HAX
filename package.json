@@ -4,7 +4,7 @@
   "description": "React-based image editing app with real-time artistic effects",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm install --legacy-peer-deps && next build",
     "start": "next start",
     "lint": "next lint"
   },
@@ -19,7 +19,7 @@
   "license": "ISC",
   "dependencies": {
     "@react-three/drei": "^9.1.0",
-    "@react-three/fiber": "^9.1.0",
+    "@react-three/fiber": "^8.15.11",
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.67",
     "@types/react-dom": "^18.2.22",
