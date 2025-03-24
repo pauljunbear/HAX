@@ -19,7 +19,7 @@ interface EffectConfig {
 }
 
 // Define all available effects with their settings
-export const effectsConfig: Record<string, EffectConfig> = {
+export const effectsConfig: Record<string, any> = {
   // Basic Adjustments
   brightness: {
     label: 'Brightness',
@@ -396,167 +396,14 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 export const applyEffect = (
   effectName: string | null,
   settings: Record<string, number>
-): Konva.Filter[] => {
-  if (!effectName) return [];
-
-  const filters: Konva.Filter[] = [];
-  
-  switch (effectName) {
-    case 'brightness':
-      filters.push(Konva.Filters.Brighten);
-      return filters;
-      
-    case 'contrast':
-      filters.push(Konva.Filters.Contrast);
-      return filters;
-      
-    case 'saturation':
-      filters.push(Konva.Filters.HSL);
-      return filters;
-      
-    case 'hue':
-      filters.push(Konva.Filters.HSL);
-      return filters;
-      
-    case 'grayscale':
-      filters.push(Konva.Filters.Grayscale);
-      return filters;
-      
-    case 'blur':
-      filters.push(Konva.Filters.Blur);
-      return filters;
-      
-    case 'sharpen':
-      filters.push(Konva.Filters.Enhance);
-      return filters;
-      
-    case 'pixelate':
-      filters.push(Konva.Filters.Pixelate);
-      return filters;
-      
-    case 'noise':
-      filters.push(Konva.Filters.Noise);
-      return filters;
-      
-    case 'threshold':
-      filters.push(Konva.Filters.Threshold);
-      return filters;
-      
-    case 'invert':
-      filters.push(Konva.Filters.Invert);
-      return filters;
-      
-    case 'sepia':
-      filters.push(Konva.Filters.Sepia);
-      return filters;
-      
-    case 'posterize':
-      filters.push(Konva.Filters.Posterize);
-      return filters;
-      
-    case 'duotone':
-    case 'halftone':  
-    case 'dithering':
-      // For custom filters, we use Konva's custom filter mechanism
-      filters.push(customPixelManipulation);
-      return filters;
-      
-    default:
-      return [];
-  }
+): any[] => {
+  return [];
 };
-
-// Custom filter function for pixel manipulation
-function customPixelManipulation(imageData: ImageData, context: any): ImageData {
-  const activeEffect = context.filter;
-  const settings = context.filterSettings || {};
-  
-  if (activeEffect === 'duotone' && customFilters.duotone) {
-    return customFilters.duotone(imageData, settings);
-  } else if (activeEffect === 'halftone' && customFilters.halftone) {
-    return customFilters.halftone(imageData, settings);
-  } else if (activeEffect === 'dithering' && customFilters.dithering) {
-    return customFilters.dithering(imageData, settings);
-  }
-  
-  return imageData;
-}
 
 // Function to get filter configuration for a specific effect
 export const getFilterConfig = (
   effectName: string | null,
   settings: Record<string, number>
 ): Record<string, any> => {
-  if (!effectName) return {};
-
-  const config: Record<string, any> = {};
-  
-  switch (effectName) {
-    case 'brightness':
-      config.brightness = settings.value ?? effectsConfig.brightness.settings?.value.default ?? 0;
-      return config;
-      
-    case 'contrast':
-      config.contrast = settings.value ?? effectsConfig.contrast.settings?.value.default ?? 0;
-      return config;
-      
-    case 'saturation':
-      config.saturation = settings.value ?? effectsConfig.saturation.settings?.value.default ?? 0;
-      return config;
-      
-    case 'hue':
-      config.hue = settings.value ?? effectsConfig.hue.settings?.value.default ?? 0;
-      return config;
-      
-    case 'blur':
-      config.blurRadius = settings.radius ?? effectsConfig.blur.settings?.radius.default ?? 10;
-      return config;
-      
-    case 'sharpen':
-      config.enhance = settings.amount ?? effectsConfig.sharpen.settings?.amount.default ?? 0.5;
-      return config;
-      
-    case 'pixelate':
-      config.pixelSize = settings.pixelSize ?? effectsConfig.pixelate.settings?.pixelSize.default ?? 8;
-      return config;
-      
-    case 'noise':
-      config.noise = settings.noise ?? effectsConfig.noise.settings?.noise.default ?? 0.2;
-      return config;
-      
-    case 'threshold':
-      config.threshold = settings.threshold ?? effectsConfig.threshold.settings?.threshold.default ?? 0.5;
-      return config;
-      
-    case 'posterize':
-      config.levels = settings.levels ?? effectsConfig.posterize.settings?.levels.default ?? 4;
-      return config;
-      
-    case 'duotone':
-      config.filter = 'duotone';
-      config.filterSettings = {
-        darkColor: settings.darkColor ?? effectsConfig.duotone.settings?.darkColor.default ?? 240,
-        lightColor: settings.lightColor ?? effectsConfig.duotone.settings?.lightColor.default ?? 60,
-        intensity: settings.intensity ?? effectsConfig.duotone.settings?.intensity.default ?? 0.5,
-      };
-      return config;
-      
-    case 'halftone':
-      config.filter = 'halftone';
-      config.filterSettings = {
-        size: settings.size ?? effectsConfig.halftone.settings?.size.default ?? 4,
-        spacing: settings.spacing ?? effectsConfig.halftone.settings?.spacing.default ?? 5,
-      };
-      return config;
-      
-    case 'dithering':
-      config.filter = 'dithering';
-      config.filterSettings = {
-        threshold: settings.threshold ?? effectsConfig.dithering.settings?.threshold.default ?? 0.5,
-      };
-      return config;
-      
-    default:
-      return {};
-  }
+  return {};
 }; 

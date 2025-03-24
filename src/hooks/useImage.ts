@@ -13,7 +13,8 @@ const useImage = (src: string): [HTMLImageElement | null, { status: string }] =>
       return;
     }
 
-    const img = new window.Image();
+    setStatus('loading');
+    const img = new Image();
     img.src = src;
     
     const onLoad = () => {

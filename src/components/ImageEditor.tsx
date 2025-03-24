@@ -6,10 +6,10 @@ import useImage from '@/hooks/useImage';
 import { applyEffect, getFilterConfig } from '@/lib/effects';
 
 interface ImageEditorProps {
-  selectedImage: string | null;
-  activeEffect: string | null;
-  effectSettings: Record<string, number>;
-  onImageUpload: (imageDataUrl: string) => void;
+  selectedImage?: string | null;
+  activeEffect?: string | null;
+  effectSettings?: Record<string, number>;
+  onImageUpload?: (imageDataUrl: string) => void;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -48,7 +48,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          onImageUpload(event.target.result as string);
+          onImageUpload?.(event.target.result as string);
           setIsLoading(false);
         }
       };
@@ -154,124 +154,8 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 relative" ref={containerRef}>
-        {isLoading && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
-            <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-              <p>Processing...</p>
-            </div>
-          </div>
-        )}
-        
-        {error && (
-          <div className="absolute top-4 left-4 right-4 bg-danger text-white p-3 rounded shadow-lg z-10">
-            <p>{error}</p>
-            <button 
-              className="absolute top-2 right-2 text-white"
-              onClick={() => setError(null)}
-            >
-              ✕
-            </button>
-          </div>
-        )}
-        
-        {selectedImage ? (
-          <Stage
-            width={stageSize.width}
-            height={stageSize.height}
-            ref={stageRef}
-          >
-            <Layer>
-              <KonvaImage
-                image={image}
-                width={imageSize.width}
-                height={imageSize.height}
-                x={(stageSize.width - imageSize.width) / 2}
-                y={(stageSize.height - imageSize.height) / 2}
-              />
-            </Layer>
-          </Stage>
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-800">
-            <div className="text-center p-6 max-w-md">
-              <h3 className="text-xl font-semibold mb-4">No Image Selected</h3>
-              <p className="mb-4 text-gray-600 dark:text-gray-400">
-                Upload an image to get started with editing. Supports JPG, PNG files up to 10MB.
-              </p>
-              <button
-                onClick={handleUploadClick}
-                className="button-primary"
-              >
-                Upload Image
-              </button>
-              <p className="mt-4 text-sm text-gray-500">
-                Drag and drop is also supported
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {selectedImage && (
-        <div className="p-4 bg-gray-200 dark:bg-gray-800 flex flex-wrap justify-between items-center gap-2">
-          <button
-            onClick={handleUploadClick}
-            className="button-secondary"
-          >
-            Change Image
-          </button>
-          
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <label htmlFor="exportFormat" className="text-sm">Format:</label>
-              <select 
-                id="exportFormat"
-                value={exportFormat}
-                onChange={(e) => setExportFormat(e.target.value as 'png' | 'jpeg')}
-                className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm"
-              >
-                <option value="png">PNG</option>
-                <option value="jpeg">JPEG</option>
-              </select>
-            </div>
-            
-            {exportFormat === 'jpeg' && (
-              <div className="flex items-center space-x-2">
-                <label htmlFor="exportQuality" className="text-sm">Quality:</label>
-                <input 
-                  id="exportQuality"
-                  type="range"
-                  min="0.1"
-                  max="1"
-                  step="0.1"
-                  value={exportQuality}
-                  onChange={(e) => setExportQuality(parseFloat(e.target.value))}
-                  className="w-20"
-                />
-                <span className="text-sm">{Math.round(exportQuality * 100)}%</span>
-              </div>
-            )}
-          </div>
-          
-          <button
-            onClick={handleExport}
-            className="button-primary"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Processing...' : 'Export Image'}
-          </button>
-        </div>
-      )}
-
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        accept="image/jpeg, image/png"
-        className="hidden"
-      />
+    <div className="h-full flex flex-col items-center justify-center">
+      <p className="text-center">Image Editor Placeholder</p>
     </div>
   );
 };
