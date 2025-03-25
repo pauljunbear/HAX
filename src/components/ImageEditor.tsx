@@ -111,10 +111,10 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       const imageNode = stageRef.current.findOne('Image');
       if (imageNode) {
         imageNode.cache();
-        imageNode.filters(applyEffect(activeEffect, effectSettings));
+        imageNode.filters(applyEffect(activeEffect, effectSettings || {}));
         
         // Apply filter configuration
-        const config = getFilterConfig(activeEffect, effectSettings);
+        const config = getFilterConfig(activeEffect, effectSettings || {});
         Object.entries(config).forEach(([key, value]) => {
           imageNode[key] = value;
         });
