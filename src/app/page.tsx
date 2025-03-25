@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 
@@ -18,15 +18,26 @@ export default function Home() {
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [effectSettings, setEffectSettings] = useState<Record<string, number>>({});
 
+  // Add debugging on component mount
+  useEffect(() => {
+    console.log("Home component mounted");
+  }, []);
+
   const handleImageUpload = (imageDataUrl: string) => {
+    console.log("handleImageUpload called with data length:", imageDataUrl.length);
+    // Debug the data format
+    console.log("Image data format:", imageDataUrl.substring(0, 50) + "...");
+    
     setSelectedImage(imageDataUrl);
   };
 
   const handleEffectChange = (effectName: string) => {
+    console.log("Effect changed to:", effectName);
     setActiveEffect(effectName);
   };
 
   const handleSettingChange = (settingName: string, value: number) => {
+    console.log(`Setting ${settingName} changed to:`, value);
     setEffectSettings((prev) => ({
       ...prev,
       [settingName]: value,
