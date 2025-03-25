@@ -1,10 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import ImageEditor from '../components/ImageEditor';
-import ControlPanel from '../components/ControlPanel';
+import dynamic from 'next/dynamic';
 import Header from '../components/Header';
 import styles from '../styles/Home.module.css';
+
+// Import ControlPanel normally since it doesn't use canvas
+import ControlPanel from '../components/ControlPanel';
+
+// Dynamically import ImageEditor with SSR disabled
+const ImageEditor = dynamic(
+  () => import('../components/ImageEditor'),
+  { ssr: false }
+);
 
 export default function Home() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);

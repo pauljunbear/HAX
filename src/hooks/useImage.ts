@@ -5,8 +5,17 @@ import { useState, useEffect } from 'react';
 const useImage = (src: string): [HTMLImageElement | null, { status: string }] => {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [status, setStatus] = useState<string>('loading');
+  const [isBrowser, setIsBrowser] = useState(false);
+
+  // Detect browser environment
+  useEffect(() => {
+    setIsBrowser(true);
+  }, []);
 
   useEffect(() => {
+    // Only run this effect on the client side
+    if (!isBrowser) return;
+
     if (!src) {
       setImage(null);
       setStatus('idle');
@@ -34,7 +43,7 @@ const useImage = (src: string): [HTMLImageElement | null, { status: string }] =>
       img.removeEventListener('load', onLoad);
       img.removeEventListener('error', onError);
     };
-  }, [src]);
+  }, [src, isBrowser]);
 
   return [image, { status }];
 };

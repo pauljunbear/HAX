@@ -14,6 +14,7 @@ interface ImageEditorProps {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
+// Make sure nothing related to canvas/konva is imported or used until we're in the browser
 const ImageEditor: React.FC<ImageEditorProps> = ({
   selectedImage,
   activeEffect,
@@ -30,6 +31,12 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [exportQuality, setExportQuality] = useState<number>(0.9); // 0.0 to 1.0
   const [exportFormat, setExportFormat] = useState<'png' | 'jpeg'>('png');
+  const [isBrowser, setIsBrowser] = useState(false);
+
+  // Detect browser environment to avoid SSR issues
+  useEffect(() => {
+    setIsBrowser(true);
+  }, []);
 
   // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,6 +74,8 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
 
   // Update stage size based on container size
   useEffect(() => {
+    if (!isBrowser) return;
+
     const updateSize = () => {
       if (containerRef.current) {
         const { clientWidth, clientHeight } = containerRef.current;
@@ -80,77 +89,77 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
-  }, []);
+  }, [isBrowser]);
 
   // Update image size when image loads
   useEffect(() => {
-    if (image) {
-      const aspectRatio = image.width / image.height;
-      let newWidth, newHeight;
+    if (!isBrowser || !image) return;
 
-      if (stageSize.width / stageSize.height > aspectRatio) {
-        // Container is wider than image aspect ratio
-        newHeight = Math.min(stageSize.height, image.height);
-        newWidth = newHeight * aspectRatio;
-      } else {
-        // Container is taller than image aspect ratio
-        newWidth = Math.min(stageSize.width, image.width);
-        newHeight = newWidth / aspectRatio;
-      }
+    const aspectRatio = image.width / image.height;
+    let newWidth, newHeight;
 
-      setImageSize({
-        width: newWidth,
-        height: newHeight,
-      });
+    if (stageSize.width / stageSize.height > aspectRatio) {
+      // Container is wider than image aspect ratio
+      newHeight = Math.min(stageSize.height, image.height);
+      newWidth = newHeight * aspectRatio;
+    } else {
+      // Container is taller than image aspect ratio
+      newWidth = Math.min(stageSize.width, image.width);
+      newHeight = newWidth / aspectRatio;
     }
-  }, [image, stageSize]);
+
+    setImageSize({
+      width: newWidth,
+      height: newHeight,
+    });
+  }, [image, stageSize, isBrowser]);
 
   // Apply filters to the image
   useEffect(() => {
-    if (stageRef.current && activeEffect) {
-      const imageNode = stageRef.current.findOne('Image');
-      if (imageNode) {
-        imageNode.cache();
-        imageNode.filters(applyEffect(activeEffect, effectSettings || {}));
-        
-        // Apply filter configuration
-        const config = getFilterConfig(activeEffect, effectSettings || {});
-        Object.entries(config).forEach(([key, value]) => {
-          imageNode[key] = value;
-        });
-        
-        imageNode.getLayer().batchDraw();
-      }
+    if (!isBrowser || !stageRef.current || !activeEffect) return;
+
+    const imageNode = stageRef.current.findOne('Image');
+    if (imageNode) {
+      imageNode.cache();
+      imageNode.filters(applyEffect(activeEffect, effectSettings || {}));
+      
+      // Apply filter configuration
+      const config = getFilterConfig(activeEffect, effectSettings || {});
+      Object.entries(config).forEach(([key, value]) => {
+        imageNode[key] = value;
+      });
+      
+      imageNode.getLayer().batchDraw();
     }
-  }, [activeEffect, effectSettings]);
+  }, [activeEffect, effectSettings, isBrowser]);
 
   // Export the image
   const handleExport = () => {
-    if (stageRef.current) {
-      setIsLoading(true);
-      
-      // Use setTimeout to allow UI to update and show loading state
-      setTimeout(() => {
-        try {
-          const dataURL = stageRef.current.toDataURL({
-            mimeType: exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
-            quality: exportQuality,
-            pixelRatio: 2, // Higher quality export
-          });
-          
-          const link = document.createElement('a');
-          link.download = `imager-export.${exportFormat}`;
-          link.href = dataURL;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          setIsLoading(false);
-        } catch (err) {
-          setError('Error exporting image. Please try again.');
-          setIsLoading(false);
-        }
-      }, 100);
-    }
+    if (!isBrowser || !stageRef.current) return;
+    
+    setIsLoading(true);
+    
+    // Use setTimeout to allow UI to update and show loading state
+    setTimeout(() => {
+      try {
+        const dataURL = stageRef.current.toDataURL({
+          mimeType: exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
+          quality: exportQuality,
+          pixelRatio: 2, // Higher quality export
+        });
+        
+        const link = document.createElement('a');
+        link.download = `imager-export.${exportFormat}`;
+        link.href = dataURL;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setIsLoading(false);
+      } catch (err) {
+        setError('Error exporting image. Please try again.');
+        setIsLoading(false);
+      }
+    }, 100);
   };
 
   // Render different states
@@ -179,6 +188,11 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
         )}
       </div>
     );
+  }
+
+  // Only render the Stage component if we're in the browser
+  if (!isBrowser) {
+    return <div className="h-full w-full flex items-center justify-center">Loading editor...</div>;
   }
 
   return (
