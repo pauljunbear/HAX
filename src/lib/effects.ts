@@ -1,6 +1,8 @@
 'use client';
 
-import Konva from 'konva';
+// Use a dynamic import approach for Konva to avoid SSR issues
+// Import Konva only in browser environment
+let Konva: any = null;
 
 // Define the structure for effect settings
 interface EffectSetting {
@@ -235,10 +237,119 @@ export const effectsConfig: Record<string, any> = {
   },
 };
 
+// Initialize Konva only in the browser
+if (typeof window !== 'undefined') {
+  // We're in the browser, so it's safe to import Konva
+  import('konva').then((module) => {
+    Konva = module.default;
+  });
+}
+
+// Apply the selected effect
+export const applyEffect = (effectName: string | null, settings: Record<string, number>) => {
+  if (!effectName || typeof window === 'undefined' || !Konva) {
+    return [];
+  }
+
+  // Rest of your applyEffect function
+  switch (effectName) {
+    case 'brightness':
+      return [Konva.Filters.Brighten];
+    case 'contrast':
+      return [Konva.Filters.Contrast];
+    case 'blur':
+      return [Konva.Filters.Blur];
+    case 'sharpen':
+      return [Konva.Filters.Sharpen];
+    case 'pixelate':
+      return [Konva.Filters.Pixelate];
+    case 'noise':
+      return [Konva.Filters.Noise];
+    case 'threshold':
+      return [Konva.Filters.Threshold];
+    case 'grayscale':
+      return [Konva.Filters.Grayscale];
+    case 'sepia':
+      return [Konva.Filters.Sepia];
+    case 'invert':
+      return [Konva.Filters.Invert];
+    // Custom filter implementations
+    case 'duotone':
+    case 'posterize':
+    case 'dithering':
+    case 'halftone':
+      return [customFilter];
+    case 'hue':
+    case 'saturation':
+      return [Konva.Filters.HSL];
+    default:
+      return [];
+  }
+};
+
+// Get filter configuration for the selected effect
+export const getFilterConfig = (effectName: string | null, settings: Record<string, number>) => {
+  if (!effectName || typeof window === 'undefined') {
+    return {};
+  }
+
+  // Set filter-specific configuration
+  switch (effectName) {
+    case 'brightness':
+      return { brightness: settings.value || 0 };
+    case 'contrast':
+      return { contrast: settings.value || 0 };
+    case 'blur':
+      return { blurRadius: settings.radius || 10 };
+    case 'sharpen':
+      return { sharpenAmount: settings.amount || 0.5 };
+    case 'pixelate':
+      return { pixelSize: settings.pixelSize || 8 };
+    case 'noise':
+      return { noise: settings.noise || 0.2 };
+    case 'threshold':
+      return { threshold: settings.threshold || 0.5 };
+    case 'hue':
+      return { hue: settings.value || 0 };
+    case 'saturation':
+      return { saturation: settings.value || 0, luminance: 0 };
+    case 'posterize':
+    case 'dithering':
+    case 'halftone':
+    case 'duotone':
+      return { 
+        customFilter: {
+          name: effectName,
+          settings: settings,
+        },
+      };
+    default:
+      return {};
+  }
+};
+
+// Custom filter implementation for Konva
+const customFilter = function(imageData: ImageData) {
+  if (typeof window === 'undefined' || !Konva) return;
+  
+  // The actual filter operation will be passed via the customFilter.func
+  // @ts-ignore: Konva type augmentation
+  const filterSettings = this.customFilter || {};
+  const effectName = filterSettings.name;
+  const settings = filterSettings.settings || {};
+  
+  if (effectName && customFilters[effectName]) {
+    customFilters[effectName](imageData, settings);
+  }
+};
+
 // Custom filters for effects not natively supported by Konva
-const customFilters = {
+const customFilters: Record<string, any> = {
   // Duotone implementation
   duotone: (imageData: ImageData, settings: Record<string, number>) => {
+    // Only run in browser
+    if (typeof window === 'undefined') return;
+    
     const { data } = imageData;
     const darkHue = settings.darkColor || 240;
     const lightHue = settings.lightColor || 60;
@@ -250,20 +361,19 @@ const customFilters = {
       
       // Map grayscale value to a position between dark and light color
       const hue = gray < 0.5 
-        ? darkHue + (lightHue - darkHue) * (gray * 2) * intensity 
+        ? darkHue + (lightHue - darkHue) * (gray * 2) * intensity
         : lightHue;
       
       // Convert HSL to RGB
       const saturation = 0.8;
       const lightness = gray;
-      const [r, g, b] = hslToRgb(hue / 360, saturation, lightness);
       
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
+      const rgb = hslToRgb(hue / 360, saturation, lightness);
+      
+      data[i] = rgb[0];
+      data[i + 1] = rgb[1];
+      data[i + 2] = rgb[2];
     }
-    
-    return imageData;
   },
   
   // Halftone effect
@@ -368,6 +478,8 @@ const customFilters = {
 
 // Helper function to convert HSL to RGB
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  if (typeof window === 'undefined') return [0, 0, 0];
+  
   let r, g, b;
 
   if (s === 0) {
@@ -390,20 +502,4 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   }
 
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-}
-
-// Function to apply the selected effect with settings
-export const applyEffect = (
-  effectName: string | null,
-  settings: Record<string, number>
-): any[] => {
-  return [];
-};
-
-// Function to get filter configuration for a specific effect
-export const getFilterConfig = (
-  effectName: string | null,
-  settings: Record<string, number>
-): Record<string, any> => {
-  return {};
-}; 
+} 
