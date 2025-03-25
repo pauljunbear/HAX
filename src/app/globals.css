@@ -33,22 +33,24 @@ body {
   overflow: hidden;
 }
 
-.controls-panel {
-  @apply bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg;
-}
+@layer components {
+  .controls-panel {
+    @apply bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg;
+  }
 
-.slider-control {
-  @apply w-full;
-}
+  .slider-control {
+    @apply w-full;
+  }
 
-.button-primary {
-  @apply bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded;
-}
+  .button-primary {
+    @apply bg-[#3490dc] hover:bg-blue-700 text-white font-bold py-2 px-4 rounded;
+  }
 
-.button-secondary {
-  @apply bg-secondary hover:bg-yellow-500 text-gray-800 font-bold py-2 px-4 rounded;
-}
+  .button-secondary {
+    @apply bg-[#ffed4a] hover:bg-yellow-500 text-gray-800 font-bold py-2 px-4 rounded;
+  }
 
-.button-danger {
-  @apply bg-danger hover:bg-red-700 text-white font-bold py-2 px-4 rounded;
+  .button-danger {
+    @apply bg-[#e3342f] hover:bg-red-700 text-white font-bold py-2 px-4 rounded;
+  }
 } 

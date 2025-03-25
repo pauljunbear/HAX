@@ -153,9 +153,95 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
     }
   };
 
+  // Render different states
+  if (!selectedImage) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-4">
+        <h2 className="text-2xl font-bold mb-4">Upload an Image to Edit</h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-6 text-center">
+          Select an image to start applying effects and filters.
+        </p>
+        <button
+          onClick={handleUploadClick}
+          className="button-primary mb-4"
+        >
+          Upload Image
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*"
+          onChange={handleFileChange}
+        />
+        {error && (
+          <p className="text-red-500 mt-4">{error}</p>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full flex flex-col items-center justify-center">
-      <p className="text-center">Image Editor Placeholder</p>
+    <div 
+      ref={containerRef} 
+      className="canvas-container h-full"
+    >
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70 dark:bg-gray-800 dark:bg-opacity-70 z-10">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-2"></div>
+            <p>Processing...</p>
+          </div>
+        </div>
+      )}
+      
+      <Stage
+        ref={stageRef}
+        width={stageSize.width}
+        height={stageSize.height}
+      >
+        <Layer>
+          {image && (
+            <KonvaImage
+              image={image}
+              width={imageSize.width}
+              height={imageSize.height}
+              x={(stageSize.width - imageSize.width) / 2}
+              y={(stageSize.height - imageSize.height) / 2}
+            />
+          )}
+        </Layer>
+      </Stage>
+      
+      <div className="absolute bottom-4 right-4 flex space-x-2">
+        <button
+          onClick={handleUploadClick}
+          className="button-secondary"
+        >
+          New Image
+        </button>
+        <button
+          onClick={handleExport}
+          className="button-primary"
+          disabled={!image}
+        >
+          Export
+        </button>
+      </div>
+      
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileChange}
+      />
+      
+      {error && (
+        <div className="absolute bottom-4 left-4 bg-red-500 text-white p-2 rounded">
+          {error}
+        </div>
+      )}
     </div>
   );
 };
