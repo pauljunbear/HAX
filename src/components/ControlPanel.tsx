@@ -20,10 +20,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState<string | null>('Basic');
   
-  // Get unique categories from effects
-  const categories = [...new Set(
-    Object.values(effectsConfig).map(effect => effect.category)
-  )];
+  // Get unique categories from effects without using Set
+  const allCategories = Object.values(effectsConfig).map(effect => effect.category);
+  const categories = allCategories.filter((category, index) => {
+    return allCategories.indexOf(category) === index;
+  });
   
   // Get effects for the active category
   const categoryEffects = Object.entries(effectsConfig)
