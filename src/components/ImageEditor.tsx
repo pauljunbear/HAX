@@ -24,7 +24,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stageRef = useRef<any>(null);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const [image] = useImage(selectedImage || '');
+  const [image, imageStatus] = useImage(selectedImage || '');
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -33,11 +33,33 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   const [exportFormat, setExportFormat] = useState<'png' | 'jpeg'>('png');
   const [isBrowser, setIsBrowser] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<any>({});
 
   // Detect browser environment to avoid SSR issues
   useEffect(() => {
     setIsBrowser(true);
+    console.log("Browser detected, component mounted");
   }, []);
+
+  // Debug effect to log state changes
+  useEffect(() => {
+    if (isBrowser) {
+      console.log("Current state:", { 
+        selectedImage: selectedImage ? "Image data available" : "No image",
+        imageStatus: imageStatus.status,
+        imageLoaded: !!image,
+        stageSize,
+        imageSize,
+      });
+      setDebugInfo({
+        selectedImage: selectedImage ? "Image data available" : "No image",
+        imageStatus: imageStatus.status,
+        imageLoaded: !!image,
+        stageSize,
+        imageSize,
+      });
+    }
+  }, [selectedImage, image, imageStatus, stageSize, imageSize, isBrowser]);
 
   // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,9 +67,13 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
     setError(null);
     
     if (file) {
+      console.log("File selected:", file.name, file.type, file.size);
+      
       // Check file size
       if (file.size > MAX_FILE_SIZE) {
-        setError(`File is too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`);
+        const errorMsg = `File is too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`;
+        console.error(errorMsg);
+        setError(errorMsg);
         return;
       }
       
@@ -56,14 +82,33 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          onImageUpload?.(event.target.result as string);
-          setIsLoading(false);
+          const imageData = event.target.result as string;
+          console.log("Image loaded successfully, data length:", imageData.length);
+          
+          // Validate that the image can be loaded before passing it up
+          const testImage = new Image();
+          testImage.onload = () => {
+            console.log("Test image loaded successfully with dimensions:", testImage.width, "x", testImage.height);
+            onImageUpload?.(imageData);
+            setIsLoading(false);
+          };
+          
+          testImage.onerror = () => {
+            console.error("Failed to load test image");
+            setError('The selected file is not a valid image. Please try another file.');
+            setIsLoading(false);
+          };
+          
+          testImage.src = imageData;
         }
       };
+      
       reader.onerror = () => {
+        console.error("FileReader error:", reader.error);
         setError('Error reading file. Please try again.');
         setIsLoading(false);
       };
+      
       reader.readAsDataURL(file);
     }
   };
@@ -86,14 +131,19 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
+      console.log("File dropped:", file.name, file.type, file.size);
       
       if (!file.type.startsWith('image/')) {
-        setError('Please drop an image file.');
+        const errorMsg = 'Please drop an image file.';
+        console.error(errorMsg);
+        setError(errorMsg);
         return;
       }
       
       if (file.size > MAX_FILE_SIZE) {
-        setError(`File is too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`);
+        const errorMsg = `File is too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`;
+        console.error(errorMsg);
+        setError(errorMsg);
         return;
       }
       
@@ -102,14 +152,33 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          onImageUpload?.(event.target.result as string);
-          setIsLoading(false);
+          const imageData = event.target.result as string;
+          console.log("Dropped image loaded successfully, data length:", imageData.length);
+          
+          // Validate that the image can be loaded before passing it up
+          const testImage = new Image();
+          testImage.onload = () => {
+            console.log("Test dropped image loaded successfully with dimensions:", testImage.width, "x", testImage.height);
+            onImageUpload?.(imageData);
+            setIsLoading(false);
+          };
+          
+          testImage.onerror = () => {
+            console.error("Failed to load test dropped image");
+            setError('The dropped file is not a valid image. Please try another file.');
+            setIsLoading(false);
+          };
+          
+          testImage.src = imageData;
         }
       };
+      
       reader.onerror = () => {
-        setError('Error reading file. Please try again.');
+        console.error("FileReader error for dropped file:", reader.error);
+        setError('Error reading dropped file. Please try again.');
         setIsLoading(false);
       };
+      
       reader.readAsDataURL(file);
     }
   };
@@ -126,6 +195,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
     const updateSize = () => {
       if (containerRef.current) {
         const { clientWidth, clientHeight } = containerRef.current;
+        console.log("Container size updated:", clientWidth, "x", clientHeight);
         setStageSize({
           width: clientWidth,
           height: clientHeight,
@@ -142,6 +212,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   useEffect(() => {
     if (!isBrowser || !image) return;
 
+    console.log("Image loaded with dimensions:", image.width, "x", image.height);
     const aspectRatio = image.width / image.height;
     let newWidth, newHeight;
 
@@ -155,6 +226,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       newHeight = newWidth / aspectRatio;
     }
 
+    console.log("Image size calculated:", newWidth, "x", newHeight);
     setImageSize({
       width: newWidth,
       height: newHeight,
@@ -165,8 +237,10 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   useEffect(() => {
     if (!isBrowser || !stageRef.current || !activeEffect) return;
 
+    console.log("Applying effect:", activeEffect);
     const imageNode = stageRef.current.findOne('Image');
     if (imageNode) {
+      console.log("Image node found, applying filters");
       imageNode.cache();
       imageNode.filters(applyEffect(activeEffect, effectSettings || {}));
       
@@ -177,6 +251,8 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       });
       
       imageNode.getLayer().batchDraw();
+    } else {
+      console.warn("No image node found in stage to apply filters");
     }
   }, [activeEffect, effectSettings, isBrowser]);
 
@@ -185,6 +261,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
     if (!isBrowser || !stageRef.current) return;
     
     setIsLoading(true);
+    console.log("Starting export process");
     
     // Use setTimeout to allow UI to update and show loading state
     setTimeout(() => {
@@ -194,6 +271,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
           quality: exportQuality,
           pixelRatio: 2, // Higher quality export
         });
+        console.log(`Exported image as ${exportFormat} with quality ${exportQuality}`);
         
         const link = document.createElement('a');
         link.download = `imager-export.${exportFormat}`;
@@ -203,6 +281,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
         document.body.removeChild(link);
         setIsLoading(false);
       } catch (err) {
+        console.error("Export error:", err);
         setError('Error exporting image. Please try again.');
         setIsLoading(false);
       }
@@ -217,6 +296,20 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   // Export format control
   const handleExportFormatChange = (format: 'png' | 'jpeg') => {
     setExportFormat(format);
+  };
+
+  // Force reload the image if needed
+  const handleForceReload = () => {
+    if (!selectedImage) return;
+    
+    console.log("Force reloading image");
+    const tempImage = new Image();
+    tempImage.onload = () => {
+      console.log("Force reload successful");
+      // This will trigger the useImage hook to reload
+      onImageUpload?.(selectedImage);
+    };
+    tempImage.src = selectedImage;
   };
 
   // Render different states
@@ -280,6 +373,43 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       <div className="h-full w-full flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-emerald-500 border-gray-200"></div>
         <span className="ml-3 text-gray-600">Loading editor...</span>
+      </div>
+    );
+  }
+
+  // Show a loading state while image is loading
+  if (imageStatus.status === 'loading' || !image) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-t-emerald-500 border-gray-200 mb-4"></div>
+        <span className="text-gray-600">Loading image...</span>
+        <button 
+          onClick={handleForceReload}
+          className="mt-4 px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded-md hover:bg-gray-300"
+        >
+          Force Reload
+        </button>
+      </div>
+    );
+  }
+
+  // Show error state if image failed to load
+  if (imageStatus.status === 'error') {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center p-6">
+        <div className="bg-red-50 p-6 rounded-lg text-center max-w-md">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h3 className="text-lg font-medium text-red-800 mb-2">Failed to load image</h3>
+          <p className="text-sm text-red-600 mb-4">There was a problem loading the selected image. Please try a different image.</p>
+          <button
+            onClick={handleUploadClick}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition-colors"
+          >
+            Upload New Image
+          </button>
+        </div>
       </div>
     );
   }
@@ -408,6 +538,19 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
             </svg>
             {error}
           </div>
+        </div>
+      )}
+      
+      {/* Debug info - only visible in development */}
+      {process.env.NODE_ENV === 'development' && Object.keys(debugInfo).length > 0 && (
+        <div className="absolute top-2 right-2 max-w-xs bg-white bg-opacity-90 p-2 rounded border text-xs overflow-auto max-h-40">
+          <div className="font-bold mb-1">Debug Info:</div>
+          {Object.entries(debugInfo).map(([key, value]) => (
+            <div key={key} className="grid grid-cols-2 gap-1">
+              <span className="font-mono">{key}:</span>
+              <span>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
