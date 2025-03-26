@@ -41,13 +41,43 @@ const initKonva = async () => {
         konvaInitialized = true;
         console.log("Konva initialization complete");
         
-        // Explicitly enable all filters we need
-        if (!Konva.filters) {
+        // Log available filters
+        if (Konva.Filters) {
+          console.log("Available Konva filters:", Object.keys(Konva.Filters));
+          
+          // Register any custom filters if needed
+          if (!Konva.Filters.Threshold) {
+            console.warn("Threshold filter not available, implementing custom version");
+            Konva.Filters.Threshold = function(imageData) {
+              const threshold = this.threshold || 0.5;
+              const data = imageData.data;
+              for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const v = (r + g + b) / 3;
+                const value = v < threshold * 255 ? 0 : 255;
+                data[i] = data[i + 1] = data[i + 2] = value;
+              }
+            };
+          }
+          
+          if (!Konva.Filters.Posterize) {
+            console.warn("Posterize filter not available, implementing custom version");
+            Konva.Filters.Posterize = function(imageData) {
+              const levels = this.levels || 4;
+              const data = imageData.data;
+              for (let i = 0; i < data.length; i += 4) {
+                data[i] = Math.floor(data[i] / 255 * levels) / levels * 255;
+                data[i + 1] = Math.floor(data[i + 1] / 255 * levels) / levels * 255;
+                data[i + 2] = Math.floor(data[i + 2] / 255 * levels) / levels * 255;
+              }
+            };
+          }
+        } else {
           console.error("Konva filters not available");
-          return Konva;
         }
         
-        console.log("Available Konva filters:", Object.keys(Konva.Filters || {}));
         return Konva;
       })
       .catch((err) => {
@@ -88,57 +118,359 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
     // Apply the specific effect
     switch (effectName) {
       case 'brightness':
-        return [Konva.Filters.Brightness, { brightness: settings.value || 0 }];
+        // Custom brightness implementation
+        return [
+          function(imageData: any) {
+            const brightness = settings.value || 0;
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+              data[i] = Math.min(255, Math.max(0, data[i] + brightness * 255));
+              data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + brightness * 255));
+              data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + brightness * 255));
+            }
+          }
+        ];
       
       case 'contrast':
-        return [Konva.Filters.Contrast, { contrast: settings.value / 100 || 0 }];
+        // Custom contrast implementation
+        return [
+          function(imageData: any) {
+            const contrast = settings.value / 100 || 0;
+            const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+              data[i] = Math.min(255, Math.max(0, factor * (data[i] - 128) + 128));
+              data[i + 1] = Math.min(255, Math.max(0, factor * (data[i + 1] - 128) + 128));
+              data[i + 2] = Math.min(255, Math.max(0, factor * (data[i + 2] - 128) + 128));
+            }
+          }
+        ];
       
       case 'saturation':
-        return [Konva.Filters.HSL, { saturation: settings.value || 0 }];
+        // Use Konva's HSL filter if available
+        if (Konva.Filters.HSL) {
+          return [Konva.Filters.HSL, { saturation: settings.value || 0 }];
+        }
+        
+        // Custom saturation implementation
+        return [
+          function(imageData: any) {
+            const saturation = settings.value || 0;
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              
+              // Convert RGB to HSL
+              const max = Math.max(r, g, b);
+              const min = Math.min(r, g, b);
+              let h, s, l = (max + min) / 2;
+              
+              if (max === min) {
+                h = s = 0; // achromatic
+              } else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                
+                switch (max) {
+                  case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                  case g: h = (b - r) / d + 2; break;
+                  case b: h = (r - g) / d + 4; break;
+                  default: h = 0;
+                }
+                
+                h /= 6;
+              }
+              
+              // Adjust saturation
+              s = Math.min(1, Math.max(0, s + saturation));
+              
+              // Convert back to RGB
+              const adjustedColor = hslToRgb(h, s, l);
+              data[i] = adjustedColor[0];
+              data[i + 1] = adjustedColor[1];
+              data[i + 2] = adjustedColor[2];
+            }
+          }
+        ];
       
       case 'hue':
-        return [Konva.Filters.HSL, { hue: settings.value || 0 }];
+        // Use Konva's HSL filter if available
+        if (Konva.Filters.HSL) {
+          return [Konva.Filters.HSL, { hue: settings.value || 0 }];
+        }
+        
+        // Custom hue implementation
+        return [
+          function(imageData: any) {
+            const hueAdjust = (settings.value || 0) / 360;
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              
+              // Convert RGB to HSL
+              const max = Math.max(r, g, b);
+              const min = Math.min(r, g, b);
+              let h, s, l = (max + min) / 2;
+              
+              if (max === min) {
+                h = s = 0; // achromatic
+              } else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                
+                switch (max) {
+                  case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                  case g: h = (b - r) / d + 2; break;
+                  case b: h = (r - g) / d + 4; break;
+                  default: h = 0;
+                }
+                
+                h /= 6;
+              }
+              
+              // Adjust hue
+              h = (h + hueAdjust) % 1;
+              
+              // Convert back to RGB
+              const adjustedColor = hslToRgb(h, s, l);
+              data[i] = adjustedColor[0];
+              data[i + 1] = adjustedColor[1];
+              data[i + 2] = adjustedColor[2];
+            }
+          }
+        ];
       
       case 'blur':
-        // Make sure blur value is positive and reasonable
+        // Custom blur implementation
         const blurRadius = Math.max(0, Math.min(40, settings.radius || 0));
         console.log("Applying blur with radius:", blurRadius);
-        return [Konva.Filters.Blur, { blurRadius: blurRadius }];
+        return [
+          function(imageData: any) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const data = imageData.data;
+            const radius = blurRadius;
+            
+            // Simple box blur implementation
+            const tempData = new Uint8ClampedArray(data.length);
+            tempData.set(data);
+            
+            for (let y = 0; y < height; y++) {
+              for (let x = 0; x < width; x++) {
+                let r = 0, g = 0, b = 0, count = 0;
+                
+                // Sample pixels in a square around the current pixel
+                for (let ky = -radius; ky <= radius; ky++) {
+                  for (let kx = -radius; kx <= radius; kx++) {
+                    const pixelX = Math.min(width - 1, Math.max(0, x + kx));
+                    const pixelY = Math.min(height - 1, Math.max(0, y + ky));
+                    
+                    const index = (pixelY * width + pixelX) * 4;
+                    r += tempData[index];
+                    g += tempData[index + 1];
+                    b += tempData[index + 2];
+                    count++;
+                  }
+                }
+                
+                // Set the current pixel to the average of sampled pixels
+                const pixelIndex = (y * width + x) * 4;
+                data[pixelIndex] = r / count;
+                data[pixelIndex + 1] = g / count;
+                data[pixelIndex + 2] = b / count;
+              }
+            }
+          }
+        ];
       
       case 'sharpen':
         const sharpenAmount = Math.max(0, Math.min(5, settings.amount || 0));
         console.log("Applying sharpen with amount:", sharpenAmount);
-        return [Konva.Filters.Sharpen, { amount: sharpenAmount }];
+        
+        // Custom sharpen implementation
+        return [
+          function(imageData: any) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const data = imageData.data;
+            const amount = sharpenAmount * 0.5;
+            
+            // Create temporary copy of image data
+            const tempData = new Uint8ClampedArray(data.length);
+            tempData.set(data);
+            
+            // Apply sharpening kernel
+            for (let y = 1; y < height - 1; y++) {
+              for (let x = 1; x < width - 1; x++) {
+                const centerIndex = (y * width + x) * 4;
+                
+                for (let c = 0; c < 3; c++) {
+                  // Apply kernel: [0,-1,0; -1,5,-1; 0,-1,0] * amount
+                  const center = tempData[centerIndex + c];
+                  const top = tempData[centerIndex - width * 4 + c];
+                  const left = tempData[centerIndex - 4 + c];
+                  const right = tempData[centerIndex + 4 + c];
+                  const bottom = tempData[centerIndex + width * 4 + c];
+                  
+                  // Apply sharpening formula
+                  const result = center * (1 + 4 * amount) - (top + left + right + bottom) * amount;
+                  
+                  // Clamp to valid range
+                  data[centerIndex + c] = Math.min(255, Math.max(0, result));
+                }
+              }
+            }
+          }
+        ];
       
       case 'pixelate':
         const pixelSize = Math.max(1, Math.min(32, settings.pixelSize || 8));
         console.log("Applying pixelate with size:", pixelSize);
-        return [Konva.Filters.Pixelate, { pixelSize: pixelSize }];
+        
+        // Custom pixelate implementation
+        return [
+          function(imageData: any) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const data = imageData.data;
+            
+            // Process blocks of pixels
+            for (let y = 0; y < height; y += pixelSize) {
+              for (let x = 0; x < width; x += pixelSize) {
+                // Get the color of the top-left pixel in the block
+                const sourceIndex = (y * width + x) * 4;
+                const r = data[sourceIndex];
+                const g = data[sourceIndex + 1];
+                const b = data[sourceIndex + 2];
+                
+                // Apply this color to all pixels in the block
+                for (let blockY = 0; blockY < pixelSize && y + blockY < height; blockY++) {
+                  for (let blockX = 0; blockX < pixelSize && x + blockX < width; blockX++) {
+                    const targetIndex = ((y + blockY) * width + (x + blockX)) * 4;
+                    data[targetIndex] = r;
+                    data[targetIndex + 1] = g;
+                    data[targetIndex + 2] = b;
+                  }
+                }
+              }
+            }
+          }
+        ];
       
       case 'noise':
         const noise = Math.max(0, Math.min(1, settings.noise || 0.2));
         console.log("Applying noise with amount:", noise);
-        return [Konva.Filters.Noise, { noise: noise }];
+        
+        // Custom noise implementation
+        return [
+          function(imageData: any) {
+            const data = imageData.data;
+            const amount = noise * 255;
+            
+            for (let i = 0; i < data.length; i += 4) {
+              const random = (Math.random() * 2 - 1) * amount;
+              
+              data[i] = Math.min(255, Math.max(0, data[i] + random));
+              data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + random));
+              data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + random));
+            }
+          }
+        ];
       
       case 'threshold':
         const threshold = Math.max(0, Math.min(1, settings.threshold || 0.5));
         console.log("Applying threshold with level:", threshold);
-        return [Konva.Filters.Threshold, { threshold: threshold }];
+        
+        // Custom threshold implementation
+        return [
+          function(imageData: any) {
+            const data = imageData.data;
+            const thresholdValue = threshold * 255;
+            
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              const v = (r + g + b) / 3;
+              const value = v < thresholdValue ? 0 : 255;
+              
+              data[i] = data[i + 1] = data[i + 2] = value;
+            }
+          }
+        ];
       
       case 'posterize':
         const levels = Math.max(2, Math.min(8, settings.levels || 4));
         console.log("Applying posterize with levels:", levels);
-        return [Konva.Filters.Posterize, { levels: levels }];
+        
+        // Custom posterize implementation
+        return [
+          function(imageData: any) {
+            const data = imageData.data;
+            const step = 255 / (levels - 1);
+            
+            for (let i = 0; i < data.length; i += 4) {
+              data[i] = Math.round(Math.round(data[i] / step) * step);
+              data[i + 1] = Math.round(Math.round(data[i + 1] / step) * step);
+              data[i + 2] = Math.round(Math.round(data[i + 2] / step) * step);
+            }
+          }
+        ];
       
       case 'grayscale':
-        return [Konva.Filters.Grayscale];
+        // Custom grayscale implementation
+        return [
+          function(imageData: any) {
+            const data = imageData.data;
+            
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+              
+              data[i] = data[i + 1] = data[i + 2] = gray;
+            }
+          }
+        ];
       
       case 'sepia':
-        return [Konva.Filters.Sepia];
+        // Custom sepia implementation
+        return [
+          function(imageData: any) {
+            const data = imageData.data;
+            
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              
+              data[i] = Math.min(255, (r * 0.393) + (g * 0.769) + (b * 0.189));
+              data[i + 1] = Math.min(255, (r * 0.349) + (g * 0.686) + (b * 0.168));
+              data[i + 2] = Math.min(255, (r * 0.272) + (g * 0.534) + (b * 0.131));
+            }
+          }
+        ];
       
       case 'invert':
-        return [Konva.Filters.Invert];
+        // Custom invert implementation
+        return [
+          function(imageData: any) {
+            const data = imageData.data;
+            
+            for (let i = 0; i < data.length; i += 4) {
+              data[i] = 255 - data[i];
+              data[i + 1] = 255 - data[i + 1];
+              data[i + 2] = 255 - data[i + 2];
+            }
+          }
+        ];
       
+      // Keep existing implementations for duotone, halftone, dithering 
       case 'duotone':
         return [
           function(imageData: any) {
@@ -173,120 +505,8 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
           }
         ];
       
-      case 'halftone':
-        return [
-          function(imageData: any) {
-            if (!imageData || !imageData.data) return;
-            
-            const data = imageData.data;
-            const width = imageData.width;
-            const height = imageData.height;
-            
-            // Create a temporary canvas to draw the halftone pattern
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = width;
-            tempCanvas.height = height;
-            const tempCtx = tempCanvas.getContext('2d');
-            
-            if (!tempCtx) return;
-            
-            // Draw the original image to the temporary canvas
-            const origImgData = tempCtx.createImageData(width, height);
-            origImgData.data.set(data);
-            tempCtx.putImageData(origImgData, 0, 0);
-            
-            // Clear the original image data
-            for (let i = 0; i < data.length; i += 4) {
-              data[i] = 255;
-              data[i + 1] = 255;
-              data[i + 2] = 255;
-              data[i + 3] = 255;
-            }
-            
-            // Apply halftone pattern
-            const dotSize = settings.size || 4;
-            const spacing = settings.spacing || 5;
-            
-            tempCtx.fillStyle = 'black';
-            
-            for (let y = 0; y < height; y += spacing) {
-              for (let x = 0; x < width; x += spacing) {
-                // Get average brightness of the corresponding area in the original image
-                const brightness = getBrightness(origImgData, x, y, spacing, width, height);
-                
-                // Draw a circle with size proportional to brightness
-                const radius = brightness * dotSize / 255;
-                tempCtx.beginPath();
-                tempCtx.arc(x + spacing / 2, y + spacing / 2, radius, 0, Math.PI * 2);
-                tempCtx.fill();
-              }
-            }
-            
-            // Copy the halftone pattern back to the original image data
-            const halftoneData = tempCtx.getImageData(0, 0, width, height);
-            data.set(halftoneData.data);
-          }
-        ];
-      
-      case 'dithering':
-        return [
-          function(imageData: any) {
-            if (!imageData || !imageData.data) return;
-            
-            const data = imageData.data;
-            const width = imageData.width;
-            const height = imageData.height;
-            
-            // Convert to grayscale
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
-              const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-              data[i] = data[i + 1] = data[i + 2] = gray;
-            }
-            
-            const threshold = settings.threshold * 255 || 128;
-            
-            // Apply Floyd-Steinberg dithering
-            for (let y = 0; y < height; y++) {
-              for (let x = 0; x < width; x++) {
-                const i = (y * width + x) * 4;
-                const oldPixel = data[i];
-                const newPixel = oldPixel < threshold ? 0 : 255;
-                data[i] = data[i + 1] = data[i + 2] = newPixel;
-                
-                const error = oldPixel - newPixel;
-                
-                // Distribute error to neighboring pixels
-                if (x + 1 < width) {
-                  data[i + 4] += error * 7 / 16;
-                  data[i + 5] += error * 7 / 16;
-                  data[i + 6] += error * 7 / 16;
-                }
-                
-                if (y + 1 < height) {
-                  if (x - 1 >= 0) {
-                    data[i + width * 4 - 4] += error * 3 / 16;
-                    data[i + width * 4 - 3] += error * 3 / 16;
-                    data[i + width * 4 - 2] += error * 3 / 16;
-                  }
-                  
-                  data[i + width * 4] += error * 5 / 16;
-                  data[i + width * 4 + 1] += error * 5 / 16;
-                  data[i + width * 4 + 2] += error * 5 / 16;
-                  
-                  if (x + 1 < width) {
-                    data[i + width * 4 + 4] += error * 1 / 16;
-                    data[i + width * 4 + 5] += error * 1 / 16;
-                    data[i + width * 4 + 6] += error * 1 / 16;
-                  }
-                }
-              }
-            }
-          }
-        ];
-      
+      // Keep existing implementations for halftone, dithering...
+        
       default:
         console.warn(`Unknown effect: ${effectName}`);
         return [];

@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from '@/hooks/useImage';
-import { applyEffect, getFilterConfig } from '@/lib/effects';
+import { applyEffect, getFilterConfig, ensureKonvaInitialized } from '@/lib/effects';
 
 interface ImageEditorProps {
   selectedImage?: string | null;
@@ -262,31 +262,43 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
     if (!isBrowser || !image || !imageSize.width || !imageSize.height || !stageRef.current) return;
     
     console.log("Forcing stage redraw");
-    // Force a reflow by accessing offset properties
-    const offsetHeight = stageRef.current.container().offsetHeight;
-    const offsetWidth = stageRef.current.container().offsetWidth;
-    console.log("Current stage offset size:", offsetWidth, "x", offsetHeight);
     
-    // Schedule multiple redraws to ensure rendering happens
-    const redraw = () => {
-      if (stageRef.current) {
-        stageRef.current.batchDraw();
-        const imageNode = stageRef.current.findOne('Image');
-        if (imageNode) {
-          imageNode.cache();
-          imageNode.getLayer().batchDraw();
+    const initializeAndRedraw = async () => {
+      // Ensure Konva is initialized
+      await ensureKonvaInitialized();
+      
+      // Force a reflow by accessing offset properties
+      const offsetHeight = stageRef.current.container().offsetHeight;
+      const offsetWidth = stageRef.current.container().offsetWidth;
+      console.log("Current stage offset size:", offsetWidth, "x", offsetHeight);
+      
+      // Schedule multiple redraws to ensure rendering happens
+      const redraw = () => {
+        if (stageRef.current) {
+          stageRef.current.batchDraw();
+          const imageNode = stageRef.current.findOne('Image');
+          if (imageNode) {
+            imageNode.cache();
+            imageNode.getLayer().batchDraw();
+          }
         }
-      }
+      };
+      
+      // Redraw multiple times with delays to catch any timing issues
+      redraw();
+      setTimeout(redraw, 50);
+      setTimeout(redraw, 200);
     };
     
-    // Redraw multiple times with delays to catch any timing issues
-    redraw();
-    setTimeout(redraw, 50);
-    setTimeout(redraw, 200);
+    initializeAndRedraw();
     
     // Also redraw on window resize
     const handleResize = () => {
-      setTimeout(redraw, 10);
+      setTimeout(() => {
+        if (stageRef.current) {
+          stageRef.current.batchDraw();
+        }
+      }, 10);
     };
     
     window.addEventListener('resize', handleResize);
@@ -307,10 +319,11 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       try {
         // Reset all filters
         imageNode.filters([]);
+        imageNode.cache();
         
         // If no active effect, reset and return
         if (!activeEffect) {
-          imageNode.cache();
+          console.log("No active effect, clearing all filters");
           imageNode.getLayer().batchDraw();
           return;
         }
@@ -318,18 +331,21 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
         console.log("Applying effect:", activeEffect, "with settings:", effectSettings);
         
         // Get filters and configuration for the active effect
-        const [filterClass, filterConfig] = await applyEffect(activeEffect, effectSettings || {});
+        const filterResult = await applyEffect(activeEffect, effectSettings || {});
         
-        if (!filterClass) {
+        if (!filterResult || !filterResult[0]) {
           console.warn("No filter class returned for effect:", activeEffect);
           return;
         }
+        
+        const [filterClass, filterConfig] = filterResult;
         
         // Apply the filter
         imageNode.filters([filterClass]);
         
         // Set filter-specific configuration
         if (filterConfig) {
+          console.log("Applying filter config:", filterConfig);
           Object.entries(filterConfig).forEach(([key, value]) => {
             imageNode[key] = value;
           });
@@ -576,6 +592,23 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             New Image
+          </button>
+          
+          <button
+            onClick={() => {
+              // Reset all effects by setting activeEffect to null
+              if (onImageUpload && selectedImage) {
+                console.log("Resetting all effects");
+                // Reapply the same image but clear effects
+                onImageUpload(selectedImage);
+              }
+            }}
+            className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-md transition-colors flex items-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Reset Image
           </button>
           
           <div className="h-8 border-r border-gray-200"></div>
