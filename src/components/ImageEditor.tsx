@@ -295,26 +295,57 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
 
   // Apply filters to the image
   useEffect(() => {
-    if (!isBrowser || !stageRef.current || !activeEffect) return;
-
-    console.log("Applying effect:", activeEffect);
-    const imageNode = stageRef.current.findOne('Image');
-    if (imageNode) {
-      console.log("Image node found, applying filters");
-      imageNode.cache();
-      imageNode.filters(applyEffect(activeEffect, effectSettings || {}));
+    if (!isBrowser || !image || !stageRef.current) return;
+    
+    const applyFilters = async () => {
+      const imageNode = stageRef.current.findOne('Image');
+      if (!imageNode) {
+        console.error("Image node not found in Stage");
+        return;
+      }
       
-      // Apply filter configuration
-      const config = getFilterConfig(activeEffect, effectSettings || {});
-      Object.entries(config).forEach(([key, value]) => {
-        imageNode[key] = value;
-      });
-      
-      imageNode.getLayer().batchDraw();
-    } else {
-      console.warn("No image node found in stage to apply filters");
-    }
-  }, [activeEffect, effectSettings, isBrowser]);
+      try {
+        // Reset all filters
+        imageNode.filters([]);
+        
+        // If no active effect, reset and return
+        if (!activeEffect) {
+          imageNode.cache();
+          imageNode.getLayer().batchDraw();
+          return;
+        }
+        
+        console.log("Applying effect:", activeEffect, "with settings:", effectSettings);
+        
+        // Get filters and configuration for the active effect
+        const [filterClass, filterConfig] = await applyEffect(activeEffect, effectSettings || {});
+        
+        if (!filterClass) {
+          console.warn("No filter class returned for effect:", activeEffect);
+          return;
+        }
+        
+        // Apply the filter
+        imageNode.filters([filterClass]);
+        
+        // Set filter-specific configuration
+        if (filterConfig) {
+          Object.entries(filterConfig).forEach(([key, value]) => {
+            imageNode[key] = value;
+          });
+        }
+        
+        // Update the canvas
+        imageNode.cache();
+        imageNode.getLayer().batchDraw();
+        console.log(`Applied ${activeEffect} effect successfully`);
+      } catch (error) {
+        console.error("Error applying filters:", error);
+      }
+    };
+    
+    applyFilters();
+  }, [activeEffect, effectSettings, image, isBrowser]);
 
   // Export the image
   const handleExport = () => {
