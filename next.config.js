@@ -1,4 +1,16 @@
 /** @type {import('next').NextConfig} */
-module.exports = {
+const nextConfig = {
   reactStrictMode: true,
+  images: {
+    domains: [],
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+  },
+  webpack: (config) => {
+    config.externals = [...config.externals, { canvas: 'canvas' }];  // required for Konva
+    return config;
+  },
 };
+
+module.exports = nextConfig;

@@ -2,88 +2,75 @@
 
 import { useState, useEffect, useRef } from 'react';
 
-const useImage = (src: string): [HTMLImageElement | null, { status: string }] => {
+const useImage = (src: string): [HTMLImageElement | null, { status: string, error?: string }] => {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [status, setStatus] = useState<string>('loading');
+  const [status, setStatus] = useState<{ status: string, error?: string }>({ status: 'loading' });
   const [isBrowser, setIsBrowser] = useState(false);
   const imgRef = useRef<HTMLImageElement | null>(null);
 
   // Detect browser environment
   useEffect(() => {
     setIsBrowser(true);
-    console.log("useImage: Browser environment detected");
-  }, []);
-
-  // Cleanup function to prevent memory leaks
-  useEffect(() => {
-    return () => {
-      // Clean up resources when the component unmounts
-      if (imgRef.current) {
-        console.log("useImage: Cleaning up image references on unmount");
-        imgRef.current.onload = null;
-        imgRef.current.onerror = null;
-        imgRef.current = null;
-      }
-    };
   }, []);
 
   useEffect(() => {
-    // Only run this effect on the client side
     if (!isBrowser) return;
 
-    console.log(`useImage: Processing image source: ${src ? 'Source provided' : 'No source'}`);
-
+    // Reset state if src is empty
     if (!src) {
-      console.log("useImage: No source provided, setting status to idle");
       setImage(null);
-      setStatus('idle');
+      setStatus({ status: 'idle' });
       return;
     }
 
-    // First set loading state
-    setStatus('loading');
+    // Set loading state
+    setStatus({ status: 'loading' });
     
     // Create a new image instance
     const img = new Image();
     imgRef.current = img;
     
-    // Setup event handlers
     const onLoad = () => {
-      console.log(`useImage: Image loaded successfully - dimensions: ${img.width}x${img.height}`);
+      console.log(`Image loaded successfully: ${img.width}x${img.height}`);
       setImage(img);
-      setStatus('loaded');
+      setStatus({ status: 'loaded' });
     };
     
-    const onError = () => {
-      console.error("useImage: Failed to load image:", src.substring(0, 100) + (src.length > 100 ? '...' : ''));
+    const onError = (e: ErrorEvent) => {
+      console.error("Failed to load image:", e.message);
       setImage(null);
-      setStatus('error');
+      setStatus({ 
+        status: 'error',
+        error: e.message || 'Failed to load image' 
+      });
     };
     
     img.addEventListener('load', onLoad);
     img.addEventListener('error', onError);
     
-    // Assign src after setting up event handlers
-    img.src = src;
-    
-    // If image is already cached, it might trigger the onload event before we can attach the listener
-    if (img.complete) {
-      console.log("useImage: Image already in cache, triggering load event manually");
-      onLoad();
+    // Set the source
+    try {
+      img.src = src;
+      
+      // Handle already cached images
+      if (img.complete) {
+        onLoad();
+      }
+    } catch (err) {
+      onError(err as ErrorEvent);
     }
     
-    // Clean up function
     return () => {
-      console.log("useImage: Cleaning up event listeners for previous image");
       img.removeEventListener('load', onLoad);
       img.removeEventListener('error', onError);
-      
-      // Cancel any pending image loads by nullifying src
-      img.src = '';
+      if (imgRef.current) {
+        imgRef.current.src = '';
+        imgRef.current = null;
+      }
     };
   }, [src, isBrowser]);
 
-  return [image, { status }];
+  return [image, status];
 };
 
 export default useImage; 

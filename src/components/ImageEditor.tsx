@@ -44,25 +44,18 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   // Debug effect to log state changes
   useEffect(() => {
     if (isBrowser) {
-      console.log("Current state:", { 
-        selectedImage: selectedImage ? "Image data available" : "No image",
-        imageStatus: imageStatus.status,
+      console.log("ImageEditor state:", { 
+        selectedImage: selectedImage ? `${selectedImage.substring(0, 50)}...` : "No image",
+        imageStatus: imageStatus,
         imageLoaded: !!image,
-        stageSize,
         imageSize,
-      });
-      setDebugInfo({
-        selectedImage: selectedImage ? "Image data available" : "No image",
-        imageStatus: imageStatus.status,
-        imageLoaded: !!image,
         stageSize,
-        imageSize,
       });
     }
-  }, [selectedImage, image, imageStatus, stageSize, imageSize, isBrowser]);
+  }, [selectedImage, image, imageStatus, imageSize, stageSize, isBrowser]);
 
   // Handle file upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setError(null);
     
@@ -79,37 +72,40 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       
       setIsLoading(true);
       
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const imageData = event.target.result as string;
-          console.log("Image loaded successfully, data length:", imageData.length);
-          
-          // Validate that the image can be loaded before passing it up
-          const testImage = new Image();
-          testImage.onload = () => {
-            console.log("Test image loaded successfully with dimensions:", testImage.width, "x", testImage.height);
-            onImageUpload?.(imageData);
-            setIsLoading(false);
+      try {
+        const imageDataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (event.target?.result) {
+              resolve(event.target.result as string);
+            } else {
+              reject(new Error('Failed to read file'));
+            }
           };
-          
-          testImage.onerror = () => {
-            console.error("Failed to load test image");
-            setError('The selected file is not a valid image. Please try another file.');
-            setIsLoading(false);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+
+        console.log("Image loaded as data URL, length:", imageDataUrl.length);
+        
+        // Pre-load the image to verify it works
+        await new Promise<void>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            console.log("Test image loaded successfully:", img.width, "x", img.height);
+            resolve();
           };
-          
-          testImage.src = imageData;
-        }
-      };
-      
-      reader.onerror = () => {
-        console.error("FileReader error:", reader.error);
-        setError('Error reading file. Please try again.');
+          img.onerror = () => reject(new Error('Failed to load image'));
+          img.src = imageDataUrl;
+        });
+
+        onImageUpload?.(imageDataUrl);
+      } catch (err) {
+        console.error("Error processing image:", err);
+        setError(err instanceof Error ? err.message : 'Failed to process image');
+      } finally {
         setIsLoading(false);
-      };
-      
-      reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -194,25 +190,53 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
 
     const updateSize = () => {
       if (containerRef.current) {
-        const { clientWidth, clientHeight } = containerRef.current;
-        console.log("Container size updated:", clientWidth, "x", clientHeight);
-        setStageSize({
-          width: clientWidth,
-          height: clientHeight,
-        });
+        // Force a reflow by accessing offsetWidth/Height
+        const offsetWidth = containerRef.current.offsetWidth;
+        const offsetHeight = containerRef.current.offsetHeight;
+        
+        // Ensure we have valid dimensions
+        console.log("Container actual size:", offsetWidth, "x", offsetHeight);
+        
+        if (offsetWidth > 0 && offsetHeight > 0) {
+          setStageSize({
+            width: offsetWidth,
+            height: offsetHeight,
+          });
+        } else {
+          // Set minimum fallback dimensions
+          console.warn("Container has zero dimensions, using fallback");
+          setStageSize({
+            width: 800,
+            height: 600,
+          });
+          
+          // Attempt to recalculate after a delay
+          setTimeout(updateSize, 100);
+        }
       }
     };
 
+    // Initial update
     updateSize();
+    
+    // Update on resize
     window.addEventListener('resize', updateSize);
+    
+    // Also set a timer to repeatedly check for a while
+    // This helps catch late container size changes
+    const sizeCheckIntervals = [50, 100, 300, 500, 1000];
+    sizeCheckIntervals.forEach(delay => {
+      setTimeout(updateSize, delay);
+    });
+    
     return () => window.removeEventListener('resize', updateSize);
   }, [isBrowser]);
 
-  // Update image size when image loads
+  // Update image size when image loads or stage size changes
   useEffect(() => {
-    if (!isBrowser || !image) return;
+    if (!isBrowser || !image || !stageSize.width || !stageSize.height) return;
 
-    console.log("Image loaded with dimensions:", image.width, "x", image.height);
+    console.log("Calculating image size for stage:", stageSize);
     const aspectRatio = image.width / image.height;
     let newWidth, newHeight;
 
@@ -226,12 +250,48 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       newHeight = newWidth / aspectRatio;
     }
 
-    console.log("Image size calculated:", newWidth, "x", newHeight);
+    console.log("Setting image size to:", newWidth, "x", newHeight);
     setImageSize({
-      width: newWidth,
-      height: newHeight,
+      width: Math.round(newWidth),
+      height: Math.round(newHeight),
     });
   }, [image, stageSize, isBrowser]);
+
+  // Force a reflow and redraw after the image is loaded and sized
+  useEffect(() => {
+    if (!isBrowser || !image || !imageSize.width || !imageSize.height || !stageRef.current) return;
+    
+    console.log("Forcing stage redraw");
+    // Force a reflow by accessing offset properties
+    const offsetHeight = stageRef.current.container().offsetHeight;
+    const offsetWidth = stageRef.current.container().offsetWidth;
+    console.log("Current stage offset size:", offsetWidth, "x", offsetHeight);
+    
+    // Schedule multiple redraws to ensure rendering happens
+    const redraw = () => {
+      if (stageRef.current) {
+        stageRef.current.batchDraw();
+        const imageNode = stageRef.current.findOne('Image');
+        if (imageNode) {
+          imageNode.cache();
+          imageNode.getLayer().batchDraw();
+        }
+      }
+    };
+    
+    // Redraw multiple times with delays to catch any timing issues
+    redraw();
+    setTimeout(redraw, 50);
+    setTimeout(redraw, 200);
+    
+    // Also redraw on window resize
+    const handleResize = () => {
+      setTimeout(redraw, 10);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [image, imageSize, isBrowser]);
 
   // Apply filters to the image
   useEffect(() => {
@@ -378,7 +438,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   }
 
   // Show a loading state while image is loading
-  if (imageStatus.status === 'loading' || !image) {
+  if ((typeof imageStatus === 'object' && imageStatus.status === 'loading') || !image) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center">
         <div className="animate-spin rounded-full h-10 w-10 border-2 border-t-emerald-500 border-gray-200 mb-4"></div>
@@ -389,12 +449,17 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
         >
           Force Reload
         </button>
+        {typeof imageStatus === 'object' && imageStatus.error && (
+          <div className="mt-3 text-red-500 text-xs max-w-md text-center">
+            Error: {imageStatus.error}
+          </div>
+        )}
       </div>
     );
   }
 
   // Show error state if image failed to load
-  if (imageStatus.status === 'error') {
+  if (typeof imageStatus === 'object' && imageStatus.status === 'error') {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center p-6">
         <div className="bg-red-50 p-6 rounded-lg text-center max-w-md">
@@ -402,7 +467,9 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <h3 className="text-lg font-medium text-red-800 mb-2">Failed to load image</h3>
-          <p className="text-sm text-red-600 mb-4">There was a problem loading the selected image. Please try a different image.</p>
+          <p className="text-sm text-red-600 mb-4">
+            {imageStatus.error || "There was a problem loading the selected image."}
+          </p>
           <button
             onClick={handleUploadClick}
             className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition-colors"
@@ -417,7 +484,12 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   return (
     <div 
       ref={containerRef} 
-      className="h-full relative"
+      className="h-full relative w-full flex items-center justify-center"
+      style={{ 
+        minHeight: '400px',
+        visibility: 'visible',
+        display: 'block'
+      }}
     >
       {isLoading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white bg-opacity-80">
@@ -433,19 +505,30 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
         width={stageSize.width}
         height={stageSize.height}
         className="bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+CjxyZWN0IHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YxZjFmMSI+PC9yZWN0Pgo8cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YxZjFmMSI+PC9yZWN0Pgo8cmVjdCB4PSIxMCIgeT0iMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjZmZmZmZmIj48L3JlY3Q+CjxyZWN0IHg9IjAiIHk9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiNmZmZmZmYiPjwvcmVjdD4KPC9zdmc+')]"
+        style={{
+          display: 'block',
+          width: `${stageSize.width}px`,
+          height: `${stageSize.height}px`,
+          position: 'relative',
+          zIndex: 1,
+          visibility: 'visible'
+        }}
       >
         <Layer>
           {image && (
             <KonvaImage
               image={image}
-              width={imageSize.width}
-              height={imageSize.height}
-              x={(stageSize.width - imageSize.width) / 2}
-              y={(stageSize.height - imageSize.height) / 2}
+              width={imageSize.width || 100}
+              height={imageSize.height || 100}
+              x={(stageSize.width - (imageSize.width || 0)) / 2}
+              y={(stageSize.height - (imageSize.height || 0)) / 2}
               shadowColor="rgba(0,0,0,0.2)"
               shadowBlur={20}
               shadowOffset={{ x: 0, y: 2 }}
               shadowOpacity={0.5}
+              listening={true}
+              perfectDrawEnabled={true}
+              transformsEnabled="all"
             />
           )}
         </Layer>
