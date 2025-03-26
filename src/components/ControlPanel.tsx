@@ -6,7 +6,7 @@ import { effectsConfig } from '@/lib/effects';
 interface ControlPanelProps {
   activeEffect?: string | null;
   effectSettings?: Record<string, number>;
-  onEffectChange?: (effectName: string) => void;
+  onEffectChange?: (effectName: string | null) => void;
   onSettingChange?: (settingName: string, value: number) => void;
   hasImage?: boolean;
 }

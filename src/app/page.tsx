@@ -67,7 +67,7 @@ export default function Home() {
     testImage.src = imageDataUrl;
   };
 
-  const handleEffectChange = (effectName: string) => {
+  const handleEffectChange = (effectName: string | null) => {
     console.log("Effect changed to:", effectName);
     setActiveEffect(effectName);
   };
