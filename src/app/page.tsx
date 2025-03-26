@@ -17,6 +17,8 @@ export default function Home() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [activeEffect, setActiveEffect] = useState<string | null>(null);
   const [effectSettings, setEffectSettings] = useState<Record<string, number>>({});
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   // Add debugging on component mount
   useEffect(() => {
@@ -24,11 +26,39 @@ export default function Home() {
   }, []);
 
   const handleImageUpload = (imageDataUrl: string) => {
+    // Reset error state
+    setImageError(null);
+    setImageLoading(true);
+    
     console.log("handleImageUpload called with data length:", imageDataUrl.length);
     // Debug the data format
     console.log("Image data format:", imageDataUrl.substring(0, 50) + "...");
+
+    // Validate the image data
+    if (!imageDataUrl.startsWith('data:image/')) {
+      console.error("Invalid image data format:", imageDataUrl.substring(0, 50));
+      setImageError("Invalid image data format");
+      setImageLoading(false);
+      return;
+    }
     
-    setSelectedImage(imageDataUrl);
+    // Test load the image first
+    const testImage = new Image();
+    testImage.onload = () => {
+      console.log("Test image loaded successfully in Home component, setting selectedImage");
+      console.log("Dimensions:", testImage.width, "x", testImage.height);
+      setSelectedImage(imageDataUrl);
+      setImageLoading(false);
+    };
+    
+    testImage.onerror = (error) => {
+      console.error("Failed to load test image in Home component:", error);
+      setImageError("Failed to load image. Please try another file.");
+      setImageLoading(false);
+    };
+    
+    // Set the source to trigger loading
+    testImage.src = imageDataUrl;
   };
 
   const handleEffectChange = (effectName: string) => {
@@ -77,6 +107,19 @@ export default function Home() {
         {/* Main editor area */}
         <div className="flex-1 p-6 bg-gray-50 overflow-hidden">
           <div className="w-full h-full bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            {imageLoading && (
+              <div className="absolute inset-0 z-20 bg-white bg-opacity-80 flex items-center justify-center">
+                <div className="flex flex-col items-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-t-emerald-500 border-gray-200 mb-2"></div>
+                  <span className="text-gray-600">Processing image...</span>
+                </div>
+              </div>
+            )}
+            {imageError && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 bg-red-50 text-red-700 px-4 py-3 rounded-md shadow-md text-sm">
+                {imageError}
+              </div>
+            )}
             <ImageEditor 
               selectedImage={selectedImage}
               activeEffect={activeEffect}

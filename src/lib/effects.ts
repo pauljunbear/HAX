@@ -238,52 +238,89 @@ export const effectsConfig: Record<string, any> = {
 };
 
 // Initialize Konva only in the browser
-if (typeof window !== 'undefined') {
-  // We're in the browser, so it's safe to import Konva
-  import('konva').then((module) => {
-    Konva = module.default;
-  });
-}
+let konvaInitialized = false;
+let konvaInitPromise: Promise<any> | null = null;
+
+const initKonva = async () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  
+  if (konvaInitialized && Konva) {
+    return Konva;
+  }
+  
+  if (!konvaInitPromise) {
+    console.log("Starting Konva initialization");
+    konvaInitPromise = import('konva')
+      .then((module) => {
+        Konva = module.default;
+        konvaInitialized = true;
+        console.log("Konva initialization complete");
+        return Konva;
+      })
+      .catch((err) => {
+        console.error("Error initializing Konva:", err);
+        throw err;
+      });
+  }
+  
+  return konvaInitPromise;
+};
 
 // Apply the selected effect
 export const applyEffect = (effectName: string | null, settings: Record<string, number>) => {
-  if (!effectName || typeof window === 'undefined' || !Konva) {
+  if (!effectName || typeof window === 'undefined') {
+    console.log("Cannot apply effect: No effect name or not in browser");
     return [];
   }
-
-  // Rest of your applyEffect function
-  switch (effectName) {
-    case 'brightness':
-      return [Konva.Filters.Brighten];
-    case 'contrast':
-      return [Konva.Filters.Contrast];
-    case 'blur':
-      return [Konva.Filters.Blur];
-    case 'sharpen':
-      return [Konva.Filters.Sharpen];
-    case 'pixelate':
-      return [Konva.Filters.Pixelate];
-    case 'noise':
-      return [Konva.Filters.Noise];
-    case 'threshold':
-      return [Konva.Filters.Threshold];
-    case 'grayscale':
-      return [Konva.Filters.Grayscale];
-    case 'sepia':
-      return [Konva.Filters.Sepia];
-    case 'invert':
-      return [Konva.Filters.Invert];
-    // Custom filter implementations
-    case 'duotone':
-    case 'posterize':
-    case 'dithering':
-    case 'halftone':
-      return [customFilter];
-    case 'hue':
-    case 'saturation':
-      return [Konva.Filters.HSL];
-    default:
-      return [];
+  
+  if (!Konva) {
+    console.warn("Konva not initialized yet, initializing now");
+    initKonva().catch(err => console.error("Failed to initialize Konva:", err));
+    return [];
+  }
+  
+  console.log(`Applying effect: ${effectName} with settings:`, settings);
+  
+  try {
+    // Rest of your applyEffect function
+    switch (effectName) {
+      case 'brightness':
+        return [Konva.Filters.Brighten];
+      case 'contrast':
+        return [Konva.Filters.Contrast];
+      case 'blur':
+        return [Konva.Filters.Blur];
+      case 'sharpen':
+        return [Konva.Filters.Sharpen];
+      case 'pixelate':
+        return [Konva.Filters.Pixelate];
+      case 'noise':
+        return [Konva.Filters.Noise];
+      case 'threshold':
+        return [Konva.Filters.Threshold];
+      case 'grayscale':
+        return [Konva.Filters.Grayscale];
+      case 'sepia':
+        return [Konva.Filters.Sepia];
+      case 'invert':
+        return [Konva.Filters.Invert];
+      // Custom filter implementations
+      case 'duotone':
+      case 'posterize':
+      case 'dithering':
+      case 'halftone':
+        return [customFilter];
+      case 'hue':
+      case 'saturation':
+        return [Konva.Filters.HSL];
+      default:
+        return [];
+    }
+  } catch (error) {
+    console.error("Error applying effect:", error);
+    return [];
   }
 };
 
@@ -502,4 +539,13 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   }
 
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-} 
+}
+
+// Initialize Konva when in browser environment
+if (typeof window !== 'undefined') {
+  console.log("Browser environment detected, initializing Konva");
+  initKonva().catch(err => console.error("Failed to initialize Konva on module load:", err));
+}
+
+// Export helper for explicit initialization
+export const ensureKonvaInitialized = initKonva; 
