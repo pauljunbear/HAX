@@ -34,6 +34,12 @@ export default function Home() {
     // Debug the data format
     console.log("Image data format:", imageDataUrl.substring(0, 50) + "...");
 
+    // Reset active effect when a new image is uploaded
+    if (activeEffect) {
+      setActiveEffect(null);
+      setEffectSettings({});
+    }
+
     // Validate the image data
     if (!imageDataUrl.startsWith('data:image/')) {
       console.error("Invalid image data format:", imageDataUrl.substring(0, 50));

@@ -129,10 +129,39 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       {activeEffect && (
         <div className="p-5">
           <button
-            onClick={() => onEffectChange?.(activeEffect)}
+            onClick={() => {
+              console.log("Resetting effect:", activeEffect);
+              // Reset the settings to defaults before triggering effect change
+              const defaultSettings: Record<string, number> = {};
+              if (effectsConfig[activeEffect]?.settings) {
+                Object.entries(effectsConfig[activeEffect].settings).forEach(([key, setting]) => {
+                  defaultSettings[key] = (setting as any).default;
+                });
+              }
+              
+              // First reset settings to default values
+              Object.entries(defaultSettings).forEach(([key, value]) => {
+                onSettingChange?.(key, value);
+              });
+              
+              // Then re-apply the effect with default settings
+              setTimeout(() => {
+                onEffectChange?.(activeEffect);
+              }, 50);
+            }}
             className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-md transition-colors"
           >
             Reset Settings
+          </button>
+          
+          <button
+            onClick={() => {
+              console.log("Clearing effect completely");
+              onEffectChange?.(null);
+            }}
+            className="w-full mt-2 py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-md transition-colors"
+          >
+            Clear Effect
           </button>
         </div>
       )}
