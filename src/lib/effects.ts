@@ -16,6 +16,13 @@ interface EffectConfig {
   settings?: Record<string, EffectSetting>;
 }
 
+// Define interface for image data
+interface KonvaImageData {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+
 // Use a dynamic import approach for Konva to avoid SSR issues
 // Import Konva only in browser environment
 let Konva: any = null;
@@ -48,7 +55,7 @@ const initKonva = async () => {
           // Register any custom filters if needed
           if (!Konva.Filters.Threshold) {
             console.warn("Threshold filter not available, implementing custom version");
-            Konva.Filters.Threshold = function(imageData) {
+            Konva.Filters.Threshold = function(imageData: ImageData) {
               const threshold = this.threshold || 0.5;
               const data = imageData.data;
               for (let i = 0; i < data.length; i += 4) {
@@ -64,7 +71,7 @@ const initKonva = async () => {
           
           if (!Konva.Filters.Posterize) {
             console.warn("Posterize filter not available, implementing custom version");
-            Konva.Filters.Posterize = function(imageData) {
+            Konva.Filters.Posterize = function(imageData: ImageData) {
               const levels = this.levels || 4;
               const data = imageData.data;
               for (let i = 0; i < data.length; i += 4) {
@@ -120,7 +127,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
       case 'brightness':
         // Custom brightness implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const brightness = settings.value || 0;
             const data = imageData.data;
             for (let i = 0; i < data.length; i += 4) {
@@ -134,7 +141,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
       case 'contrast':
         // Custom contrast implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const contrast = settings.value / 100 || 0;
             const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
             const data = imageData.data;
@@ -154,7 +161,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
         
         // Custom saturation implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const saturation = settings.value || 0;
             const data = imageData.data;
             for (let i = 0; i < data.length; i += 4) {
@@ -203,7 +210,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
         
         // Custom hue implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const hueAdjust = (settings.value || 0) / 360;
             const data = imageData.data;
             for (let i = 0; i < data.length; i += 4) {
@@ -249,7 +256,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
         const blurRadius = Math.max(0, Math.min(40, settings.radius || 0));
         console.log("Applying blur with radius:", blurRadius);
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const width = imageData.width;
             const height = imageData.height;
             const data = imageData.data;
@@ -293,7 +300,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
         
         // Custom sharpen implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const width = imageData.width;
             const height = imageData.height;
             const data = imageData.data;
@@ -333,7 +340,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
         
         // Custom pixelate implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const width = imageData.width;
             const height = imageData.height;
             const data = imageData.data;
@@ -367,7 +374,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
         
         // Custom noise implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const data = imageData.data;
             const amount = noise * 255;
             
@@ -387,7 +394,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
         
         // Custom threshold implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const data = imageData.data;
             const thresholdValue = threshold * 255;
             
@@ -409,7 +416,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
         
         // Custom posterize implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const data = imageData.data;
             const step = 255 / (levels - 1);
             
@@ -424,7 +431,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
       case 'grayscale':
         // Custom grayscale implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const data = imageData.data;
             
             for (let i = 0; i < data.length; i += 4) {
@@ -441,7 +448,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
       case 'sepia':
         // Custom sepia implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const data = imageData.data;
             
             for (let i = 0; i < data.length; i += 4) {
@@ -459,7 +466,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
       case 'invert':
         // Custom invert implementation
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             const data = imageData.data;
             
             for (let i = 0; i < data.length; i += 4) {
@@ -473,7 +480,7 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
       // Keep existing implementations for duotone, halftone, dithering 
       case 'duotone':
         return [
-          function(imageData: any) {
+          function(imageData: KonvaImageData) {
             if (!imageData || !imageData.data) return;
             
             const data = imageData.data;

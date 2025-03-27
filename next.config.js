@@ -15,6 +15,11 @@ const nextConfig = {
     // Temporarily ignore TypeScript errors during build
     ignoreBuildErrors: true,
   },
+  experimental: {
+    // Explicitly tell Next.js to use the src directory
+    appDir: true,
+  },
+  distDir: '.next',
 };
 
 module.exports = nextConfig;

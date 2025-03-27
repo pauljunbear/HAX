@@ -186,51 +186,48 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
 
   // Update stage size based on container size
   useEffect(() => {
-    if (!isBrowser) return;
-
     const updateSize = () => {
       if (containerRef.current) {
-        // Force a reflow by accessing offsetWidth/Height
-        const offsetWidth = containerRef.current.offsetWidth;
-        const offsetHeight = containerRef.current.offsetHeight;
-        
-        // Ensure we have valid dimensions
-        console.log("Container actual size:", offsetWidth, "x", offsetHeight);
-        
-        if (offsetWidth > 0 && offsetHeight > 0) {
-          setStageSize({
-            width: offsetWidth,
-            height: offsetHeight,
-          });
-        } else {
-          // Set minimum fallback dimensions
-          console.warn("Container has zero dimensions, using fallback");
-          setStageSize({
-            width: 800,
-            height: 600,
-          });
-          
-          // Attempt to recalculate after a delay
-          setTimeout(updateSize, 100);
-        }
+        const { clientWidth, clientHeight } = containerRef.current;
+        console.log("Container size update:", clientWidth, "x", clientHeight);
+        setStageSize({
+          width: clientWidth,
+          height: clientHeight,
+        });
       }
     };
 
     // Initial update
     updateSize();
     
-    // Update on resize
-    window.addEventListener('resize', updateSize);
+    // Add resize event with throttling
+    let resizeTimeout: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        updateSize();
+      }, 100); // Throttle to avoid excessive updates
+    };
     
-    // Also set a timer to repeatedly check for a while
-    // This helps catch late container size changes
-    const sizeCheckIntervals = [50, 100, 300, 500, 1000];
-    sizeCheckIntervals.forEach(delay => {
-      setTimeout(updateSize, delay);
-    });
+    window.addEventListener('resize', handleResize);
     
-    return () => window.removeEventListener('resize', updateSize);
-  }, [isBrowser]);
+    // Force a redraw after a small delay to ensure images show properly
+    const redrawTimeout = setTimeout(() => {
+      updateSize();
+      if (stageRef.current) {
+        const layer = stageRef.current.findOne('Layer');
+        if (layer) {
+          layer.batchDraw();
+        }
+      }
+    }, 500);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+      clearTimeout(redrawTimeout);
+    };
+  }, []);
 
   // Update image size when image loads or stage size changes
   useEffect(() => {
@@ -255,6 +252,16 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       width: Math.round(newWidth),
       height: Math.round(newHeight),
     });
+    
+    // Force stage redraw to ensure image displays correctly
+    setTimeout(() => {
+      if (stageRef.current) {
+        const layer = stageRef.current.findOne('Layer');
+        if (layer) {
+          layer.batchDraw();
+        }
+      }
+    }, 50);
   }, [image, stageSize, isBrowser]);
 
   // Force a reflow and redraw after the image is loaded and sized
