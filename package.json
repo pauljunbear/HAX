@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "clean": "rm -rf .next && rm -rf node_modules/.cache",
+    "fix-dirs": "mkdir -p app app/api && cp -n src/app/layout.tsx app/layout.js 2>/dev/null || true && cp -n src/app/page.tsx app/page.js 2>/dev/null || true",
+    "fix": "node scripts/fix-common-issues.js"
   },
   "keywords": [
     "image",

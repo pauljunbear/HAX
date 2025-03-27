@@ -1,78 +1,104 @@
-# Imager2 - Web-Based Image Editor
+# Imager
 
-Imager2 is a powerful, browser-based image editing tool that allows users to apply creative effects and filters to their images in real-time. Built with React, Next.js, and modern web technologies, it provides a smooth and intuitive editing experience directly in the browser.
+A modern web-based image editing application built with Next.js, React, and Tailwind CSS. Imager provides real-time artistic effects and filters for your images.
 
 ## Features
 
-- **Easy Image Upload:** Drag & drop or select high-resolution images up to 10MB
-- **Real-time Effects Preview:** Instantly see how effects look as you adjust parameters
-- **Wide Range of Effects:**
-  - Basic adjustments (brightness, contrast, saturation, hue)
-  - Filters (grayscale, sepia, invert)
-  - Color effects (duotone)
-  - Blur & sharpen
-  - Artistic effects (halftone, dithering, posterize)
-  - Distortion effects (pixelate, noise)
-- **Export Options:** Download your edited images in PNG or JPEG format with quality control
-- **Responsive Design:** Works on desktop and mobile devices
-
-## Tech Stack
-
-- **Frontend:** React, Next.js, TypeScript
-- **Styling:** Tailwind CSS
-- **Image Processing:** 
-  - Konva.js and React Konva for canvas manipulation
-  - Custom pixel manipulation algorithms
-- **Deployment:** Vercel
+- **Modern UI**: Clean, intuitive interface with a left sidebar for controls and main canvas area
+- **Image Upload**: Easily upload images to edit
+- **Real-time Effects**: Apply various effects to your images including:
+  - Brightness, contrast, and saturation adjustments
+  - Duotone effects
+  - Dithering and halftone processing
+  - Blur, sharpen, and pixelate filters
+  - Noise and texture generators
+- **Export**: Download your edited images
 
 ## Getting Started
 
-### Live Demo
+### Prerequisites
 
-Visit [https://imager2.vercel.app](https://imager2.vercel.app) to use the application.
+- Node.js 16.x or higher
+- npm or yarn
 
-### Local Development
+### Installation
 
 1. Clone the repository:
-   ```
-   git clone https://github.com/pauljunbear/imager2.git
-   cd imager2
-   ```
+```
+git clone https://github.com/yourusername/imager.git
+cd imager
+```
 
 2. Install dependencies:
-   ```
-   npm install --legacy-peer-deps
-   ```
+```
+npm install
+# or
+yarn install
+```
 
 3. Start the development server:
-   ```
-   npm run dev
-   ```
+```
+npm run dev
+# or
+yarn dev
+```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-## How to Use
+## Troubleshooting
 
-1. **Upload an Image:** Click the "Upload Image" button or drag and drop a file
-2. **Select an Effect:** Choose from the effects tabs and click on an effect to apply it
-3. **Adjust Settings:** Use the sliders to customize the effect parameters
-4. **Export:** Select your desired format and quality, then click "Export Image"
+### Images Not Displaying
 
-## Future Enhancements
+If uploaded images aren't displaying in the editor:
 
-- User-saved custom presets
-- Layered effects
-- Undo/redo functionality
-- Social media sharing
-- Advanced 3D effects
+1. Check your browser console for any errors
+2. Try resizing your browser window which can trigger a redraw
+3. Ensure the image is a valid format (JPG, PNG) and under 10MB
+
+### Build Errors
+
+If you encounter build errors:
+
+1. Make sure you have the correct Node.js version installed
+2. Clear Next.js cache with `npm run clean` or `rm -rf .next`
+3. Reinstall dependencies with `npm install`
+
+### Directory Structure Issues
+
+If you see errors about missing directories or routing problems:
+
+1. Ensure that both `/app` and `/src/app` directories exist
+2. Check that all routes are properly set up
+3. Make sure `next.config.js` has the experimental `appDir` option enabled
+
+## Project Structure
+
+```
+imager/
+├── app/               # Next.js App Router core (root routes)
+├── src/
+│   ├── app/           # Main application code 
+│   ├── components/    # React components
+│   ├── hooks/         # Custom React hooks
+│   ├── lib/           # Utilities and helper functions
+│   └── styles/        # CSS styles
+├── public/            # Static assets
+└── ...                # Config files
+```
+
+## Technologies Used
+
+- **Next.js**: React framework for production
+- **React**: UI library
+- **Konva.js**: Canvas manipulation
+- **Tailwind CSS**: Utility-first CSS framework
 
 ## License
 
-ISC
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Acknowledgements
+## Acknowledgments
 
-- [Next.js](https://nextjs.org/)
-- [React Konva](https://konvajs.org/docs/react/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Vercel](https://vercel.com/)
+- Built with [Next.js](https://nextjs.org/)
+- UI styled with [Tailwind CSS](https://tailwindcss.com/)
+- Canvas powered by [Konva.js](https://konvajs.org/)

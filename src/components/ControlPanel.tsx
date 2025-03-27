@@ -64,18 +64,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   return (
     <div className="h-full overflow-y-auto">
       <div className="p-5 border-b border-gray-100">
-        <h2 className="text-lg font-medium text-gray-800 mb-4">Effects</h2>
+        <h2 className="text-lg font-medium text-gray-800 mb-5">Effects</h2>
         
-        {/* Category tabs */}
-        <div className="flex flex-wrap gap-1.5 mb-6">
+        {/* Primary Category tabs */}
+        <div className="flex flex-wrap bg-gray-100 p-1 rounded-lg mb-6">
           {categories.map(category => (
             <button
               key={category}
               onClick={() => setActiveCategory(category)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
                 activeCategory === category
-                  ? 'bg-gray-800 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-white text-gray-800 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
               }`}
             >
               {category}
@@ -89,7 +89,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <button
               key={effect.id}
               onClick={() => onEffectChange?.(effect.id)}
-              className={`px-4 py-2.5 text-sm rounded-md transition-all ${
+              className={`px-4 py-3 text-sm rounded-lg transition-all ${
                 activeEffect === effect.id
                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium shadow-sm'
                   : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
@@ -104,10 +104,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       {/* Settings sliders */}
       {activeEffect && currentEffectSettings.length > 0 && (
         <div className="p-5 border-b border-gray-100">
-          <h3 className="text-sm font-medium text-gray-700 mb-4">Adjust Settings</h3>
+          <h3 className="text-sm font-medium text-gray-700 mb-5">Adjust Settings</h3>
           {currentEffectSettings.map(setting => (
             <div key={setting.id} className="mb-5">
-              <div className="flex justify-between mb-1.5">
+              <div className="flex justify-between mb-2">
                 <label className="text-xs text-gray-600 font-medium">{setting.label}</label>
                 <span className="text-xs text-gray-500 font-mono">{setting.currentValue.toFixed(2)}</span>
               </div>
@@ -118,16 +118,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 step={setting.step}
                 value={setting.currentValue}
                 onChange={e => onSettingChange?.(setting.id, parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
               />
             </div>
           ))}
         </div>
       )}
       
-      {/* Reset button */}
+      {/* Action buttons */}
       {activeEffect && (
-        <div className="p-5">
+        <div className="p-5 space-y-3">
           <button
             onClick={() => {
               console.log("Resetting effect:", activeEffect);
@@ -149,9 +149,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 onEffectChange?.(activeEffect);
               }, 50);
             }}
-            className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-md transition-colors"
+            className="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors flex items-center justify-center"
           >
-            Reset Settings
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Reset to Defaults
           </button>
           
           <button
@@ -159,9 +162,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               console.log("Clearing effect completely");
               onEffectChange?.(null);
             }}
-            className="w-full mt-2 py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-md transition-colors"
+            className="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors flex items-center justify-center"
           >
-            Clear Effect
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Remove Effect
           </button>
         </div>
       )}
