@@ -1,7 +1,24 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { effectsConfig } from '@/lib/effects';
+
+// Debounce helper function
+const useDebounce = (value: any, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+  
+  return debouncedValue;
+};
 
 interface ControlPanelProps {
   activeEffect?: string | null;
@@ -19,6 +36,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   hasImage = false,
 }) => {
   const [activeCategory, setActiveCategory] = useState<string | null>('Basic');
+  const [localSliderValues, setLocalSliderValues] = useState<Record<string, number>>({});
+  
+  // Reset local slider values when active effect changes
+  useEffect(() => {
+    setLocalSliderValues({});
+  }, [activeEffect]);
   
   // Get unique categories from effects without using Set
   const allCategories = Object.values(effectsConfig).map(effect => effect.category);
@@ -44,6 +67,32 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           : (setting as any).default,
       }))
     : [];
+  
+  // Handle slider change with debouncing for high-computation effects
+  const handleSliderChange = (settingId: string, value: number) => {
+    setLocalSliderValues(prev => ({
+      ...prev,
+      [settingId]: value
+    }));
+    
+    // Apply immediately for most effects
+    if (activeEffect !== 'blur') {
+      onSettingChange?.(settingId, value);
+    }
+  };
+  
+  // Process debounced blur effect changes
+  const debouncedBlurValue = useDebounce(
+    activeEffect === 'blur' && localSliderValues.radius !== undefined ? localSliderValues.radius : null, 
+    200
+  );
+  
+  // Apply debounced blur effect
+  useEffect(() => {
+    if (activeEffect === 'blur' && debouncedBlurValue !== null && onSettingChange) {
+      onSettingChange('radius', debouncedBlurValue);
+    }
+  }, [debouncedBlurValue, activeEffect, onSettingChange]);
   
   if (!hasImage) {
     return (
@@ -123,23 +172,41 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </svg>
             Adjust Settings
           </h3>
-          {currentEffectSettings.map(setting => (
-            <div key={setting.id} className="mb-6">
-              <div className="flex justify-between mb-2">
-                <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">{setting.label}</label>
-                <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono bg-[rgb(var(--apple-gray-100))] px-2 py-0.5 rounded-full">{setting.currentValue.toFixed(2)}</span>
+          {currentEffectSettings.map(setting => {
+            const displayValue = activeEffect === 'blur' && setting.id === 'radius' && localSliderValues.radius !== undefined 
+              ? localSliderValues.radius 
+              : setting.currentValue;
+              
+            return (
+              <div key={setting.id} className="mb-6">
+                <div className="flex justify-between mb-2">
+                  <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">{setting.label}</label>
+                  <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono bg-[rgb(var(--apple-gray-100))] px-2 py-0.5 rounded-full">
+                    {displayValue.toFixed(2)}
+                    {activeEffect === 'blur' && setting.id === 'radius' && (
+                      localSliderValues.radius !== undefined && localSliderValues.radius !== setting.currentValue 
+                        ? ' (adjusting...)'
+                        : ''
+                    )}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={setting.min}
+                  max={setting.max}
+                  step={setting.step}
+                  value={displayValue}
+                  onChange={e => handleSliderChange(setting.id, parseFloat(e.target.value))}
+                  className={`w-full appearance-none cursor-pointer ${activeEffect === 'blur' ? 'accent-[rgb(var(--primary))]' : ''}`}
+                />
+                {activeEffect === 'blur' && setting.id === 'radius' && (
+                  <div className="mt-1 text-xs text-[rgb(var(--apple-gray-500))]">
+                    <span className="opacity-75">Adjustments to blur are applied after sliding</span>
+                  </div>
+                )}
               </div>
-              <input
-                type="range"
-                min={setting.min}
-                max={setting.max}
-                step={setting.step}
-                value={setting.currentValue}
-                onChange={e => onSettingChange?.(setting.id, parseFloat(e.target.value))}
-                className="w-full appearance-none cursor-pointer"
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
       
@@ -156,6 +223,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   defaultSettings[key] = (setting as any).default;
                 });
               }
+              
+              // Reset local slider values
+              setLocalSliderValues({});
               
               // First reset settings to default values
               Object.entries(defaultSettings).forEach(([key, value]) => {
