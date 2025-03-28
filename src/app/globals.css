@@ -27,6 +27,7 @@
   --primary: 40, 160, 120;
   --primary-light: 72, 187, 150;
   --primary-dark: 25, 130, 95;
+  --canvas-bg: 246, 246, 246;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -34,6 +35,7 @@
     --foreground-rgb: 255, 255, 255;
     --background-start-rgb: 28, 28, 30;
     --background-end-rgb: 18, 18, 18;
+    --canvas-bg: 38, 38, 40;
   }
 }
 
@@ -125,9 +127,9 @@ body {
   }
 }
 
-/* Checkerboard canvas background */
-.checkerboard-bg {
-  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+CjxyZWN0IHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YxZjFmMSI+PC9yZWN0Pgo8cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YxZjFmMSI+PC9yZWN0Pgo8cmVjdCB4PSIxMCIgeT0iMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjZmZmZmZmIj48L3JlY3Q+CjxyZWN0IHg9IjAiIHk9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiNmZmZmZmYiPjwvcmVjdD4KPC9zdmc+');
+/* Canvas background */
+.canvas-bg {
+  background-color: rgb(var(--canvas-bg));
 }
 
 /* Frosted glass effect */

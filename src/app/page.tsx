@@ -119,8 +119,8 @@ export default function Home() {
         </div>
         
         {/* Main editor area */}
-        <div className="flex-1 p-8 bg-[rgb(var(--background-start-rgb))] overflow-hidden">
-          <div className="w-full h-full bg-white rounded-xl shadow-sm border border-[rgb(var(--apple-gray-200))] overflow-hidden">
+        <div className="flex-1 canvas-bg overflow-hidden">
+          <div className="w-full h-full overflow-hidden">
             {imageLoading && (
               <div className="absolute inset-0 z-20 bg-white/90 backdrop-blur-sm flex items-center justify-center">
                 <div className="flex flex-col items-center">

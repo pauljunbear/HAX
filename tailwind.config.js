@@ -13,6 +13,9 @@ module.exports = {
           light: 'rgb(var(--primary-light))',
           dark: 'rgb(var(--primary-dark))',
         },
+        canvas: {
+          bg: 'rgb(var(--canvas-bg))',
+        },
         apple: {
           blue: 'rgb(var(--apple-blue))',
           red: 'rgb(var(--apple-red))',
