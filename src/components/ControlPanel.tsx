@@ -89,6 +89,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               }`}
             >
               {category}
+              {category === 'Artistic' && (
+                <div className="w-2 h-2 bg-[rgb(var(--primary))] rounded-full ml-1 inline-block"></div>
+              )}
             </button>
           ))}
         </div>
