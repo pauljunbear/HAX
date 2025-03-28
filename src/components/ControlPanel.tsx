@@ -47,35 +47,45 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   
   if (!hasImage) {
     return (
-      <div className="p-5 h-full flex flex-col items-center justify-center text-center">
-        <div className="w-20 h-20 mb-5 rounded-full bg-gray-100 flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="p-6 h-full flex flex-col items-center justify-center text-center">
+        <div className="w-24 h-24 mb-6 rounded-full bg-[rgb(var(--apple-gray-100))] flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-[rgb(var(--apple-gray-400))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </div>
-        <h2 className="text-lg font-medium text-gray-800 mb-2">No Image Selected</h2>
-        <p className="text-sm text-gray-500 mb-4">
+        <h2 className="text-xl font-medium text-[rgb(var(--apple-gray-800))] mb-3">No Image Selected</h2>
+        <p className="text-sm text-[rgb(var(--apple-gray-500))] mb-6 max-w-xs">
           Upload an image to start applying effects and filters
         </p>
+        <div className="w-10 h-10 border-2 border-[rgb(var(--apple-gray-200))] rounded-full flex items-center justify-center animate-pulse">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[rgb(var(--apple-gray-400))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          </svg>
+        </div>
       </div>
     );
   }
   
   return (
     <div className="h-full overflow-y-auto">
-      <div className="p-5 border-b border-gray-100">
-        <h2 className="text-lg font-medium text-gray-800 mb-5">Effects</h2>
+      <div className="p-6 border-b border-[rgb(var(--apple-gray-100))]">
+        <h2 className="text-lg font-medium text-[rgb(var(--apple-gray-800))] mb-6 flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[rgb(var(--primary))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+          </svg>
+          Effects
+        </h2>
         
         {/* Primary Category tabs */}
-        <div className="flex flex-wrap bg-gray-100 p-1 rounded-lg mb-6">
+        <div className="flex flex-wrap bg-[rgb(var(--apple-gray-100))] p-1 rounded-xl mb-6">
           {categories.map(category => (
             <button
               key={category}
               onClick={() => setActiveCategory(category)}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+              className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
                 activeCategory === category
-                  ? 'bg-white text-gray-800 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                  ? 'tab-apple-active'
+                  : 'tab-apple-inactive'
               }`}
             >
               {category}
@@ -84,15 +94,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
         
         {/* Effect buttons */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-3">
           {categoryEffects.map(effect => (
             <button
               key={effect.id}
               onClick={() => onEffectChange?.(effect.id)}
-              className={`px-4 py-3 text-sm rounded-lg transition-all ${
+              className={`px-4 py-3.5 text-sm rounded-xl transition-all ${
                 activeEffect === effect.id
-                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium shadow-sm'
-                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                  ? 'bg-[rgb(var(--primary))] text-white font-medium shadow-sm'
+                  : 'bg-white border border-[rgb(var(--apple-gray-200))] text-[rgb(var(--apple-gray-700))] hover:bg-[rgb(var(--apple-gray-50))] hover:shadow-sm'
               }`}
             >
               {effect.label}
@@ -103,13 +113,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       
       {/* Settings sliders */}
       {activeEffect && currentEffectSettings.length > 0 && (
-        <div className="p-5 border-b border-gray-100">
-          <h3 className="text-sm font-medium text-gray-700 mb-5">Adjust Settings</h3>
+        <div className="p-6 border-b border-[rgb(var(--apple-gray-100))]">
+          <h3 className="text-sm font-medium text-[rgb(var(--apple-gray-700))] mb-6 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-[rgb(var(--primary))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            Adjust Settings
+          </h3>
           {currentEffectSettings.map(setting => (
-            <div key={setting.id} className="mb-5">
+            <div key={setting.id} className="mb-6">
               <div className="flex justify-between mb-2">
-                <label className="text-xs text-gray-600 font-medium">{setting.label}</label>
-                <span className="text-xs text-gray-500 font-mono">{setting.currentValue.toFixed(2)}</span>
+                <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">{setting.label}</label>
+                <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono bg-[rgb(var(--apple-gray-100))] px-2 py-0.5 rounded-full">{setting.currentValue.toFixed(2)}</span>
               </div>
               <input
                 type="range"
@@ -118,7 +133,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 step={setting.step}
                 value={setting.currentValue}
                 onChange={e => onSettingChange?.(setting.id, parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                className="w-full appearance-none cursor-pointer"
               />
             </div>
           ))}
@@ -127,7 +142,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       
       {/* Action buttons */}
       {activeEffect && (
-        <div className="p-5 space-y-3">
+        <div className="p-6 space-y-3">
           <button
             onClick={() => {
               console.log("Resetting effect:", activeEffect);
@@ -149,7 +164,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 onEffectChange?.(activeEffect);
               }, 50);
             }}
-            className="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors flex items-center justify-center"
+            className="btn-apple-secondary w-full py-3 flex items-center justify-center"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -162,7 +177,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               console.log("Clearing effect completely");
               onEffectChange?.(null);
             }}
-            className="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors flex items-center justify-center"
+            className="btn-apple-ghost w-full py-3 flex items-center justify-center"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
