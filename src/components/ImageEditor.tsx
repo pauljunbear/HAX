@@ -583,7 +583,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
         ref={stageRef}
         width={stageSize.width}
         height={stageSize.height}
-        className="checkerboard-bg"
+        className="canvas-bg"
         style={{
           display: 'block',
           width: `${stageSize.width}px`,
@@ -603,10 +603,10 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
               height={imageSize.height || 100}
               x={(stageSize.width - (imageSize.width || 0)) / 2}
               y={(stageSize.height - (imageSize.height || 0)) / 2}
-              shadowColor="rgba(0,0,0,0.15)"
-              shadowBlur={30}
-              shadowOffset={{ x: 0, y: 5 }}
-              shadowOpacity={0.6}
+              shadowColor="rgba(0,0,0,0.08)"
+              shadowBlur={20}
+              shadowOffset={{ x: 0, y: 2 }}
+              shadowOpacity={0.4}
               listening={true}
               perfectDrawEnabled={true}
               transformsEnabled="all"
@@ -617,7 +617,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       
       {/* Control bar */}
       <div className="absolute bottom-6 left-0 right-0 flex justify-center px-4">
-        <div className="glass-panel rounded-xl shadow-lg p-3 flex items-center space-x-4">
+        <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-[rgb(var(--apple-gray-200))] p-3 flex items-center space-x-4">
           <button
             onClick={handleUploadClick}
             className="btn-apple-primary flex items-center"
@@ -654,7 +654,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
                   </button>
                   
                   {showExportOptions && (
-                    <div className="absolute bottom-full mb-2 right-0 glass-panel rounded-lg shadow-lg p-3 min-w-[200px]">
+                    <div className="absolute bottom-full mb-2 right-0 bg-white rounded-lg shadow-sm border border-[rgb(var(--apple-gray-200))] p-3 min-w-[200px]">
                       <div className="mb-3">
                         <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium block mb-1">Format</label>
                         <div className="flex bg-[rgb(var(--apple-gray-100))] rounded-lg p-1">
