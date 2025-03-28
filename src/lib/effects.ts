@@ -477,49 +477,180 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
           }
         ];
       
-      // Keep existing implementations for duotone, halftone, dithering 
+      // Implement proper duotone effect based on color mapping
       case 'duotone':
+        const darkHue = settings.darkColor / 360 || 0.67;
+        const lightHue = settings.lightColor / 360 || 0.17;
+        const duotoneIntensity = settings.intensity || 0.5;
+        
+        console.log("Applying duotone with dark:", settings.darkColor, "light:", settings.lightColor, "intensity:", duotoneIntensity);
+        
         return [
           function(imageData: KonvaImageData) {
             if (!imageData || !imageData.data) return;
             
             const data = imageData.data;
-            const len = data.length;
             
-            // Convert to grayscale first
-            for (let i = 0; i < len; i += 4) {
-              const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
-              data[i] = brightness;
-              data[i + 1] = brightness;
-              data[i + 2] = brightness;
-            }
-            
-            // Apply duotone effect
-            const darkColor = hslToRgb(settings.darkColor / 360 || 0.67, 0.6, 0.2);
-            const lightColor = hslToRgb(settings.lightColor / 360 || 0.17, 0.6, 0.8);
-            const intensity = settings.intensity || 0.5;
-            
-            for (let i = 0; i < len; i += 4) {
-              const t = data[i] / 255;
-              const r = Math.round(lerp(darkColor[0], lightColor[0], t) * intensity + data[i] * (1 - intensity));
-              const g = Math.round(lerp(darkColor[1], lightColor[1], t) * intensity + data[i] * (1 - intensity));
-              const b = Math.round(lerp(darkColor[2], lightColor[2], t) * intensity + data[i] * (1 - intensity));
+            // First convert to grayscale
+            for (let i = 0; i < data.length; i += 4) {
+              // Use proper luminance formula for grayscale
+              const gray = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
               
-              data[i] = r;
-              data[i + 1] = g;
-              data[i + 2] = b;
+              // Normalize to 0-1 range for mapping
+              const normalizedGray = gray / 255;
+              
+              // Get the dark and light colors from hue
+              const darkColor = hslToRgb(darkHue, 0.8, 0.2);
+              const lightColor = hslToRgb(lightHue, 0.8, 0.8);
+              
+              // Map grayscale to gradient between dark and light colors
+              // based on the duotone algorithm from Simeon Nortey's approach
+              data[i] = lerp(darkColor[0], lightColor[0], normalizedGray * duotoneIntensity + (1 - duotoneIntensity) * normalizedGray);
+              data[i + 1] = lerp(darkColor[1], lightColor[1], normalizedGray * duotoneIntensity + (1 - duotoneIntensity) * normalizedGray);
+              data[i + 2] = lerp(darkColor[2], lightColor[2], normalizedGray * duotoneIntensity + (1 - duotoneIntensity) * normalizedGray);
             }
           }
         ];
       
-      // Keep existing implementations for halftone, dithering...
+      // Implement proper halftone effect
+      case 'halftone':
+        const dotSize = Math.max(1, Math.min(20, settings.size || 4));
+        const spacing = Math.max(1, Math.min(20, settings.spacing || 5));
         
+        console.log("Applying halftone with dotSize:", dotSize, "spacing:", spacing);
+        
+        return [
+          function(imageData: KonvaImageData) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const data = imageData.data;
+            
+            // Create a temporary copy of the image data
+            const tempData = new Uint8ClampedArray(data.length);
+            tempData.set(data);
+            
+            // Clear the original data to white
+            for (let i = 0; i < data.length; i += 4) {
+              data[i] = data[i + 1] = data[i + 2] = 255;
+            }
+            
+            // Calculate cell size (spacing + dotSize)
+            const cellSize = spacing + dotSize;
+            
+            // Draw halftone dots
+            for (let y = 0; y < height; y += cellSize) {
+              for (let x = 0; x < width; x += cellSize) {
+                // Average the brightness in this cell
+                let totalBrightness = 0;
+                let count = 0;
+                
+                // Sample pixels in this cell
+                for (let cy = 0; cy < cellSize && y + cy < height; cy++) {
+                  for (let cx = 0; cx < cellSize && x + cx < width; cx++) {
+                    const index = ((y + cy) * width + (x + cx)) * 4;
+                    const r = tempData[index];
+                    const g = tempData[index + 1];
+                    const b = tempData[index + 2];
+                    totalBrightness += (r + g + b) / 3;
+                    count++;
+                  }
+                }
+                
+                if (count === 0) continue;
+                
+                // Calculate average brightness
+                const avgBrightness = totalBrightness / count;
+                
+                // Scale dot radius based on brightness (invert so darker areas have bigger dots)
+                const radius = (255 - avgBrightness) / 255 * dotSize;
+                
+                if (radius <= 0) continue;
+                
+                // Draw a dot centered in the cell
+                const centerX = x + cellSize / 2;
+                const centerY = y + cellSize / 2;
+                
+                // Draw filled circle
+                for (let dy = -radius; dy <= radius; dy++) {
+                  for (let dx = -radius; dx <= radius; dx++) {
+                    // Check if point is in circle
+                    if (dx * dx + dy * dy <= radius * radius) {
+                      const pixelX = Math.floor(centerX + dx);
+                      const pixelY = Math.floor(centerY + dy);
+                      
+                      // Check bounds
+                      if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
+                        const index = (pixelY * width + pixelX) * 4;
+                        // Set to black
+                        data[index] = data[index + 1] = data[index + 2] = 0;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ];
+        
+      // Implement proper dithering effect based on Floyd-Steinberg algorithm
+      case 'dithering':
+        const ditherThreshold = Math.max(0, Math.min(1, settings.threshold || 0.5)) * 255;
+        
+        console.log("Applying dithering with threshold:", ditherThreshold);
+        
+        return [
+          function(imageData: KonvaImageData) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const data = imageData.data;
+            
+            // Convert to grayscale and create a copy for processing
+            const grayscale = new Uint8ClampedArray(width * height);
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              // Use proper luminance formula
+              grayscale[i / 4] = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
+            }
+            
+            // Apply Floyd-Steinberg dithering algorithm
+            for (let y = 0; y < height; y++) {
+              for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                const oldPixel = grayscale[index];
+                const newPixel = oldPixel < ditherThreshold ? 0 : 255;
+                
+                // Set the pixel in the output
+                data[index * 4] = data[index * 4 + 1] = data[index * 4 + 2] = newPixel;
+                
+                // Calculate error
+                const error = oldPixel - newPixel;
+                
+                // Distribute error to neighboring pixels
+                if (x + 1 < width) {
+                  grayscale[index + 1] += error * 7 / 16;
+                }
+                if (y + 1 < height) {
+                  if (x > 0) {
+                    grayscale[(y + 1) * width + (x - 1)] += error * 3 / 16;
+                  }
+                  grayscale[(y + 1) * width + x] += error * 5 / 16;
+                  if (x + 1 < width) {
+                    grayscale[(y + 1) * width + (x + 1)] += error * 1 / 16;
+                  }
+                }
+              }
+            }
+          }
+        ];
+      
       default:
         console.warn(`Unknown effect: ${effectName}`);
         return [];
     }
   } catch (error) {
-    console.error("Error applying effect:", error);
+    console.error(`Error applying effect ${effectName}:`, error);
     return [];
   }
 };
