@@ -34,6 +34,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   const [isBrowser, setIsBrowser] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>({});
+  const [showExportOptions, setShowExportOptions] = useState(false);
 
   // Detect browser environment to avoid SSR issues
   useEffect(() => {
@@ -191,14 +192,14 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
         const { clientWidth, clientHeight } = containerRef.current;
         console.log("Container size update:", clientWidth, "x", clientHeight);
         setStageSize({
-          width: clientWidth,
-          height: clientHeight,
+          width: clientWidth || 800, // Fallback size if clientWidth is 0
+          height: clientHeight || 600, // Fallback size if clientHeight is 0
         });
       }
     };
 
-    // Initial update
-    updateSize();
+    // Initial update with a slight delay to ensure DOM is ready
+    setTimeout(updateSize, 10);
     
     // Add resize event with throttling
     let resizeTimeout: NodeJS.Timeout;
@@ -211,27 +212,47 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
     
     window.addEventListener('resize', handleResize);
     
-    // Force a redraw after a small delay to ensure images show properly
-    const redrawTimeout = setTimeout(() => {
-      updateSize();
-      if (stageRef.current) {
-        const layer = stageRef.current.findOne('Layer');
-        if (layer) {
-          layer.batchDraw();
+    // Force multiple redraws after mounting to ensure images show properly
+    const redrawTimeouts = [100, 300, 800, 1500].map(delay => 
+      setTimeout(() => {
+        updateSize();
+        if (stageRef.current) {
+          const layer = stageRef.current.findOne('Layer');
+          if (layer) {
+            layer.batchDraw();
+          }
         }
-      }
-    }, 500);
+      }, delay)
+    );
     
     return () => {
       window.removeEventListener('resize', handleResize);
       clearTimeout(resizeTimeout);
-      clearTimeout(redrawTimeout);
+      redrawTimeouts.forEach(timeout => clearTimeout(timeout));
     };
   }, []);
 
   // Update image size when image loads or stage size changes
   useEffect(() => {
-    if (!isBrowser || !image || !stageSize.width || !stageSize.height) return;
+    if (!isBrowser || !image) return;
+    if (!stageSize.width || !stageSize.height) {
+      // Force stage size if it's not set yet
+      if (containerRef.current) {
+        const { clientWidth, clientHeight } = containerRef.current;
+        if (clientWidth && clientHeight) {
+          setStageSize({
+            width: clientWidth,
+            height: clientHeight,
+          });
+        } else {
+          setStageSize({
+            width: 800, // Default fallback
+            height: 600, // Default fallback
+          });
+        }
+      }
+      return;
+    }
 
     console.log("Calculating image size for stage:", stageSize);
     const aspectRatio = image.width / image.height;
@@ -254,14 +275,18 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
     });
     
     // Force stage redraw to ensure image displays correctly
-    setTimeout(() => {
-      if (stageRef.current) {
-        const layer = stageRef.current.findOne('Layer');
-        if (layer) {
-          layer.batchDraw();
+    // Use multiple redraws with different delays to ensure it works
+    [50, 200, 500].forEach(delay => {
+      setTimeout(() => {
+        if (stageRef.current) {
+          const layer = stageRef.current.findOne('Layer');
+          if (layer) {
+            console.log(`Forcing redraw after ${delay}ms`);
+            layer.batchDraw();
+          }
         }
-      }
-    }, 50);
+      }, delay);
+    });
   }, [image, stageSize, isBrowser]);
 
   // Force a reflow and redraw after the image is loaded and sized
@@ -546,10 +571,10 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       }}
     >
       {isLoading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white bg-opacity-80">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 backdrop-blur-sm">
           <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-2 border-t-emerald-500 border-gray-200 mb-2"></div>
-            <p className="text-gray-600 text-sm">Processing...</p>
+            <div className="h-10 w-10 rounded-full border-4 border-[rgb(var(--apple-gray-200))] border-t-[rgb(var(--primary))] animate-spin mb-3"></div>
+            <p className="text-[rgb(var(--apple-gray-600))] font-medium">Processing...</p>
           </div>
         </div>
       )}
@@ -558,14 +583,16 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
         ref={stageRef}
         width={stageSize.width}
         height={stageSize.height}
-        className="bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+CjxyZWN0IHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YxZjFmMSI+PC9yZWN0Pgo8cmVjdCB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2YxZjFmMSI+PC9yZWN0Pgo8cmVjdCB4PSIxMCIgeT0iMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjZmZmZmZmIj48L3JlY3Q+CjxyZWN0IHg9IjAiIHk9IjEwIiB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiNmZmZmZmYiPjwvcmVjdD4KPC9zdmc+')]"
+        className="checkerboard-bg"
         style={{
           display: 'block',
           width: `${stageSize.width}px`,
           height: `${stageSize.height}px`,
           position: 'relative',
           zIndex: 1,
-          visibility: 'visible'
+          visibility: 'visible',
+          borderRadius: '0.5rem',
+          overflow: 'hidden'
         }}
       >
         <Layer>
@@ -576,10 +603,10 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
               height={imageSize.height || 100}
               x={(stageSize.width - (imageSize.width || 0)) / 2}
               y={(stageSize.height - (imageSize.height || 0)) / 2}
-              shadowColor="rgba(0,0,0,0.2)"
-              shadowBlur={20}
-              shadowOffset={{ x: 0, y: 2 }}
-              shadowOpacity={0.5}
+              shadowColor="rgba(0,0,0,0.15)"
+              shadowBlur={30}
+              shadowOffset={{ x: 0, y: 5 }}
+              shadowOpacity={0.6}
               listening={true}
               perfectDrawEnabled={true}
               transformsEnabled="all"
@@ -589,122 +616,117 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       </Stage>
       
       {/* Control bar */}
-      <div className="absolute bottom-4 left-0 right-0 flex justify-center px-4">
-        <div className="bg-white rounded-md shadow-md border border-gray-200 p-2 flex items-center space-x-4">
+      <div className="absolute bottom-6 left-0 right-0 flex justify-center px-4">
+        <div className="glass-panel rounded-xl shadow-lg p-3 flex items-center space-x-4">
           <button
             onClick={handleUploadClick}
-            className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-md transition-colors flex items-center"
+            className="btn-apple-primary flex items-center"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             New Image
           </button>
           
-          <button
-            onClick={() => {
-              // Reset all effects by setting activeEffect to null
-              if (onImageUpload && selectedImage) {
-                console.log("Resetting all effects");
-                // Reapply the same image but clear effects
-                onImageUpload(selectedImage);
-              }
-            }}
-            className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-md transition-colors flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Reset Image
-          </button>
-          
-          <div className="h-8 border-r border-gray-200"></div>
-          
-          <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1">
-              <span className="text-xs text-gray-500">Format:</span>
-              <div className="flex">
-                <button 
-                  className={`px-2 py-1 text-xs rounded-l-md ${
-                    exportFormat === 'png' 
-                      ? 'bg-gray-800 text-white' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  onClick={() => handleExportFormatChange('png')}
+          {image && (
+            <>
+              <div className="h-6 w-px bg-[rgb(var(--apple-gray-200))]"></div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={handleExport}
+                  className="btn-apple-secondary flex items-center"
                 >
-                  PNG
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export
                 </button>
-                <button 
-                  className={`px-2 py-1 text-xs rounded-r-md ${
-                    exportFormat === 'jpeg' 
-                      ? 'bg-gray-800 text-white' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  onClick={() => handleExportFormatChange('jpeg')}
-                >
-                  JPEG
-                </button>
+                
+                <div className="relative group">
+                  <button
+                    onClick={() => setShowExportOptions(!showExportOptions)}
+                    className="btn-apple-ghost p-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                  </button>
+                  
+                  {showExportOptions && (
+                    <div className="absolute bottom-full mb-2 right-0 glass-panel rounded-lg shadow-lg p-3 min-w-[200px]">
+                      <div className="mb-3">
+                        <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium block mb-1">Format</label>
+                        <div className="flex bg-[rgb(var(--apple-gray-100))] rounded-lg p-1">
+                          <button
+                            onClick={() => setExportFormat('png')}
+                            className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-colors ${
+                              exportFormat === 'png'
+                                ? 'bg-white text-[rgb(var(--apple-gray-800))] shadow-sm'
+                                : 'text-[rgb(var(--apple-gray-600))]'
+                            }`}
+                          >
+                            PNG
+                          </button>
+                          <button
+                            onClick={() => setExportFormat('jpeg')}
+                            className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-colors ${
+                              exportFormat === 'jpeg'
+                                ? 'bg-white text-[rgb(var(--apple-gray-800))] shadow-sm'
+                                : 'text-[rgb(var(--apple-gray-600))]'
+                            }`}
+                          >
+                            JPEG
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {exportFormat === 'jpeg' && (
+                        <div className="mb-3">
+                          <div className="flex justify-between mb-1">
+                            <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">Quality</label>
+                            <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono">{Math.round(exportQuality * 100)}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0.1}
+                            max={1}
+                            step={0.05}
+                            value={exportQuality}
+                            onChange={(e) => setExportQuality(parseFloat(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+                      )}
+                      
+                      <button
+                        onClick={handleExport}
+                        className="btn-apple-primary w-full"
+                      >
+                        Export Image
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            
-            <div className="flex items-center space-x-1">
-              <span className="text-xs text-gray-500">Quality:</span>
-              <input
-                type="range"
-                min="0.1"
-                max="1"
-                step="0.1"
-                value={exportQuality}
-                onChange={handleExportQualityChange}
-                className="w-20 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-800"
-              />
-              <span className="text-xs text-gray-600 w-6">{Math.round(exportQuality * 100)}%</span>
-            </div>
-          </div>
-          
-          <div className="h-8 border-r border-gray-200"></div>
-          
-          <button
-            onClick={handleExport}
-            className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-md transition-colors flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export
-          </button>
+            </>
+          )}
         </div>
       </div>
       
+      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
-        className="hidden"
-        accept="image/*"
+        accept="image/jpeg, image/png, image/gif, image/webp"
         onChange={handleFileChange}
+        className="hidden"
       />
       
-      {error && (
-        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 px-4 py-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200 shadow-md">
-          <div className="flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {error}
-          </div>
-        </div>
-      )}
-      
-      {/* Debug info - only visible in development */}
-      {process.env.NODE_ENV === 'development' && Object.keys(debugInfo).length > 0 && (
-        <div className="absolute top-2 right-2 max-w-xs bg-white bg-opacity-90 p-2 rounded border text-xs overflow-auto max-h-40">
-          <div className="font-bold mb-1">Debug Info:</div>
-          {Object.entries(debugInfo).map(([key, value]) => (
-            <div key={key} className="grid grid-cols-2 gap-1">
-              <span className="font-mono">{key}:</span>
-              <span>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
-            </div>
-          ))}
+      {/* Debug info */}
+      {process.env.NODE_ENV !== 'production' && Object.keys(debugInfo).length > 0 && (
+        <div className="absolute top-2 left-2 text-xs bg-black/80 text-white p-2 rounded-md font-mono opacity-70 hover:opacity-100 transition-opacity">
+          <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
         </div>
       )}
     </div>
