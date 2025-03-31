@@ -96,8 +96,226 @@ const initKonva = async () => {
   return konvaInitPromise;
 };
 
-// Apply the selected effect
-export const applyEffect = async (effectName: string | null, settings: Record<string, number>) => {
+// Add these imports and interfaces at the top of the file, after existing interfaces
+import { SelectionData } from '@/components/SelectionTool';
+
+// Define interface for filter region
+interface FilterRegion {
+  selection: SelectionData;
+  mode: 'selection' | 'inverse';
+}
+
+// Helper function to check if a point is inside a selection
+const isPointInSelection = (x: number, y: number, selection: SelectionData): boolean => {
+  if (!selection) return false;
+  
+  if (selection.type === 'rectangle') {
+    return (
+      x >= (selection.x || 0) &&
+      x <= (selection.x || 0) + (selection.width || 0) &&
+      y >= (selection.y || 0) &&
+      y <= (selection.y || 0) + (selection.height || 0)
+    );
+  }
+  
+  if (selection.type === 'ellipse') {
+    const centerX = (selection.x || 0) + (selection.width || 0) / 2;
+    const centerY = (selection.y || 0) + (selection.height || 0) / 2;
+    const radiusX = (selection.width || 0) / 2;
+    const radiusY = (selection.height || 0) / 2;
+    
+    if (radiusX <= 0 || radiusY <= 0) return false;
+    
+    // Check if point is inside ellipse: (x-h)²/a² + (y-k)²/b² <= 1
+    return Math.pow(x - centerX, 2) / Math.pow(radiusX, 2) + 
+           Math.pow(y - centerY, 2) / Math.pow(radiusY, 2) <= 1;
+  }
+  
+  if (selection.type === 'freehand' && selection.points) {
+    // Point-in-polygon algorithm
+    const points = selection.points;
+    let inside = false;
+    
+    for (let i = 0, j = points.length - 2; i < points.length; i += 2) {
+      const xi = points[i];
+      const yi = points[i + 1];
+      const xj = points[j];
+      const yj = points[j + 1];
+      
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      
+      if (intersect) inside = !inside;
+      
+      j = i;
+    }
+    
+    return inside;
+  }
+  
+  return false;
+};
+
+// Modify the function creation for custom brightness to handle masking
+// Add this inside the applyEffect switch statement case 'brightness':
+const createBrightnessFilter = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
+  return function(imageData: KonvaImageData) {
+    const brightness = settings.value || 0;
+    const data = imageData.data;
+    const width = imageData.width;
+    
+    // Check if we have a filter region
+    const hasRegion = !!filterRegion && !!filterRegion.selection;
+    
+    // Apply brightness filter
+    for (let i = 0; i < data.length; i += 4) {
+      // Calculate x,y position for this pixel
+      const pixelIndex = i / 4;
+      const x = pixelIndex % width;
+      const y = Math.floor(pixelIndex / width);
+      
+      // Check if this pixel should be affected
+      if (hasRegion) {
+        const inSelection = isPointInSelection(x, y, filterRegion.selection);
+        // Skip this pixel based on the filter mode
+        if ((filterRegion.mode === 'selection' && !inSelection) || 
+            (filterRegion.mode === 'inverse' && inSelection)) {
+          continue;
+        }
+      }
+      
+      // Apply the brightness effect
+      data[i] = Math.min(255, Math.max(0, data[i] + brightness * 255));
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + brightness * 255));
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + brightness * 255));
+    }
+  };
+};
+
+// Now replace the brightness case in the applyEffect function with this:
+case 'brightness':
+  // Use the filter with masking if provided
+  return [createBrightnessFilter(settings, filterRegion)];
+
+// Modify the createContrastFilter function to handle masking (adding below createBrightnessFilter)
+const createContrastFilter = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
+  return function(imageData: KonvaImageData) {
+    const contrast = settings.value / 100 || 0;
+    const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+    const data = imageData.data;
+    const width = imageData.width;
+    
+    // Check if we have a filter region
+    const hasRegion = !!filterRegion && !!filterRegion.selection;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      // Calculate x,y position for this pixel
+      const pixelIndex = i / 4;
+      const x = pixelIndex % width;
+      const y = Math.floor(pixelIndex / width);
+      
+      // Check if this pixel should be affected
+      if (hasRegion) {
+        const inSelection = isPointInSelection(x, y, filterRegion.selection);
+        // Skip this pixel based on the filter mode
+        if ((filterRegion.mode === 'selection' && !inSelection) || 
+            (filterRegion.mode === 'inverse' && inSelection)) {
+          continue;
+        }
+      }
+      
+      // Apply the contrast effect
+      data[i] = Math.min(255, Math.max(0, factor * (data[i] - 128) + 128));
+      data[i + 1] = Math.min(255, Math.max(0, factor * (data[i + 1] - 128) + 128));
+      data[i + 2] = Math.min(255, Math.max(0, factor * (data[i + 2] - 128) + 128));
+    }
+  };
+};
+
+// Replace the contrast case in the applyEffect function with this:
+case 'contrast':
+  // Use the filter with masking if provided
+  return [createContrastFilter(settings, filterRegion)];
+
+// Update createSaturationFilter function to handle masking
+const createSaturationFilter = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
+  return function(imageData: KonvaImageData) {
+    const saturation = settings.value || 0;
+    const data = imageData.data;
+    const width = imageData.width;
+    
+    // Check if we have a filter region
+    const hasRegion = !!filterRegion && !!filterRegion.selection;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      // Calculate x,y position for this pixel
+      const pixelIndex = i / 4;
+      const x = pixelIndex % width;
+      const y = Math.floor(pixelIndex / width);
+      
+      // Check if this pixel should be affected
+      if (hasRegion) {
+        const inSelection = isPointInSelection(x, y, filterRegion.selection);
+        // Skip this pixel based on the filter mode
+        if ((filterRegion.mode === 'selection' && !inSelection) || 
+            (filterRegion.mode === 'inverse' && inSelection)) {
+          continue;
+        }
+      }
+      
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      
+      // Convert RGB to HSL
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h, s, l = (max + min) / 2;
+      
+      if (max === min) {
+        h = s = 0; // achromatic
+      } else {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+          default: h = 0;
+        }
+        
+        h /= 6;
+      }
+      
+      // Adjust saturation
+      s = Math.min(1, Math.max(0, s + saturation));
+      
+      // Convert back to RGB
+      const adjustedColor = hslToRgb(h, s, l);
+      data[i] = adjustedColor[0];
+      data[i + 1] = adjustedColor[1];
+      data[i + 2] = adjustedColor[2];
+    }
+  };
+};
+
+// Update the saturation case in the applyEffect function
+case 'saturation':
+  // Use Konva's HSL filter if available and no masking
+  if (Konva.Filters.HSL && !filterRegion) {
+    return [Konva.Filters.HSL, { saturation: settings.value || 0 }];
+  }
+  
+  // Otherwise use our custom implementation with masking support
+  return [createSaturationFilter(settings, filterRegion)];
+
+// Modify the applyEffect function signature to accept a filterRegion parameter
+export const applyEffect = async (
+  effectName: string | null, 
+  settings: Record<string, number>,
+  filterRegion?: FilterRegion
+) => {
   if (!effectName || typeof window === 'undefined') {
     console.log("Cannot apply effect: No effect name or not in browser");
     return [];
@@ -125,82 +343,21 @@ export const applyEffect = async (effectName: string | null, settings: Record<st
     // Apply the specific effect
     switch (effectName) {
       case 'brightness':
-        // Custom brightness implementation
-        return [
-          function(imageData: KonvaImageData) {
-            const brightness = settings.value || 0;
-            const data = imageData.data;
-            for (let i = 0; i < data.length; i += 4) {
-              data[i] = Math.min(255, Math.max(0, data[i] + brightness * 255));
-              data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + brightness * 255));
-              data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + brightness * 255));
-            }
-          }
-        ];
+        // Use the filter with masking if provided
+        return [createBrightnessFilter(settings, filterRegion)];
       
       case 'contrast':
-        // Custom contrast implementation
-        return [
-          function(imageData: KonvaImageData) {
-            const contrast = settings.value / 100 || 0;
-            const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-            const data = imageData.data;
-            for (let i = 0; i < data.length; i += 4) {
-              data[i] = Math.min(255, Math.max(0, factor * (data[i] - 128) + 128));
-              data[i + 1] = Math.min(255, Math.max(0, factor * (data[i + 1] - 128) + 128));
-              data[i + 2] = Math.min(255, Math.max(0, factor * (data[i + 2] - 128) + 128));
-            }
-          }
-        ];
+        // Use the filter with masking if provided
+        return [createContrastFilter(settings, filterRegion)];
       
       case 'saturation':
-        // Use Konva's HSL filter if available
-        if (Konva.Filters.HSL) {
+        // Use Konva's HSL filter if available and no masking
+        if (Konva.Filters.HSL && !filterRegion) {
           return [Konva.Filters.HSL, { saturation: settings.value || 0 }];
         }
         
-        // Custom saturation implementation
-        return [
-          function(imageData: KonvaImageData) {
-            const saturation = settings.value || 0;
-            const data = imageData.data;
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
-              
-              // Convert RGB to HSL
-              const max = Math.max(r, g, b);
-              const min = Math.min(r, g, b);
-              let h, s, l = (max + min) / 2;
-              
-              if (max === min) {
-                h = s = 0; // achromatic
-              } else {
-                const d = max - min;
-                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-                
-                switch (max) {
-                  case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                  case g: h = (b - r) / d + 2; break;
-                  case b: h = (r - g) / d + 4; break;
-                  default: h = 0;
-                }
-                
-                h /= 6;
-              }
-              
-              // Adjust saturation
-              s = Math.min(1, Math.max(0, s + saturation));
-              
-              // Convert back to RGB
-              const adjustedColor = hslToRgb(h, s, l);
-              data[i] = adjustedColor[0];
-              data[i + 1] = adjustedColor[1];
-              data[i + 2] = adjustedColor[2];
-            }
-          }
-        ];
+        // Otherwise use our custom implementation with masking support
+        return [createSaturationFilter(settings, filterRegion)];
       
       case 'hue':
         // Use Konva's HSL filter if available

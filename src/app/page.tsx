@@ -6,6 +6,10 @@ import Head from 'next/head';
 
 // Import ControlPanel normally since it doesn't use canvas
 import ControlPanel from '@/components/ControlPanel';
+import HistoryPanel from '@/components/HistoryPanel';
+import LayersPanel from '@/components/LayersPanel';
+import useHistory, { HistoryState } from '@/hooks/useHistory';
+import useLayers, { Layer } from '@/hooks/useLayers';
 
 // Dynamically import ImageEditor with SSR disabled
 const ImageEditor = dynamic(
@@ -15,10 +19,44 @@ const ImageEditor = dynamic(
 
 export default function Home() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [activeEffect, setActiveEffect] = useState<string | null>(null);
-  const [effectSettings, setEffectSettings] = useState<Record<string, number>>({});
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [showLayers, setShowLayers] = useState<boolean>(false);
+
+  // Initialize history with empty state
+  const { 
+    currentState,
+    history,
+    currentIndex,
+    addToHistory, 
+    undo, 
+    redo, 
+    canUndo, 
+    canRedo,
+    clearHistory,
+    jumpToState
+  } = useHistory({
+    activeEffect: null,
+    effectSettings: {}
+  });
+
+  // Initialize layers
+  const {
+    layers,
+    activeLayerId,
+    addLayer,
+    removeLayer,
+    updateLayer,
+    moveLayer,
+    setActiveLayer,
+    toggleLayerVisibility,
+    toggleLayerLock,
+    duplicateLayer
+  } = useLayers();
+
+  // Extract activeEffect and effectSettings from history state
+  const { activeEffect, effectSettings } = currentState;
 
   // Add debugging on component mount
   useEffect(() => {
@@ -34,11 +72,8 @@ export default function Home() {
     // Debug the data format
     console.log("Image data format:", imageDataUrl.substring(0, 50) + "...");
 
-    // Reset active effect when a new image is uploaded
-    if (activeEffect) {
-      setActiveEffect(null);
-      setEffectSettings({});
-    }
+    // Reset active effect and clear history when a new image is uploaded
+    clearHistory({ activeEffect: null, effectSettings: {} });
 
     // Validate the image data
     if (!imageDataUrl.startsWith('data:image/')) {
@@ -69,15 +104,63 @@ export default function Home() {
 
   const handleEffectChange = (effectName: string | null) => {
     console.log("Effect changed to:", effectName);
-    setActiveEffect(effectName);
+    
+    // Create new state for history
+    const newState: HistoryState = {
+      activeEffect: effectName,
+      effectSettings: effectName ? { ...effectSettings } : {}
+    };
+    
+    // Add to history
+    addToHistory(newState);
   };
 
   const handleSettingChange = (settingName: string, value: number) => {
     console.log(`Setting ${settingName} changed to:`, value);
-    setEffectSettings((prev) => ({
-      ...prev,
+    
+    // Create new settings object with the updated value
+    const newSettings = {
+      ...effectSettings,
       [settingName]: value,
-    }));
+    };
+    
+    // Create new state for history
+    const newState: HistoryState = {
+      activeEffect,
+      effectSettings: newSettings
+    };
+    
+    // Add to history
+    addToHistory(newState);
+  };
+
+  const handleUndo = () => {
+    undo();
+  };
+
+  const handleRedo = () => {
+    redo();
+  };
+
+  const handleJumpToState = (index: number) => {
+    jumpToState(index);
+  };
+
+  const toggleHistoryPanel = () => {
+    setShowHistory(prev => !prev);
+  };
+
+  const toggleLayersPanel = () => {
+    setShowLayers(prev => !prev);
+  };
+
+  // Add a new layer with the current image
+  const handleAddLayer = () => {
+    addLayer({
+      name: `Layer ${layers.length + 1}`,
+      type: 'image',
+      data: selectedImage
+    });
   };
 
   return (
@@ -91,6 +174,38 @@ export default function Home() {
           <div className="ml-3 text-xs font-medium bg-[rgb(var(--apple-gray-100))] text-[rgb(var(--apple-gray-600))] px-2.5 py-1 rounded-full">Real-time Effects</div>
         </div>
         <div className="flex gap-4">
+          {selectedImage && (
+            <>
+              <button
+                onClick={toggleHistoryPanel}
+                className={`text-sm flex items-center transition-colors px-3 py-1.5 rounded-md ${
+                  showHistory 
+                  ? 'bg-[rgb(var(--primary-50))] text-[rgb(var(--primary))]'
+                  : 'text-[rgb(var(--apple-gray-600))] hover:text-[rgb(var(--apple-gray-800))] hover:bg-[rgb(var(--apple-gray-50))]'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                History
+                {canUndo && <span className="ml-1.5 w-2 h-2 bg-[rgb(var(--primary))] rounded-full"></span>}
+              </button>
+              
+              <button
+                onClick={toggleLayersPanel}
+                className={`text-sm flex items-center transition-colors px-3 py-1.5 rounded-md ${
+                  showLayers 
+                  ? 'bg-[rgb(var(--primary-50))] text-[rgb(var(--primary))]'
+                  : 'text-[rgb(var(--apple-gray-600))] hover:text-[rgb(var(--apple-gray-800))] hover:bg-[rgb(var(--apple-gray-50))]'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                Layers
+              </button>
+            </>
+          )}
           <a 
             href="https://github.com/pauljunbear/imager2" 
             target="_blank" 
@@ -116,6 +231,35 @@ export default function Home() {
             onSettingChange={handleSettingChange}
             hasImage={!!selectedImage}
           />
+          
+          {/* History panel */}
+          {showHistory && selectedImage && (
+            <HistoryPanel
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              history={history}
+              currentIndex={currentIndex}
+              onJumpToState={handleJumpToState}
+            />
+          )}
+          
+          {/* Layers panel */}
+          {showLayers && selectedImage && (
+            <LayersPanel
+              layers={layers}
+              activeLayerId={activeLayerId}
+              onSetActiveLayer={setActiveLayer}
+              onToggleVisibility={toggleLayerVisibility}
+              onRemoveLayer={removeLayer}
+              onAddLayer={handleAddLayer}
+              onDuplicateLayer={duplicateLayer}
+              onMoveLayer={moveLayer}
+              onUpdateLayer={updateLayer}
+              onToggleLock={toggleLayerLock}
+            />
+          )}
         </div>
         
         {/* Main editor area */}
