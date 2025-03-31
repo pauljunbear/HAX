@@ -105,88 +105,60 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
   ];
   
   return (
-    <div className="p-6 border-b border-[rgb(var(--apple-gray-100))]">
-      <h3 className="text-sm font-medium text-[rgb(var(--apple-gray-700))] mb-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-[rgb(var(--primary))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div className="border-t border-[rgb(var(--apple-gray-200))] bg-white/80">
+      <div className="p-6 border-b border-[rgb(var(--apple-gray-100))]">
+        <h2 className="text-lg font-medium text-[rgb(var(--apple-gray-800))] mb-6 flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[rgb(var(--primary))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
           Layers
-        </div>
-        <div className="flex space-x-2">
+        </h2>
+        
+        <div className="flex justify-between mb-4">
           <button
             onClick={onAddLayer}
-            title="Add Layer"
-            className="w-6 h-6 rounded hover:bg-[rgb(var(--apple-gray-100))] text-[rgb(var(--apple-gray-600))] flex items-center justify-center"
+            className="btn-apple-secondary py-2 px-4"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-          </button>
-          <button
-            onClick={() => activeLayerId && onDuplicateLayer(activeLayerId)}
-            disabled={!activeLayerId}
-            title="Duplicate Layer"
-            className={`w-6 h-6 rounded flex items-center justify-center ${
-              activeLayerId
-                ? 'hover:bg-[rgb(var(--apple-gray-100))] text-[rgb(var(--apple-gray-600))]'
-                : 'text-[rgb(var(--apple-gray-300))] cursor-not-allowed'
-            }`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          </button>
-          <button
-            onClick={() => activeLayerId && onRemoveLayer(activeLayerId)}
-            disabled={!activeLayerId || layers.length <= 1}
-            title="Delete Layer"
-            className={`w-6 h-6 rounded flex items-center justify-center ${
-              activeLayerId && layers.length > 1
-                ? 'hover:bg-red-100 text-red-500'
-                : 'text-[rgb(var(--apple-gray-300))] cursor-not-allowed'
-            }`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
+            Add Layer
           </button>
         </div>
-      </h3>
-      
-      {/* Layers list */}
-      <div className="mt-3 border border-[rgb(var(--apple-gray-200))] rounded-lg overflow-hidden">
+      </div>
+
+      <div className="max-h-72 overflow-y-auto p-4">
         {layers.length === 0 ? (
-          <div className="p-4 text-sm text-[rgb(var(--apple-gray-500))] text-center">
-            No layers
+          <div className="text-center text-[rgb(var(--apple-gray-400))] py-4">
+            <p className="text-sm">No layers yet</p>
           </div>
         ) : (
-          <ul className="max-h-64 overflow-y-auto">
+          <div className="space-y-2">
             {layers.map((layer) => (
-              <li 
+              <div
                 key={layer.id}
-                className={`
-                  px-3 py-2 text-sm border-b border-[rgb(var(--apple-gray-200))] last:border-b-0
-                  transition-colors relative
-                  ${dragOverLayerId === layer.id ? 'bg-[rgb(var(--primary-50))]' : ''}
-                  ${layer.id === activeLayerId 
-                    ? 'bg-[rgb(var(--primary-50))] text-[rgb(var(--primary))]' 
-                    : 'text-[rgb(var(--apple-gray-700))] hover:bg-[rgb(var(--apple-gray-50))]'
-                  }
-                `}
                 onClick={() => onSetActiveLayer(layer.id)}
-                draggable
-                onDragStart={(e) => handleDragStart(e, layer.id)}
-                onDragOver={(e) => handleDragOver(e, layer.id)}
-                onDrop={(e) => handleDrop(e, layer.id)}
-                onDragEnd={handleDragEnd}
+                className={`
+                  border rounded-lg overflow-hidden transition-colors
+                  ${layer.id === activeLayerId 
+                    ? 'border-[rgb(var(--primary))]' 
+                    : 'border-[rgb(var(--apple-gray-200))]'
+                  }
+                  ${layer.locked ? 'opacity-60' : 'hover:border-[rgb(var(--primary-300))]'}
+                  cursor-pointer
+                `}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center flex-1 min-w-0">
-                    {/* Visibility toggle */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onToggleVisibility(layer.id); }}
-                      className="mr-2 text-[rgb(var(--apple-gray-500))] hover:text-[rgb(var(--apple-gray-700))]"
+                <div className={`
+                  p-3 flex items-center justify-between
+                  ${layer.id === activeLayerId ? 'bg-[rgb(var(--primary-50))]' : 'bg-white'}
+                `}>
+                  <div className="flex items-center">
+                    <button 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        onToggleVisibility(layer.id); 
+                      }}
+                      className="mr-2 text-[rgb(var(--apple-gray-600))] hover:text-[rgb(var(--apple-gray-800))]"
                     >
                       {layer.visible ? (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -200,110 +172,91 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                       )}
                     </button>
                     
-                    {/* Lock toggle */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onToggleLock(layer.id); }}
-                      className="mr-2 text-[rgb(var(--apple-gray-500))] hover:text-[rgb(var(--apple-gray-700))]"
-                    >
-                      {layer.locked ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                        </svg>
-                      )}
-                    </button>
-                    
-                    {/* Layer name - editable on double click */}
-                    {editLayerId === layer.id ? (
-                      <div onClick={(e) => e.stopPropagation()} className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      {editLayerId === layer.id ? (
                         <input
                           type="text"
                           value={layerName}
                           onChange={(e) => setLayerName(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
                           onBlur={handleSaveName}
-                          className="w-full px-1 py-0.5 text-sm border border-[rgb(var(--primary-300))] rounded"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveName();
+                            if (e.key === 'Escape') setEditLayerId(null);
+                          }}
+                          className="w-full text-sm border border-[rgb(var(--apple-gray-300))] rounded px-2 py-1"
                           autoFocus
                         />
-                      </div>
-                    ) : (
-                      <div 
-                        onDoubleClick={() => startEditingName(layer)} 
-                        className="flex-1 truncate"
-                        title={layer.name}
-                      >
-                        {layer.name}
-                      </div>
-                    )}
+                      ) : (
+                        <span
+                          className="text-sm font-medium text-[rgb(var(--apple-gray-800))] truncate block"
+                          onDoubleClick={() => startEditingName(layer)}
+                        >
+                          {layer.name}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   
-                  {/* Layer type indicator */}
-                  <div className="ml-2 flex-shrink-0">
-                    {layer.type === 'image' && (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[rgb(var(--apple-gray-500))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <div className="flex items-center">
+                    <button 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        onToggleLock(layer.id); 
+                      }}
+                      className={`
+                        mr-1 p-1 rounded-md hover:bg-[rgb(var(--apple-gray-100))]
+                        ${layer.locked ? 'text-[rgb(var(--primary))]' : 'text-[rgb(var(--apple-gray-500))]'}
+                      `}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
-                    )}
-                    {layer.type === 'text' && (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[rgb(var(--apple-gray-500))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                      </svg>
-                    )}
-                    {layer.type === 'shape' && (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[rgb(var(--apple-gray-500))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                      </svg>
-                    )}
-                    {layer.type === 'adjustment' && (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[rgb(var(--apple-gray-500))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                      </svg>
-                    )}
+                    </button>
+                    
+                    <div className="relative">
+                      <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setEditLayerId(layer.id);
+                        }}
+                        className="p-1 rounded-md text-[rgb(var(--apple-gray-500))] hover:bg-[rgb(var(--apple-gray-100))]"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+                        </svg>
+                      </button>
+                      
+                      {editLayerId === layer.id && (
+                        <div 
+                          className="absolute right-0 mt-1 z-10 bg-white rounded-lg shadow-lg border border-[rgb(var(--apple-gray-200))] py-1 w-48"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button 
+                            onClick={() => {
+                              onDuplicateLayer(layer.id);
+                              setEditLayerId(null);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-[rgb(var(--apple-gray-700))] hover:bg-[rgb(var(--apple-gray-100))]"
+                          >
+                            Duplicate Layer
+                          </button>
+                          <button 
+                            onClick={() => {
+                              onRemoveLayer(layer.id);
+                              setEditLayerId(null);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                          >
+                            Delete Layer
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-                
-                {/* Layer settings - only show for active layer */}
-                {layer.id === activeLayerId && (
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-[rgb(var(--apple-gray-500))]">Opacity</label>
-                      <div className="flex items-center mt-1">
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.01"
-                          value={layer.opacity}
-                          onChange={(e) => handleOpacityChange(layer.id, parseFloat(e.target.value))}
-                          className="w-full h-1 bg-[rgb(var(--apple-gray-200))] rounded appearance-none"
-                        />
-                        <span className="ml-2 text-xs w-8 text-[rgb(var(--apple-gray-600))]">
-                          {Math.round(layer.opacity * 100)}%
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-[rgb(var(--apple-gray-500))]">Blend</label>
-                      <select
-                        value={layer.blendMode}
-                        onChange={(e) => handleBlendModeChange(layer.id, e.target.value as BlendMode)}
-                        className="w-full mt-1 text-xs p-1 border border-[rgb(var(--apple-gray-200))] rounded"
-                      >
-                        {blendModeOptions.map(mode => (
-                          <option key={mode} value={mode}>
-                            {mode.charAt(0).toUpperCase() + mode.slice(1).replace('-', ' ')}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </div>

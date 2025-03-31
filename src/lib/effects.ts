@@ -197,8 +197,13 @@ const createBrightnessFilter = (settings: Record<string, number>, filterRegion?:
 // Modify the createContrastFilter function to handle masking (adding below createBrightnessFilter)
 const createContrastFilter = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
   return function(imageData: KonvaImageData) {
-    const contrast = settings.value / 100 || 0;
+    // Fix the contrast calculation - the original formula had issues
+    const contrast = settings.value || 0; // Get contrast value directly, not divided by 100
+    
+    // Use a better formula for contrast adjustment
+    // For a range of -100 to 100, this formula provides better results
     const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+    
     const data = imageData.data;
     const width = imageData.width;
     
@@ -222,9 +227,9 @@ const createContrastFilter = (settings: Record<string, number>, filterRegion?: F
       }
       
       // Apply the contrast effect
-      data[i] = Math.min(255, Math.max(0, factor * (data[i] - 128) + 128));
-      data[i + 1] = Math.min(255, Math.max(0, factor * (data[i + 1] - 128) + 128));
-      data[i + 2] = Math.min(255, Math.max(0, factor * (data[i + 2] - 128) + 128));
+      data[i] = Math.min(255, Math.max(0, Math.round(factor * (data[i] - 128) + 128)));
+      data[i + 1] = Math.min(255, Math.max(0, Math.round(factor * (data[i + 1] - 128) + 128)));
+      data[i + 2] = Math.min(255, Math.max(0, Math.round(factor * (data[i + 2] - 128) + 128)));
     }
   };
 };
@@ -283,7 +288,7 @@ const createSaturationFilter = (settings: Record<string, number>, filterRegion?:
       }
       
       // Adjust saturation
-      s = Math.min(1, Math.max(0, s + saturation));
+      s = Math.min(1, Math.max(0, s + saturation / 10)); // Scale saturation adjustment
       
       // Convert back to RGB
       const adjustedColor = hslToRgb(h, s, l);
@@ -337,13 +342,16 @@ export const applyEffect = async (
         return [createContrastFilter(settings, filterRegion)];
       
       case 'saturation':
+        // Scale saturation value for better effect handling
+        const scaledSaturation = settings.value ? settings.value / 10 : 0;
+        
         // Use Konva's HSL filter if available and no masking
         if (Konva.Filters.HSL && !filterRegion) {
-          return [Konva.Filters.HSL, { saturation: settings.value || 0 }];
+          return [Konva.Filters.HSL, { saturation: scaledSaturation }];
         }
         
         // Otherwise use our custom implementation with masking support
-        return [createSaturationFilter(settings, filterRegion)];
+        return [createSaturationFilter({ ...settings, value: scaledSaturation }, filterRegion)];
       
       case 'hue':
         // Use Konva's HSL filter if available
@@ -937,7 +945,7 @@ export const effectsConfig: Record<string, any> = {
     settings: {
       value: {
         label: 'Amount',
-        min: -2,
+        min: -10,
         max: 10,
         default: 0,
         step: 0.1,
