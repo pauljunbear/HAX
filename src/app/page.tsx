@@ -174,38 +174,6 @@ export default function Home() {
           <div className="ml-3 text-xs font-medium bg-[rgb(var(--apple-gray-100))] text-[rgb(var(--apple-gray-600))] px-2.5 py-1 rounded-full">Real-time Effects</div>
         </div>
         <div className="flex gap-4">
-          {selectedImage && (
-            <>
-              <button
-                onClick={toggleHistoryPanel}
-                className={`text-sm flex items-center transition-colors px-3 py-1.5 rounded-md ${
-                  showHistory 
-                  ? 'bg-[rgb(var(--primary-50))] text-[rgb(var(--primary))]'
-                  : 'text-[rgb(var(--apple-gray-600))] hover:text-[rgb(var(--apple-gray-800))] hover:bg-[rgb(var(--apple-gray-50))]'
-                }`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                History
-                {canUndo && <span className="ml-1.5 w-2 h-2 bg-[rgb(var(--primary))] rounded-full"></span>}
-              </button>
-              
-              <button
-                onClick={toggleLayersPanel}
-                className={`text-sm flex items-center transition-colors px-3 py-1.5 rounded-md ${
-                  showLayers 
-                  ? 'bg-[rgb(var(--primary-50))] text-[rgb(var(--primary))]'
-                  : 'text-[rgb(var(--apple-gray-600))] hover:text-[rgb(var(--apple-gray-800))] hover:bg-[rgb(var(--apple-gray-50))]'
-                }`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                Layers
-              </button>
-            </>
-          )}
           <a 
             href="https://github.com/pauljunbear/imager2" 
             target="_blank" 
@@ -232,8 +200,8 @@ export default function Home() {
             hasImage={!!selectedImage}
           />
           
-          {/* History panel */}
-          {showHistory && selectedImage && (
+          {/* History panel - now directly in sidebar */}
+          {selectedImage && (
             <HistoryPanel
               canUndo={canUndo}
               canRedo={canRedo}
@@ -245,8 +213,8 @@ export default function Home() {
             />
           )}
           
-          {/* Layers panel */}
-          {showLayers && selectedImage && (
+          {/* Layers panel - now directly in sidebar */}
+          {selectedImage && (
             <LayersPanel
               layers={layers}
               activeLayerId={activeLayerId}
@@ -263,31 +231,62 @@ export default function Home() {
         </div>
         
         {/* Main editor area */}
-        <div className="flex-1 canvas-bg overflow-hidden">
-          <div className="w-full h-full overflow-hidden">
-            {imageLoading && (
-              <div className="absolute inset-0 z-20 bg-white/90 backdrop-blur-sm flex items-center justify-center">
-                <div className="flex flex-col items-center">
-                  <div className="h-10 w-10 rounded-full border-4 border-[rgb(var(--apple-gray-200))] border-t-[rgb(var(--primary))] animate-spin mb-3"></div>
-                  <span className="text-[rgb(var(--apple-gray-600))] font-medium">Processing image...</span>
-                </div>
-              </div>
-            )}
-            {imageError && (
-              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 bg-red-50 text-red-700 px-4 py-3 rounded-lg shadow-md text-sm flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <div className="flex-1 relative overflow-hidden bg-[rgb(var(--apple-gray-50))]">
+          {imageLoading ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-[rgb(var(--apple-gray-400))]">
+              <svg className="animate-spin h-12 w-12 text-[rgb(var(--primary))]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <p className="mt-3 text-sm font-medium">Loading Image...</p>
+            </div>
+          ) : imageError ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-red-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="mt-3 text-sm font-medium">{imageError}</p>
+            </div>
+          ) : !selectedImage ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-[rgb(var(--apple-gray-400))]">
+              <div className="w-32 h-32 mb-8 rounded-2xl bg-[rgb(var(--apple-gray-100))] flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                {imageError}
               </div>
-            )}
-            <ImageEditor 
+              <h2 className="text-xl font-medium text-[rgb(var(--apple-gray-800))] mb-3">Drop Image or Click to Upload</h2>
+              <p className="text-sm text-[rgb(var(--apple-gray-500))] mb-8 max-w-md text-center">
+                Supported formats: JPG, PNG, GIF, WebP
+              </p>
+              <label className="btn-apple-primary cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        if (event.target?.result) {
+                          handleImageUpload(event.target.result as string);
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+                Choose Image
+              </label>
+            </div>
+          ) : (
+            <ImageEditor
               selectedImage={selectedImage}
               activeEffect={activeEffect}
               effectSettings={effectSettings}
               onImageUpload={handleImageUpload}
             />
-          </div>
+          )}
         </div>
       </main>
     </div>

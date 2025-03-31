@@ -77,7 +77,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     
     // Apply immediately for most effects
     if (activeEffect !== 'blur') {
-      onSettingChange?.(settingId, value);
+      // Special handling for contrast - scale the value for better UI experience
+      if (activeEffect === 'contrast' && settingId === 'value') {
+        // Transform contrast from UI range (-100 to 100) to effect range
+        const scaledValue = value / 100;
+        onSettingChange?.(settingId, scaledValue);
+      } else {
+        onSettingChange?.(settingId, value);
+      }
     }
   };
   

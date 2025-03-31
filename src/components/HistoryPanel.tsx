@@ -61,95 +61,71 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
   };
 
   return (
-    <div className="p-6 border-b border-[rgb(var(--apple-gray-100))]">
-      <h3 className="text-sm font-medium text-[rgb(var(--apple-gray-700))] mb-4 flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-[rgb(var(--primary))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        History
-      </h3>
-      
-      {/* Undo/Redo buttons */}
-      <div className="flex space-x-2 mb-4">
-        <button
-          onClick={onUndo}
-          disabled={!canUndo}
-          className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
-            canUndo
-              ? 'bg-[rgb(var(--apple-gray-200))] text-[rgb(var(--apple-gray-700))] hover:bg-[rgb(var(--apple-gray-300))]'
-              : 'bg-[rgb(var(--apple-gray-100))] text-[rgb(var(--apple-gray-400))] cursor-not-allowed'
-          }`}
-        >
-          <div className="flex items-center justify-center">
+    <div className="border-t border-[rgb(var(--apple-gray-200))] bg-white/80">
+      <div className="p-6 border-b border-[rgb(var(--apple-gray-100))]">
+        <h2 className="text-lg font-medium text-[rgb(var(--apple-gray-800))] mb-6 flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-[rgb(var(--primary))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          History
+        </h2>
+        
+        <div className="flex items-center space-x-3 mb-4">
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            className={`btn-apple-secondary flex-1 py-2 ${!canUndo && 'opacity-50 cursor-not-allowed'}`}
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             Undo
-          </div>
-        </button>
-        <button
-          onClick={onRedo}
-          disabled={!canRedo}
-          className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg transition-colors ${
-            canRedo
-              ? 'bg-[rgb(var(--apple-gray-200))] text-[rgb(var(--apple-gray-700))] hover:bg-[rgb(var(--apple-gray-300))]'
-              : 'bg-[rgb(var(--apple-gray-100))] text-[rgb(var(--apple-gray-400))] cursor-not-allowed'
-          }`}
-        >
-          <div className="flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          </button>
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={`btn-apple-secondary flex-1 py-2 ${!canRedo && 'opacity-50 cursor-not-allowed'}`}
+          >
+            Redo
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
-            Redo
-          </div>
-        </button>
+          </button>
+        </div>
       </div>
-      
-      {/* History list */}
-      <div className="mt-3 border border-[rgb(var(--apple-gray-200))] rounded-lg overflow-hidden">
-        {displayedHistory.length === 0 ? (
-          <div className="p-4 text-sm text-[rgb(var(--apple-gray-500))] text-center">
-            No edit history yet
+
+      <div className="max-h-72 overflow-y-auto p-4">
+        {history.length === 0 ? (
+          <div className="text-center text-[rgb(var(--apple-gray-400))] py-4">
+            <p className="text-sm">No history yet</p>
           </div>
         ) : (
-          <ul className="max-h-64 overflow-y-auto">
-            {displayedHistory.map((state, index) => {
-              const historyIndex = startIndex + index;
-              return (
-                <li 
-                  key={historyIndex}
-                  onClick={() => onJumpToState(historyIndex)}
-                  className={`
-                    px-3 py-2 text-sm border-b border-[rgb(var(--apple-gray-200))] last:border-b-0
-                    cursor-pointer transition-colors
-                    ${historyIndex === currentIndex 
-                      ? 'bg-[rgb(var(--primary-50))] text-[rgb(var(--primary))]' 
-                      : 'text-[rgb(var(--apple-gray-700))] hover:bg-[rgb(var(--apple-gray-50))]'
-                    }
-                  `}
-                >
-                  <div className="flex items-center">
-                    {historyIndex === currentIndex && (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-2 text-[rgb(var(--primary))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                    <span className={historyIndex === currentIndex ? 'font-medium' : ''}>
-                      {formatHistoryEntry(state)}
-                    </span>
+          <div className="space-y-2">
+            {history.map((state, index) => (
+              <button
+                key={index}
+                onClick={() => onJumpToState(index)}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                  index === currentIndex
+                    ? 'bg-[rgb(var(--primary))] text-white'
+                    : 'bg-white hover:bg-[rgb(var(--apple-gray-50))] text-[rgb(var(--apple-gray-700))] border border-[rgb(var(--apple-gray-200))]'
+                }`}
+              >
+                <div className="font-medium">{state.activeEffect || 'No Effect'}</div>
+                {state.activeEffect && Object.keys(state.effectSettings).length > 0 && (
+                  <div className="text-xs mt-1 opacity-80">
+                    {Object.entries(state.effectSettings).map(([key, value]) => (
+                      <span key={key} className="mr-2">
+                        {key}: {typeof value === 'number' ? value.toFixed(2) : value}
+                      </span>
+                    ))}
                   </div>
-                </li>
-              );
-            })}
-          </ul>
+                )}
+              </button>
+            ))}
+          </div>
         )}
       </div>
-      
-      {history.length > displayLimit && (
-        <div className="mt-2 text-xs text-[rgb(var(--apple-gray-500))] text-center">
-          {history.length - displayedHistory.length} more items in history
-        </div>
-      )}
     </div>
   );
 };
