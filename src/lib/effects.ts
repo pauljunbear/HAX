@@ -192,10 +192,7 @@ const createBrightnessFilter = (settings: Record<string, number>, filterRegion?:
   };
 };
 
-// Now replace the brightness case in the applyEffect function with this:
-case 'brightness':
-  // Use the filter with masking if provided
-  return [createBrightnessFilter(settings, filterRegion)];
+// Note: The brightness case will be used in the applyEffect function switch statement below
 
 // Modify the createContrastFilter function to handle masking (adding below createBrightnessFilter)
 const createContrastFilter = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
@@ -232,10 +229,7 @@ const createContrastFilter = (settings: Record<string, number>, filterRegion?: F
   };
 };
 
-// Replace the contrast case in the applyEffect function with this:
-case 'contrast':
-  // Use the filter with masking if provided
-  return [createContrastFilter(settings, filterRegion)];
+// Note: The contrast case will be used in the applyEffect function switch statement below
 
 // Update createSaturationFilter function to handle masking
 const createSaturationFilter = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
@@ -300,15 +294,7 @@ const createSaturationFilter = (settings: Record<string, number>, filterRegion?:
   };
 };
 
-// Update the saturation case in the applyEffect function
-case 'saturation':
-  // Use Konva's HSL filter if available and no masking
-  if (Konva.Filters.HSL && !filterRegion) {
-    return [Konva.Filters.HSL, { saturation: settings.value || 0 }];
-  }
-  
-  // Otherwise use our custom implementation with masking support
-  return [createSaturationFilter(settings, filterRegion)];
+// Note: The saturation case will be used in the applyEffect function switch statement below
 
 // Modify the applyEffect function signature to accept a filterRegion parameter
 export const applyEffect = async (
