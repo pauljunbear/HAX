@@ -831,6 +831,22 @@ export const applyEffect = async (
           }
         ];
       
+      // Implement geometric abstraction effect
+      case 'geometric':
+        return [createGeometricAbstraction(settings)];
+      
+      // Implement stippling effect
+      case 'stippling':
+        return [createStipplingEffect(settings)];
+      
+      // Implement cellular automata effect (Conway's Game of Life)
+      case 'cellular':
+        return [createCellularAutomataEffect(settings)];
+      
+      // Implement reaction-diffusion effect (Gray-Scott model)
+      case 'reaction-diffusion':
+        return [createReactionDiffusionEffect(settings)];
+      
       default:
         console.warn(`Unknown effect: ${effectName}`);
         return [];
@@ -897,6 +913,493 @@ function hslToRgb(h: number, s: number, l: number) {
   
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
+
+// Implementation of geometric abstraction effect
+const createGeometricAbstraction = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const width = imageData.width;
+    const height = imageData.height;
+    const data = imageData.data;
+    
+    // Create a temporary copy of the image data
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Get settings
+    const gridSize = Math.max(1, Math.min(64, settings.gridSize || 16));
+    const complexity = Math.max(0, Math.min(1, settings.complexity || 0.5));
+    
+    // Clear to white
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = data[i + 1] = data[i + 2] = 255;
+    }
+    
+    // Create geometric abstraction
+    for (let y = 0; y < height; y += gridSize) {
+      for (let x = 0; x < width; x += gridSize) {
+        // Calculate average color in this cell
+        let r = 0, g = 0, b = 0, count = 0;
+        
+        for (let cy = 0; cy < gridSize && y + cy < height; cy++) {
+          for (let cx = 0; cx < gridSize && x + cx < width; cx++) {
+            const index = ((y + cy) * width + (x + cx)) * 4;
+            r += tempData[index];
+            g += tempData[index + 1];
+            b += tempData[index + 2];
+            count++;
+          }
+        }
+        
+        if (count === 0) continue;
+        
+        // Average color
+        r = Math.round(r / count);
+        g = Math.round(g / count);
+        b = Math.round(b / count);
+        
+        // Determine the shape based on brightness and complexity
+        const brightness = (r + g + b) / 3 / 255;
+        const rand = Math.random();
+        
+        // Draw shape based on average color
+        switch (Math.floor(rand / (1 - complexity) * 4) % 4) {
+          case 0: // Rectangle
+            for (let cy = 0; cy < gridSize && y + cy < height; cy++) {
+              for (let cx = 0; cx < gridSize && x + cx < width; cx++) {
+                const index = ((y + cy) * width + (x + cx)) * 4;
+                data[index] = r;
+                data[index + 1] = g;
+                data[index + 2] = b;
+              }
+            }
+            break;
+            
+          case 1: // Circle
+            const radius = gridSize / 2 * (0.5 + brightness * 0.5);
+            const centerX = x + gridSize / 2;
+            const centerY = y + gridSize / 2;
+            
+            for (let cy = 0; cy < gridSize && y + cy < height; cy++) {
+              for (let cx = 0; cx < gridSize && x + cx < width; cx++) {
+                const dx = x + cx - centerX;
+                const dy = y + cy - centerY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist <= radius) {
+                  const index = ((y + cy) * width + (x + cx)) * 4;
+                  data[index] = r;
+                  data[index + 1] = g;
+                  data[index + 2] = b;
+                }
+              }
+            }
+            break;
+            
+          case 2: // Triangle
+            const halfGrid = gridSize / 2;
+            
+            for (let cy = 0; cy < gridSize && y + cy < height; cy++) {
+              // Calculate the width of this row in the triangle
+              const rowY = cy / gridSize;
+              const rowWidth = gridSize * rowY;
+              
+              for (let cx = 0; cx < gridSize && x + cx < width; cx++) {
+                // Check if point is in triangle
+                if (cx >= halfGrid - rowWidth / 2 && cx <= halfGrid + rowWidth / 2) {
+                  const index = ((y + cy) * width + (x + cx)) * 4;
+                  data[index] = r;
+                  data[index + 1] = g;
+                  data[index + 2] = b;
+                }
+              }
+            }
+            break;
+            
+          case 3: // Diamond
+            const mid = gridSize / 2;
+            
+            for (let cy = 0; cy < gridSize && y + cy < height; cy++) {
+              for (let cx = 0; cx < gridSize && x + cx < width; cx++) {
+                // Check if point is in diamond
+                const dx = Math.abs(cx - mid);
+                const dy = Math.abs(cy - mid);
+                
+                if (dx + dy <= mid * (0.5 + brightness * 0.5)) {
+                  const index = ((y + cy) * width + (x + cx)) * 4;
+                  data[index] = r;
+                  data[index + 1] = g;
+                  data[index + 2] = b;
+                }
+              }
+            }
+            break;
+        }
+      }
+    }
+  };
+};
+
+// Implementation of stippling effect
+const createStipplingEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const width = imageData.width;
+    const height = imageData.height;
+    const data = imageData.data;
+    
+    // Create a temporary copy of the image data
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Get settings
+    const density = Math.max(0.1, Math.min(10, settings.density || 1));
+    const dotSize = Math.max(0.5, Math.min(5, settings.dotSize || 1));
+    const useHatching = settings.useHatching || 0;
+    
+    // Clear to white
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = data[i + 1] = data[i + 2] = 255;
+    }
+    
+    // Base number of dots and spacing
+    const baseSpacing = 10 / density;
+    const maxDots = Math.ceil(width * height / (baseSpacing * baseSpacing) * 5);
+    
+    // Generate stippling effect
+    for (let i = 0; i < maxDots; i++) {
+      // Sample random position
+      const x = Math.floor(Math.random() * width);
+      const y = Math.floor(Math.random() * height);
+      
+      // Get brightness at this position
+      const index = (y * width + x) * 4;
+      const r = tempData[index];
+      const g = tempData[index + 1];
+      const b = tempData[index + 2];
+      const brightness = (r + g + b) / 3 / 255;
+      
+      // Skip based on brightness (darker areas have more dots)
+      if (Math.random() > (1 - brightness) * density) continue;
+      
+      if (useHatching > 0.5) {
+        // Draw hatching line
+        const lineLength = Math.floor(5 + 10 * (1 - brightness));
+        const angle = Math.PI * (brightness < 0.5 ? 0.25 : -0.25); // Crosshatch for darker areas
+        
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
+        
+        for (let j = -lineLength / 2; j < lineLength / 2; j++) {
+          const px = Math.floor(x + j * dx);
+          const py = Math.floor(y + j * dy);
+          
+          if (px < 0 || px >= width || py < 0 || py >= height) continue;
+          
+          const pixelIndex = (py * width + px) * 4;
+          data[pixelIndex] = data[pixelIndex + 1] = data[pixelIndex + 2] = 0;
+        }
+      } else {
+        // Draw a dot with size based on brightness (darker areas have larger dots)
+        const radius = dotSize * (1 - brightness) + 0.5;
+        
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            // Check if point is in circle
+            if (dx * dx + dy * dy <= radius * radius) {
+              const px = Math.floor(x + dx);
+              const py = Math.floor(y + dy);
+              
+              // Check bounds
+              if (px < 0 || px >= width || py < 0 || py >= height) continue;
+              
+              const pixelIndex = (py * width + px) * 4;
+              data[pixelIndex] = data[pixelIndex + 1] = data[pixelIndex + 2] = 0;
+            }
+          }
+        }
+      }
+    }
+  };
+};
+
+// Implementation of cellular automata effect (Conway's Game of Life)
+const createCellularAutomataEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const width = imageData.width;
+    const height = imageData.height;
+    const data = imageData.data;
+    
+    // Create a temporary copy of the image data
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Get settings
+    const threshold = Math.max(0.1, Math.min(0.9, settings.threshold || 0.5));
+    const iterations = Math.max(1, Math.min(10, Math.floor(settings.iterations || 3)));
+    const cellSize = Math.max(1, Math.min(8, Math.floor(settings.cellSize || 2)));
+    
+    // Initialize cellular automata grid based on image brightness
+    const cellWidth = Math.ceil(width / cellSize);
+    const cellHeight = Math.ceil(height / cellSize);
+    let grid = new Uint8Array(cellWidth * cellHeight);
+    
+    // Set initial grid state based on image brightness
+    for (let cy = 0; cy < cellHeight; cy++) {
+      for (let cx = 0; cx < cellWidth; cx++) {
+        let totalBrightness = 0;
+        let count = 0;
+        
+        // Sample the cell area in the original image
+        for (let y = 0; y < cellSize && cy * cellSize + y < height; y++) {
+          for (let x = 0; x < cellSize && cx * cellSize + x < width; x++) {
+            const imgX = cx * cellSize + x;
+            const imgY = cy * cellSize + y;
+            const index = (imgY * width + imgX) * 4;
+            
+            const r = tempData[index];
+            const g = tempData[index + 1];
+            const b = tempData[index + 2];
+            const brightness = (r + g + b) / 3 / 255;
+            
+            totalBrightness += brightness;
+            count++;
+          }
+        }
+        
+        // Set cell state based on average brightness
+        const avgBrightness = count > 0 ? totalBrightness / count : 0;
+        grid[cy * cellWidth + cx] = avgBrightness < threshold ? 1 : 0;
+      }
+    }
+    
+    // Run Conway's Game of Life for specified iterations
+    for (let iter = 0; iter < iterations; iter++) {
+      const newGrid = new Uint8Array(cellWidth * cellHeight);
+      
+      // Apply Game of Life rules
+      for (let cy = 0; cy < cellHeight; cy++) {
+        for (let cx = 0; cx < cellWidth; cx++) {
+          const idx = cy * cellWidth + cx;
+          const cell = grid[idx];
+          
+          // Count live neighbors
+          let liveNeighbors = 0;
+          for (let ny = -1; ny <= 1; ny++) {
+            for (let nx = -1; nx <= 1; nx++) {
+              if (nx === 0 && ny === 0) continue;
+              
+              const ncy = (cy + ny + cellHeight) % cellHeight;
+              const ncx = (cx + nx + cellWidth) % cellWidth;
+              
+              if (grid[ncy * cellWidth + ncx] === 1) {
+                liveNeighbors++;
+              }
+            }
+          }
+          
+          // Apply Conway's Game of Life rules
+          if (cell === 1) {
+            // Live cell
+            newGrid[idx] = (liveNeighbors === 2 || liveNeighbors === 3) ? 1 : 0;
+          } else {
+            // Dead cell
+            newGrid[idx] = (liveNeighbors === 3) ? 1 : 0;
+          }
+        }
+      }
+      
+      // Update grid for next iteration
+      grid = newGrid;
+    }
+    
+    // Clear original image (white background)
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = data[i + 1] = data[i + 2] = 255;
+    }
+    
+    // Draw final cellular automata state to image
+    for (let cy = 0; cy < cellHeight; cy++) {
+      for (let cx = 0; cx < cellWidth; cx++) {
+        const cell = grid[cy * cellWidth + cx];
+        
+        if (cell === 1) {
+          // Draw live cell
+          for (let y = 0; y < cellSize && cy * cellSize + y < height; y++) {
+            for (let x = 0; x < cellSize && cx * cellSize + x < width; x++) {
+              const imgX = cx * cellSize + x;
+              const imgY = cy * cellSize + y;
+              const index = (imgY * width + imgX) * 4;
+              
+              // Live cells are black (or can use original color by using tempData)
+              data[index] = data[index + 1] = data[index + 2] = 0;
+            }
+          }
+        }
+      }
+    }
+  };
+};
+
+// Implementation of reaction-diffusion effect (Gray-Scott model)
+const createReactionDiffusionEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const width = imageData.width;
+    const height = imageData.height;
+    const data = imageData.data;
+    
+    // Create a temporary copy of the image data
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Get settings
+    const iterations = Math.max(1, Math.min(20, Math.floor(settings.iterations || 10)));
+    const scale = Math.max(1, Math.min(8, Math.floor(settings.scale || 4)));
+    const feedRate = Math.max(0.01, Math.min(0.1, settings.feedRate || 0.055));
+    const killRate = Math.max(0.01, Math.min(0.1, settings.killRate || 0.062));
+    
+    // Downsample for performance
+    const simWidth = Math.ceil(width / scale);
+    const simHeight = Math.ceil(height / scale);
+    
+    // Create simulation grids
+    let gridA = new Float32Array(simWidth * simHeight);
+    let gridB = new Float32Array(simWidth * simHeight);
+    
+    // Initialize with a pattern based on the image
+    for (let y = 0; y < simHeight; y++) {
+      for (let x = 0; x < simWidth; x++) {
+        // Sample the original image (average over scale x scale area)
+        let totalBrightness = 0;
+        let count = 0;
+        
+        for (let sy = 0; sy < scale && y * scale + sy < height; sy++) {
+          for (let sx = 0; sx < scale && x * scale + sx < width; sx++) {
+            const imgX = x * scale + sx;
+            const imgY = y * scale + sy;
+            const index = (imgY * width + imgX) * 4;
+            
+            const r = tempData[index];
+            const g = tempData[index + 1];
+            const b = tempData[index + 2];
+            const brightness = (r + g + b) / 3 / 255;
+            
+            totalBrightness += brightness;
+            count++;
+          }
+        }
+        
+        const avgBrightness = count > 0 ? totalBrightness / count : 0;
+        
+        // Initialize with image-influenced pattern
+        // A (activator) starts at 1.0 (full) and B (inhibitor) at 0.0 (empty)
+        // except where the image is dark
+        const idx = y * simWidth + x;
+        gridA[idx] = avgBrightness < 0.4 ? 0.5 : 1.0; // Activator (A)
+        gridB[idx] = avgBrightness < 0.4 ? 0.25 : 0.0; // Inhibitor (B)
+      }
+    }
+    
+    // Add a small square in the center to seed the pattern
+    const centerX = Math.floor(simWidth / 2);
+    const centerY = Math.floor(simHeight / 2);
+    const seedSize = Math.floor(Math.min(simWidth, simHeight) / 10);
+    
+    for (let y = -seedSize; y <= seedSize; y++) {
+      for (let x = -seedSize; x <= seedSize; x++) {
+        const sx = (centerX + x + simWidth) % simWidth;
+        const sy = (centerY + y + simHeight) % simHeight;
+        
+        if (x*x + y*y <= seedSize*seedSize) {
+          gridA[sy * simWidth + sx] = 0.5;
+          gridB[sy * simWidth + sx] = 0.25;
+        }
+      }
+    }
+    
+    // Run the reaction-diffusion simulation
+    // Using Gray-Scott model parameters
+    const dA = 1.0; // Diffusion rate for A
+    const dB = 0.5; // Diffusion rate for B
+    const dt = 1.0; // Time step
+    
+    // Create temporary grids for the update
+    let nextA = new Float32Array(simWidth * simHeight);
+    let nextB = new Float32Array(simWidth * simHeight);
+    
+    // Run simulation for specified iterations
+    for (let iter = 0; iter < iterations; iter++) {
+      // Update the simulation
+      for (let y = 0; y < simHeight; y++) {
+        for (let x = 0; x < simWidth; x++) {
+          const idx = y * simWidth + x;
+          
+          // Get center values
+          const a = gridA[idx];
+          const b = gridB[idx];
+          
+          // Calculate Laplacian using a 3x3 kernel
+          let laplA = 0;
+          let laplB = 0;
+          
+          for (let ny = -1; ny <= 1; ny++) {
+            for (let nx = -1; nx <= 1; nx++) {
+              if (nx === 0 && ny === 0) continue;
+              
+              const weight = (nx === 0 || ny === 0) ? 0.2 : 0.05;
+              const nidx = ((y + ny + simHeight) % simHeight) * simWidth + ((x + nx + simWidth) % simWidth);
+              
+              laplA += weight * gridA[nidx];
+              laplB += weight * gridB[nidx];
+            }
+          }
+          
+          laplA -= 0.95 * a; // Adjust for center weight
+          laplB -= 0.95 * b;
+          
+          // Gray-Scott model reaction
+          const abb = a * b * b;
+          const reaction = abb - (feedRate + killRate) * b;
+          
+          // Update equations
+          nextA[idx] = a + dt * (dA * laplA - abb + feedRate * (1 - a));
+          nextB[idx] = b + dt * (dB * laplB + reaction);
+          
+          // Clamp values
+          nextA[idx] = Math.max(0, Math.min(1, nextA[idx]));
+          nextB[idx] = Math.max(0, Math.min(1, nextB[idx]));
+        }
+      }
+      
+      // Swap grids
+      [gridA, nextA] = [nextA, gridA];
+      [gridB, nextB] = [nextB, gridB];
+    }
+    
+    // Draw final reaction-diffusion state to the image
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        // Map to simulation grid
+        const simX = Math.min(simWidth - 1, Math.floor(x / scale));
+        const simY = Math.min(simHeight - 1, Math.floor(y / scale));
+        const simIdx = simY * simWidth + simX;
+        
+        // Get simulation values
+        const a = gridA[simIdx];
+        const b = gridB[simIdx];
+        
+        // Calculate color from the pattern (using inhibitor)
+        const index = (y * width + x) * 4;
+        
+        // Option 1: Use the pattern to create black and white
+        const val = Math.round(255 * (1 - b)); // B is the inhibitor pattern
+        data[index] = val;
+        data[index + 1] = val;
+        data[index + 2] = val;
+        
+        // Keep alpha as is
+      }
+    }
+  };
+};
 
 // Initialize Konva when in browser environment
 if (typeof window !== 'undefined') {
@@ -1122,6 +1625,115 @@ export const effectsConfig: Record<string, any> = {
         max: 1,
         default: 0.5,
         step: 0.01,
+      },
+    },
+  },
+  // Generative
+  geometric: {
+    label: 'Geometric',
+    category: 'Generative',
+    settings: {
+      gridSize: {
+        label: 'Grid Size',
+        min: 4,
+        max: 64,
+        default: 16,
+        step: 4,
+      },
+      complexity: {
+        label: 'Complexity',
+        min: 0,
+        max: 1,
+        default: 0.5,
+        step: 0.1,
+      },
+    },
+  },
+  stippling: {
+    label: 'Stippling',
+    category: 'Generative',
+    settings: {
+      density: {
+        label: 'Density',
+        min: 0.1,
+        max: 5,
+        default: 1,
+        step: 0.1,
+      },
+      dotSize: {
+        label: 'Dot Size',
+        min: 0.5,
+        max: 3,
+        default: 1,
+        step: 0.1,
+      },
+      useHatching: {
+        label: 'Use Hatching',
+        min: 0,
+        max: 1,
+        default: 0,
+        step: 1,
+      },
+    },
+  },
+  cellular: {
+    label: 'Cellular',
+    category: 'Generative',
+    settings: {
+      threshold: {
+        label: 'Threshold',
+        min: 0.1,
+        max: 0.9,
+        default: 0.5,
+        step: 0.05,
+      },
+      iterations: {
+        label: 'Iterations',
+        min: 1,
+        max: 10,
+        default: 3,
+        step: 1,
+      },
+      cellSize: {
+        label: 'Cell Size',
+        min: 1,
+        max: 8,
+        default: 2,
+        step: 1,
+      },
+    },
+  },
+  'reaction-diffusion': {
+    label: 'Reaction-Diffusion',
+    category: 'Generative',
+    settings: {
+      iterations: {
+        label: 'Iterations',
+        min: 1,
+        max: 20,
+        default: 10,
+        step: 1,
+      },
+      scale: {
+        label: 'Scale',
+        min: 1,
+        max: 8,
+        default: 4,
+        step: 1,
+      },
+      feedRate: {
+        label: 'Feed Rate',
+        min: 0.01,
+        max: 0.1,
+        default: 0.055,
+        step: 0.001,
+      },
+      killRate: {
+        label: 'Kill Rate',
+        min: 0.01,
+        max: 0.1,
+        default: 0.062,
+        step: 0.001,
       },
     },
   },
