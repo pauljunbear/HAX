@@ -156,515 +156,132 @@ const initKonva = async () => {
 //   return false;
 // };
 
-// Modify the function creation for custom brightness to handle masking
-// Add this inside the applyEffect switch statement case 'brightness':
-const createBrightnessFilter = (settings: Record<string, number>) => {
-  return function(imageData: KonvaImageData) {
-    const brightness = settings.value || 0;
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = Math.min(255, Math.max(0, data[i] + brightness * 255));
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + brightness * 255));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + brightness * 255));
+// Helper function to calculate average brightness of an area
+function getBrightness(imageData: ImageData, x: number, y: number, size: number, width: number, height: number) {
+  let totalBrightness = 0;
+  let pixelCount = 0;
+  
+  const startX = Math.max(0, x);
+  const startY = Math.max(0, y);
+  const endX = Math.min(width, x + size);
+  const endY = Math.min(height, y + size);
+  
+  for (let py = startY; py < endY; py++) {
+    for (let px = startX; px < endX; px++) {
+      const i = (py * width + px) * 4;
+      const r = imageData.data[i];
+      const g = imageData.data[i + 1];
+      const b = imageData.data[i + 2];
+      const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+      totalBrightness += brightness;
+      pixelCount++;
     }
-  };
-};
-
-// Note: The brightness case will be used in the applyEffect function switch statement below
-
-// Modify the createContrastFilter function to handle masking (adding below createBrightnessFilter)
-const createContrastFilter = (settings: Record<string, number>) => {
-  return function(imageData: KonvaImageData) {
-    const contrast = settings.value || 0;
-    const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = Math.min(255, Math.max(0, Math.round(factor * (data[i] - 128) + 128)));
-      data[i + 1] = Math.min(255, Math.max(0, Math.round(factor * (data[i + 1] - 128) + 128)));
-      data[i + 2] = Math.min(255, Math.max(0, Math.round(factor * (data[i + 2] - 128) + 128)));
-    }
-  };
-};
-
-// Note: The contrast case will be used in the applyEffect function switch statement below
-
-// Helper function to convert HSL to RGB - Ensure this is accurate
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-  let r, g, b;
-
-  if (s === 0) {
-    r = g = b = l; // achromatic
-  } else {
-    const hue2rgb = (p: number, q: number, t: number): number => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-      return p;
-    };
-
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    r = hue2rgb(p, q, h + 1/3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1/3);
   }
-
-  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+  
+  return pixelCount > 0 ? totalBrightness / pixelCount : 0;
 }
 
-// Update createSaturationFilter function
-const createSaturationFilter = (settings: Record<string, number>) => {
-  return function(imageData: KonvaImageData) {
-    const saturationAdjustment = settings.value || 0; // Scaled value (-1 to 1)
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i], g = data[i + 1], b = data[i + 2];
-      
-      // RGB to HSL (Normalized 0-1)
-      const r_n = r / 255, g_n = g / 255, b_n = b / 255;
-      const max = Math.max(r_n, g_n, b_n), min = Math.min(r_n, g_n, b_n);
-      let h = 0, s = 0, l = (max + min) / 2;
-
-      if (max !== min) {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        switch(max) {
-            case r_n: h = (g_n - b_n) / d + (g_n < b_n ? 6 : 0); break;
-            case g_n: h = (b_n - r_n) / d + 2; break;
-            case b_n: h = (r_n - g_n) / d + 4; break;
-        }
-        h /= 6;
-      }
-
-      // Adjust Saturation: Add the adjustment factor.
-      // Clamp the result between 0 and 1.
-      s = Math.max(0, Math.min(1, s + saturationAdjustment));
-
-      // HSL to RGB
-      const [newR, newG, newB] = hslToRgb(h, s, l);
-      data[i] = newR;
-      data[i + 1] = newG;
-      data[i + 2] = newB;
-    }
-  };
-};
-
-// Note: The saturation case will be used in the applyEffect function switch statement below
+// Helper function to interpolate between two values
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
+}
 
 // Define the expected return type for an effect function
-type EffectFunction = (imageData: KonvaImageData) => void;
+type KonvaFilterFunction = (imageData: KonvaImageData) => void;
+// Type for filter parameters to be set on the node
+type FilterParams = Record<string, any>;
 
-// Update applyEffect signature with explicit return type
+// Update applyEffect signature and logic
 export const applyEffect = async (
   effectName: string | null, 
   settings: Record<string, number>
-): Promise<[EffectFunction, Record<string, any>?] | [any, Record<string, any>?] | []> => {
+// Return the Konva Filter function and parameters object
+): Promise<[KonvaFilterFunction | null, FilterParams | null]> => {
   if (!effectName || typeof window === 'undefined') {
     console.log("Cannot apply effect: No effect name or not in browser");
-    return [];
+    return [null, null];
   }
   
   // Ensure Konva is initialized
   if (!Konva) {
-    console.log("Konva not initialized yet, initializing now");
-    try {
-      await initKonva();
-    } catch (err) {
-      console.error("Failed to initialize Konva:", err);
-      return [];
-    }
-    
-    if (!Konva) {
-      console.error("Konva still not initialized after attempt");
-      return [];
-    }
+    try { await initKonva(); } catch (err) { return [null, null]; }
+    if (!Konva) { return [null, null]; }
   }
   
-  console.log(`Applying effect: ${effectName} with settings:`, settings);
+  console.log(`Getting Konva filter for: ${effectName} with settings:`, settings);
   
   try {
-    // Apply the specific effect
     switch (effectName) {
       case 'brightness':
-        return [createBrightnessFilter(settings)];
+        return [Konva.Filters.Brighten, { brightness: settings.value ?? 0 }];
       
       case 'contrast':
-        return [createContrastFilter(settings)];
+        return [Konva.Filters.Contrast, { contrast: settings.value ?? 0 }];
       
-      case 'saturation': {
-        // Scale UI value (-10 to 10) to effect range (-1 to 1)
+      case 'saturation': { 
         const scaledSaturation = settings.value !== undefined ? settings.value / 10 : 0;
-        console.log(`Saturation: UI Value=${settings.value}, Scaled=${scaledSaturation}`);
-        if (Konva && Konva.Filters && Konva.Filters.HSL) {
-          console.log("Using Konva HSL for Saturation");
-          return [Konva.Filters.HSL, { saturation: scaledSaturation }];
-        }
-        console.log("Using custom Saturation filter");
-        return [createSaturationFilter({ ...settings, value: scaledSaturation })];
+        return [Konva.Filters.HSL, { saturation: scaledSaturation }];
       }
       
-      case 'hue': {
+      case 'hue': { 
         const hueDegrees = settings.value !== undefined ? settings.value : 0;
-        console.log(`Hue: UI Value=${hueDegrees}`);
-        if (Konva && Konva.Filters && Konva.Filters.HSL) {
-           console.log("Using Konva HSL for Hue");
-          return [Konva.Filters.HSL, { hue: hueDegrees }];
-        }
-        console.log("Using custom Hue filter");
-        // Custom hue implementation
-        return [
-          function(imageData: KonvaImageData) {
-            const hueAdjust = hueDegrees / 360; // Convert degrees (0-360) to 0-1 range
-            const data = imageData.data;
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i], g = data[i + 1], b = data[i + 2];
-              
-              // RGB to HSL (Normalized 0-1)
-              const r_n = r / 255, g_n = g / 255, b_n = b / 255;
-              const max = Math.max(r_n, g_n, b_n), min = Math.min(r_n, g_n, b_n);
-              let h = 0, s = 0, l = (max + min) / 2;
-
-              if (max !== min) {
-                const d = max - min;
-                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-                switch(max) {
-                    case r_n: h = (g_n - b_n) / d + (g_n < b_n ? 6 : 0); break;
-                    case g_n: h = (b_n - r_n) / d + 2; break;
-                    case b_n: h = (r_n - g_n) / d + 4; break;
-                }
-                h /= 6;
-              }
-
-              // Adjust Hue: Add adjustment and wrap around using modulo
-              h = (h + hueAdjust % 1 + 1) % 1; // Ensure positive result
-
-              // HSL to RGB
-              const [newR, newG, newB] = hslToRgb(h, s, l);
-              data[i] = newR;
-              data[i + 1] = newG;
-              data[i + 2] = newB;
-            }
-          }
-        ];
+        return [Konva.Filters.HSL, { hue: hueDegrees }];
       }
-      
-      case 'blur':
-        const blurRadius = Math.max(0, Math.min(20, settings.radius || 0));
-        console.log("Applying blur with radius:", blurRadius);
-        
-        return [
-          function(imageData: KonvaImageData) {
-            const width = imageData.width;
-            const height = imageData.height;
-            const data = imageData.data;
-            
-            const tempData = new Uint8ClampedArray(data.length);
-            tempData.set(data);
-            
-            const sampleSize = Math.min(blurRadius, 5);
-            const passes = Math.ceil(blurRadius / 5);
-            
-            for (let pass = 0; pass < passes; pass++) {
-              for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                  let r = 0, g = 0, b = 0, count = 0;
-                  
-                  for (let kx = -sampleSize; kx <= sampleSize; kx++) {
-                    const px = Math.min(width - 1, Math.max(0, x + kx));
-                    const index = (y * width + px) * 4;
-                    
-                    r += tempData[index];
-                    g += tempData[index + 1];
-                    b += tempData[index + 2];
-                    count++;
-                  }
-                  
-                  const pixelIndex = (y * width + x) * 4;
-                  data[pixelIndex] = r / count;
-                  data[pixelIndex + 1] = g / count;
-                  data[pixelIndex + 2] = b / count;
-                }
-              }
-              
-              tempData.set(data);
-              
-              for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                  let r = 0, g = 0, b = 0, count = 0;
-                  
-                  for (let ky = -sampleSize; ky <= sampleSize; ky++) {
-                    const py = Math.min(height - 1, Math.max(0, y + ky));
-                    const index = (py * width + x) * 4;
-                    
-                    r += tempData[index];
-                    g += tempData[index + 1];
-                    b += tempData[index + 2];
-                    count++;
-                  }
-                  
-                  const pixelIndex = (y * width + x) * 4;
-                  data[pixelIndex] = r / count;
-                  data[pixelIndex + 1] = g / count;
-                  data[pixelIndex + 2] = b / count;
-                }
-              }
-              
-              if (pass < passes - 1) {
-                tempData.set(data);
-              }
-            }
-          }
-        ];
-      
+
+      case 'blur': 
+        return [Konva.Filters.Blur, { blurRadius: settings.radius ?? 0 }];
+
       case 'sharpen':
-        const sharpenAmount = Math.max(0, Math.min(5, settings.amount || 0));
-        console.log("Applying sharpen with amount:", sharpenAmount);
-        
-        return [
-          function(imageData: KonvaImageData) {
-            const width = imageData.width;
-            const height = imageData.height;
-            const data = imageData.data;
-            const amount = sharpenAmount * 0.5;
-            
-            const tempData = new Uint8ClampedArray(data.length);
-            tempData.set(data);
-            
-            for (let y = 1; y < height - 1; y++) {
-              for (let x = 1; x < width - 1; x++) {
-                const centerIndex = (y * width + x) * 4;
-                
-                for (let c = 0; c < 3; c++) {
-                  const center = tempData[centerIndex + c];
-                  const top = tempData[centerIndex - width * 4 + c];
-                  const left = tempData[centerIndex - 4 + c];
-                  const right = tempData[centerIndex + 4 + c];
-                  const bottom = tempData[centerIndex + width * 4 + c];
-                  
-                  const result = center * (1 + 4 * amount) - (top + left + right + bottom) * amount;
-                  
-                  data[centerIndex + c] = Math.min(255, Math.max(0, result));
-                }
-              }
-            }
-          }
-        ];
-      
+        return [Konva.Filters.Enhance, { enhance: (settings.amount ?? 0) * 0.5 }]; // Enhance seems closer to sharpen
+
       case 'pixelate':
-        const pixelSize = Math.max(1, Math.min(32, settings.pixelSize || 8));
-        console.log("Applying pixelate with size:", pixelSize);
-        
-        return [
-          function(imageData: KonvaImageData) {
-            const width = imageData.width;
-            const height = imageData.height;
-            const data = imageData.data;
-            
-            for (let y = 0; y < height; y += pixelSize) {
-              for (let x = 0; x < width; x += pixelSize) {
-                const sourceIndex = (y * width + x) * 4;
-                const r = data[sourceIndex];
-                const g = data[sourceIndex + 1];
-                const b = data[sourceIndex + 2];
-                
-                for (let blockY = 0; blockY < pixelSize && y + blockY < height; blockY++) {
-                  for (let blockX = 0; blockX < pixelSize && x + blockX < width; blockX++) {
-                    const targetIndex = ((y + blockY) * width + (x + blockX)) * 4;
-                    data[targetIndex] = r;
-                    data[targetIndex + 1] = g;
-                    data[targetIndex + 2] = b;
-                  }
-                }
-              }
-            }
-          }
-        ];
-      
+        return [Konva.Filters.Pixelate, { pixelSize: settings.pixelSize ?? 8 }];
+
       case 'noise':
-        const noise = Math.max(0, Math.min(1, settings.noise || 0.2));
-        console.log("Applying noise with amount:", noise);
-        
-        return [
-          function(imageData: KonvaImageData) {
-            const data = imageData.data;
-            const amount = noise * 255;
-            
-            for (let i = 0; i < data.length; i += 4) {
-              const random = (Math.random() * 2 - 1) * amount;
-              
-              data[i] = Math.min(255, Math.max(0, data[i] + random));
-              data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + random));
-              data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + random));
-            }
-          }
-        ];
-      
+        return [Konva.Filters.Noise, { noise: settings.noise ?? 0.2 }];
+
       case 'threshold':
-        const threshold = Math.max(0, Math.min(1, settings.threshold || 0.5));
-        console.log("Applying threshold with level:", threshold);
-        
-        return [
-          function(imageData: KonvaImageData) {
-            const data = imageData.data;
-            const thresholdValue = threshold * 255;
-            
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
-              const v = (r + g + b) / 3;
-              const value = v < thresholdValue ? 0 : 255;
-              
-              data[i] = data[i + 1] = data[i + 2] = value;
-            }
-          }
-        ];
-      
+        return [Konva.Filters.Threshold, { threshold: settings.threshold ?? 0.5 }];
+
       case 'posterize':
-        const levels = Math.max(2, Math.min(8, settings.levels || 4));
-        console.log("Applying posterize with levels:", levels);
+        return [Konva.Filters.Posterize, { levels: settings.levels ?? 4 }];
         
-        return [
-          function(imageData: KonvaImageData) {
-            const data = imageData.data;
-            const step = 255 / (levels - 1);
-            
-            for (let i = 0; i < data.length; i += 4) {
-              data[i] = Math.round(Math.round(data[i] / step) * step);
-              data[i + 1] = Math.round(Math.round(data[i + 1] / step) * step);
-              data[i + 2] = Math.round(Math.round(data[i + 2] / step) * step);
-            }
-          }
-        ];
-      
       case 'grayscale':
-        return [
-          function(imageData: KonvaImageData) {
-            const data = imageData.data;
-            
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
-              const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-              
-              data[i] = data[i + 1] = data[i + 2] = gray;
-            }
-          }
-        ];
-      
+        return [Konva.Filters.Grayscale, {}];
+        
       case 'sepia':
-        return [
-          function(imageData: KonvaImageData) {
-            const data = imageData.data;
-            
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
-              
-              data[i] = Math.min(255, (r * 0.393) + (g * 0.769) + (b * 0.189));
-              data[i + 1] = Math.min(255, (r * 0.349) + (g * 0.686) + (b * 0.168));
-              data[i + 2] = Math.min(255, (r * 0.272) + (g * 0.534) + (b * 0.131));
-            }
-          }
-        ];
-      
+        return [Konva.Filters.Sepia, {}];
+        
       case 'invert':
-        return [
-          function(imageData: KonvaImageData) {
-            const data = imageData.data;
-            
-            for (let i = 0; i < data.length; i += 4) {
-              data[i] = 255 - data[i];
-              data[i + 1] = 255 - data[i + 1];
-              data[i + 2] = 255 - data[i + 2];
-            }
-          }
-        ];
-      
-      case 'duotone':
-        return [createDuotoneEffect(settings)];
-      
-      case 'halftone':
-        return [createHalftoneEffect(settings)];
-      
-      case 'dithering':
-        const ditherThreshold = Math.max(0, Math.min(1, settings.threshold || 0.5)) * 255;
-        
-        console.log("Applying dithering with threshold:", ditherThreshold);
-        
-        return [
-          function(imageData: KonvaImageData) {
-            const width = imageData.width;
-            const height = imageData.height;
-            const data = imageData.data;
-            
-            const grayscale = new Uint8ClampedArray(width * height);
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
-              grayscale[i / 4] = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
-            }
-            
-            for (let y = 0; y < height; y++) {
-              for (let x = 0; x < width; x++) {
-                const index = y * width + x;
-                const oldPixel = grayscale[index];
-                const newPixel = oldPixel < ditherThreshold ? 0 : 255;
-                
-                data[index * 4] = data[index * 4 + 1] = data[index * 4 + 2] = newPixel;
-                
-                const error = oldPixel - newPixel;
-                
-                if (x + 1 < width) {
-                  grayscale[index + 1] += error * 7 / 16;
-                }
-                if (y + 1 < height) {
-                  if (x > 0) {
-                    grayscale[(y + 1) * width + (x - 1)] += error * 3 / 16;
-                  }
-                  grayscale[(y + 1) * width + x] += error * 5 / 16;
-                  if (x + 1 < width) {
-                    grayscale[(y + 1) * width + (x + 1)] += error * 1 / 16;
-                  }
-                }
-              }
-            }
-          }
-        ];
-      
-      case 'geometric':
-        return [createGeometricAbstraction(settings)];
-      
-      case 'stippling':
-        return [createStipplingEffect(settings)];
-      
-      case 'cellular':
-        return [createCellularAutomataEffect(settings)];
-      
-      case 'reaction-diffusion':
-        return [createReactionDiffusionEffect(settings)];
-      
+        return [Konva.Filters.Invert, {}];
+
+      // Keep custom filters for ones Konva doesn't have built-in
       case 'pencilSketch':
-        return [createPencilSketchEffect(settings)];
-      
-      case 'oilPainting':
-        return [createKuwaharaEffect(settings)];
-      
+        return [createPencilSketchEffect(settings), {}];
+      case 'halftone':
+        return [createHalftoneEffect(settings), {}];
+      case 'duotone':
+        return [createDuotoneEffect(settings), {}];
       case 'bloom':
-        return [createBloomEffect(settings)];
-      
+        return [createBloomEffect(settings), {}];
+      case 'oilPainting': // Kuwahara
+        return [createKuwaharaEffect(settings), {}];
+      case 'geometric':
+        return [createGeometricAbstraction(settings), {}];
+      case 'stippling':
+        return [createStipplingEffect(settings), {}];
+      case 'cellular':
+        return [createCellularAutomataEffect(settings), {}];
+      case 'reaction-diffusion':
+        return [createReactionDiffusionEffect(settings), {}];
+        
       default:
-        console.warn(`Unknown effect: ${effectName}`);
-        return [];
+        console.warn(`Unknown effect or no Konva filter: ${effectName}`);
+        return [null, null];
     }
   } catch (error) {
-    console.error(`Error applying effect ${effectName}:`, error);
-    return [];
+    console.error(`Error getting filter for ${effectName}:`, error);
+    return [null, null];
   }
 };
 
