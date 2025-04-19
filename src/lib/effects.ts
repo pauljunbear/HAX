@@ -229,11 +229,14 @@ const createSaturationFilter = (settings: Record<string, number>) => {
 
 // Note: The saturation case will be used in the applyEffect function switch statement below
 
-// Modify the applyEffect function signature to accept a filterRegion parameter
+// Define the expected return type for an effect function
+type EffectFunction = (imageData: KonvaImageData) => void;
+
+// Update applyEffect signature with explicit return type
 export const applyEffect = async (
   effectName: string | null, 
   settings: Record<string, number>
-) => {
+): Promise<[EffectFunction, Record<string, any>?] | [any, Record<string, any>?] | []> => {
   if (!effectName || typeof window === 'undefined') {
     console.log("Cannot apply effect: No effect name or not in browser");
     return [];

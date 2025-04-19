@@ -43,12 +43,16 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [showExportOptions, setShowExportOptions] = useState(false);
   
-  // Use imperative handle to expose methods
-  useImperativeHandle(ref, () => ({
+  // Define the imperative handle methods object in the main component scope
+  const imperativeHandleMethods = {
     exportImage: () => {
-      console.log("Export function called via ref");
-      if (!isBrowser || !stageRef.current) {
-        console.error("Export failed: Ref or browser context not available.");
+      console.log("Export function called via ref"); // Log: Function entry
+      if (!isBrowser) {
+        console.error("Export failed: Not in browser environment.");
+        return;
+      }
+      if (!stageRef.current) {
+        console.error("Export failed: Stage ref is not available.");
         return;
       }
 
@@ -65,6 +69,14 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         try {
           // --- Create Temporary Stage for Export ---
           console.log("Creating temporary stage for export...");
+          // Ensure Konva is available before creating Stage
+          const Konva = (window as any).Konva; // Access Konva globally if init worked
+          if (!Konva) {
+             console.error("Export failed: Konva is not initialized globally.");
+             setIsLoading(false);
+             return;
+          }
+          
           const tempStage = new Konva.Stage({
             container: document.createElement('div'), // Hidden container
             width: imageNode.width(),
@@ -126,7 +138,10 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         }
       }, 50); 
     }
-  }));
+  };
+
+  // Use imperative handle to expose methods
+  useImperativeHandle(ref, () => (imperativeHandleMethods));
 
   // Call onReady when the component is ready
   useEffect(() => {
@@ -136,7 +151,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       onReady(imperativeHandleMethods);
     }
     // Dependency array should include the object that onReady depends on
-  }, [stageRef, onReady, imperativeHandleMethods]);
+  }, [stageRef, onReady]); // Remove imperativeHandleMethods from deps here, it's stable
 
   // Detect browser environment to avoid SSR issues
   useEffect(() => {
