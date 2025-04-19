@@ -4,7 +4,7 @@ import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } f
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from '@/hooks/useImage';
 import { applyEffect, getFilterConfig, ensureKonvaInitialized } from '@/lib/effects';
-import SelectionTool, { SelectionType, SelectionData } from './SelectionTool';
+import { SelectionType, SelectionData } from './SelectionTool';
 import SelectionToolbar from './SelectionToolbar';
 
 interface ImageEditorProps {
@@ -43,47 +43,63 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [showExportOptions, setShowExportOptions] = useState(false);
   
-  // Selection-related state
-  const [selectionType, setSelectionType] = useState<SelectionType>(null);
-  const [selections, setSelections] = useState<SelectionData[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showSelectionTools, setShowSelectionTools] = useState(false);
-  const [applyMode, setApplyMode] = useState<'full' | 'selection' | 'inverse'>('full');
-
   // Use imperative handle to expose methods
   useImperativeHandle(ref, () => ({
     exportImage: () => {
-      if (!isBrowser || !stageRef.current) {
-        console.error("Cannot export: Not in browser or stageRef not available");
+      console.log("Export function called via ref"); // Log: Function entry
+      if (!isBrowser) {
+        console.error("Export failed: Not in browser environment.");
+        return;
+      }
+      if (!stageRef.current) {
+        console.error("Export failed: Stage ref is not available.");
         return;
       }
       
+      console.log(`Attempting export with format: ${exportFormat}, quality: ${exportQuality}`);
       setIsLoading(true);
-      console.log("Starting export process via ref");
       
-      // Use setTimeout to allow UI to update
+      // Use setTimeout to ensure loading state updates before potentially blocking operation
       setTimeout(() => {
         try {
+          console.log("Calling stageRef.current.toDataURL...");
           const dataURL = stageRef.current.toDataURL({
             mimeType: exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
             quality: exportQuality,
-            pixelRatio: 2, // Higher quality export
+            pixelRatio: 2, // Export at 2x resolution
           });
-          console.log(`Exported image as ${exportFormat} with quality ${exportQuality}`);
+          
+          if (!dataURL) {
+            console.error("Export failed: toDataURL returned null or empty.");
+            setError('Failed to generate image data for export.');
+            setIsLoading(false);
+            return;
+          }
+          
+          console.log(`Exported image dataURL length: ${dataURL.length}`);
+          console.log(`DataURL start: ${dataURL.substring(0, 100)}...`);
           
           const link = document.createElement('a');
           link.download = `imager-export.${exportFormat}`;
           link.href = dataURL;
+          
+          // Append, click, and remove the link to trigger download
+          console.log("Appending link to body...");
           document.body.appendChild(link);
+          console.log("Clicking link...");
           link.click();
+          console.log("Removing link from body...");
           document.body.removeChild(link);
+          
+          console.log("Export process completed successfully.");
           setIsLoading(false);
+          
         } catch (err) {
-          console.error("Export error via ref:", err);
-          setError('Error exporting image. Please try again.');
+          console.error("Export error caught:", err);
+          setError(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
           setIsLoading(false);
         }
-      }, 100);
+      }, 50); // Short delay
     }
   }));
 
@@ -409,26 +425,18 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       }
       
       try {
-        // Reset all filters
         imageNode.filters([]);
         imageNode.cache();
         
-        // If no active effect, reset and return
         if (!activeEffect) {
           console.log("No active effect, clearing all filters");
           imageNode.getLayer().batchDraw();
           return;
         }
         
-        // If we're in selection mode, don't apply the effect globally
-        if (applyMode !== 'full' && selectedId) {
-          console.log("In selection mode, skipping global effect application");
-          return;
-        }
+        console.log("Applying effect:", activeEffect, "with settings:", effectSettings);
         
-        console.log("Applying effect globally:", activeEffect, "with settings:", effectSettings);
-        
-        // Get filters and configuration for the active effect - no filter region for global effects
+        // Call applyEffect without selection/masking parameters
         const filterResult = await applyEffect(activeEffect, effectSettings || {});
         
         if (!filterResult || !filterResult[0]) {
@@ -437,19 +445,14 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         }
         
         const [filterClass, filterConfig] = filterResult;
-        
-        // Apply the filter
         imageNode.filters([filterClass]);
         
-        // Set filter-specific configuration
         if (filterConfig) {
-          console.log("Applying filter config:", filterConfig);
           Object.entries(filterConfig).forEach(([key, value]) => {
             imageNode[key] = value;
           });
         }
         
-        // Update the canvas
         imageNode.cache();
         imageNode.getLayer().batchDraw();
         console.log(`Applied ${activeEffect} effect successfully`);
@@ -459,7 +462,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     };
     
     applyFilters();
-  }, [activeEffect, effectSettings, image, isBrowser, applyMode, selectedId]);
+  }, [activeEffect, effectSettings, image, isBrowser]);
 
   // Export the image (This is the original export function, now accessible via ref)
   const handleExport = () => {
@@ -496,227 +499,6 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       onImageUpload?.(selectedImage);
     };
     tempImage.src = selectedImage;
-  };
-
-  // Handle when a selection is completed (drawn by user)
-  const handleSelectionComplete = (selection: SelectionData | null) => {
-    if (!selection) return;
-    
-    // Check if this is an update to an existing selection
-    const existingIndex = selections.findIndex(s => s.id === selection.id);
-    
-    if (existingIndex >= 0) {
-      // Update existing selection
-      const newSelections = [...selections];
-      newSelections[existingIndex] = selection;
-      setSelections(newSelections);
-    } else {
-      // Add new selection
-      setSelections([...selections, selection]);
-    }
-    
-    // Select the new selection
-    setSelectedId(selection.id);
-  };
-  
-  // Handle selecting an existing selection
-  const handleSelectExisting = (id: string | null) => {
-    setSelectedId(id);
-  };
-  
-  // Handle deleting a selection
-  const handleDeleteSelection = (id: string) => {
-    setSelections(selections.filter(s => s.id !== id));
-    setSelectedId(null);
-  };
-  
-  // Clear all selections
-  const handleClearSelections = () => {
-    setSelections([]);
-    setSelectedId(null);
-  };
-  
-  // Toggle selection tools
-  const toggleSelectionTools = () => {
-    setShowSelectionTools(prev => !prev);
-    if (!showSelectionTools) {
-      // Set default selection type when showing tools
-      setSelectionType('rectangle');
-    } else {
-      // Clear selection type when hiding tools
-      setSelectionType(null);
-    }
-  };
-  
-  // Handle applying effect to selection
-  const handleApplyToSelection = () => {
-    if (selectedId) {
-      setApplyMode('selection');
-      applyEffectWithMask();
-    }
-  };
-  
-  // Handle applying effect outside selection
-  const handleApplyOutsideSelection = () => {
-    if (selectedId) {
-      setApplyMode('inverse');
-      applyEffectWithMask();
-    }
-  };
-  
-  // Apply effect with masking
-  const applyEffectWithMask = async () => {
-    if (!stageRef.current || !selectedId) return;
-    
-    const imageNode = stageRef.current.findOne('Image');
-    if (!imageNode) {
-      console.error("Image node not found in Stage");
-      return;
-    }
-    
-    try {
-      // Reset filters first
-      imageNode.filters([]);
-      imageNode.cache();
-      
-      // If no active effect, just reset and return
-      if (!activeEffect) {
-        console.log("No active effect, clearing all filters");
-        imageNode.getLayer().batchDraw();
-        setApplyMode('full');
-        return;
-      }
-      
-      console.log(`Applying ${activeEffect} with mask mode: ${applyMode}`);
-      
-      // Get the selection
-      const selection = selections.find(s => s.id === selectedId);
-      if (!selection) {
-        console.error("Selected selection not found");
-        return;
-      }
-      
-      // Create a filter region object
-      const filterRegion = {
-        selection,
-        mode: applyMode
-      };
-      
-      // Get filters and configuration for the active effect, passing the filter region
-      const filterResult = await applyEffect(activeEffect, effectSettings || {}, filterRegion);
-      
-      if (!filterResult || !filterResult[0]) {
-        console.warn("No filter class returned for effect:", activeEffect);
-        return;
-      }
-      
-      const [filterClass, filterConfig] = filterResult;
-      
-      // Apply the filter
-      imageNode.filters([filterClass]);
-      
-      // Set filter-specific configuration
-      if (filterConfig) {
-        console.log("Applying filter config:", filterConfig);
-        Object.entries(filterConfig).forEach(([key, value]) => {
-          imageNode[key] = value;
-        });
-      }
-      
-      // Update the canvas
-      imageNode.cache();
-      imageNode.getLayer().batchDraw();
-      console.log(`Applied ${activeEffect} effect with masking`);
-      
-    } catch (error) {
-      console.error("Error applying filters with mask:", error);
-    }
-  };
-  
-  // Modified applyFilters to consider masking
-  useEffect(() => {
-    if (!isBrowser || !image) return;
-    
-    const initializeAndRedraw = async () => {
-      // Ensure Konva is properly initialized
-      await ensureKonvaInitialized();
-      
-      // Reset scale to fit properly in container
-      const scaleX = stageSize.width / imageSize.width;
-      const scaleY = stageSize.height / imageSize.height;
-      const scale = Math.min(scaleX, scaleY);
-      
-      console.log(`Redrawing image with scale: ${scale}`);
-      
-      // Make sure the image layer is redrawn with the new size
-      if (stageRef.current) {
-        stageRef.current.batchDraw();
-      }
-    };
-    
-    initializeAndRedraw();
-  }, [isBrowser, image, stageSize, imageSize, selections]);
-  
-  // Handle when selection mode changes to full
-  useEffect(() => {
-    if (applyMode !== 'full') {
-      // Reset to full image mode when selection/inverse is done
-      setApplyMode('full');
-    }
-  }, [activeEffect, effectSettings]);
-
-  // Add these handlers for the stage events
-  const handleMouseDown = (e: any) => {
-    if (!selectionType || !showSelectionTools) return;
-    
-    // Use target to make sure we're clicking on the stage
-    const target = e.target;
-    if (target === e.target.getStage()) {
-      const pos = e.target.getStage().getPointerPosition();
-      const selectionToolLayer = stageRef.current?.findOne('Layer:nth-child(2)');
-      if (selectionToolLayer) {
-        // We're simulating an event on the selection tool layer
-        selectionToolLayer.fire('mousedown', {
-          evt: e.evt,
-          target: target,
-          currentTarget: selectionToolLayer,
-          type: 'mousedown',
-          pointerId: e.pointerId
-        }, true);
-      }
-    }
-  };
-
-  const handleMouseMove = (e: any) => {
-    if (!selectionType || !showSelectionTools) return;
-    
-    const selectionToolLayer = stageRef.current?.findOne('Layer:nth-child(2)');
-    if (selectionToolLayer) {
-      // We're simulating an event on the selection tool layer
-      selectionToolLayer.fire('mousemove', {
-        evt: e.evt,
-        target: e.target,
-        currentTarget: selectionToolLayer,
-        type: 'mousemove',
-        pointerId: e.pointerId
-      }, true);
-    }
-  };
-
-  const handleMouseUp = (e: any) => {
-    if (!selectionType || !showSelectionTools) return;
-    
-    const selectionToolLayer = stageRef.current?.findOne('Layer:nth-child(2)');
-    if (selectionToolLayer) {
-      // We're simulating an event on the selection tool layer
-      selectionToolLayer.fire('mouseup', {
-        evt: e.evt,
-        target: e.target,
-        currentTarget: selectionToolLayer,
-        type: 'mouseup',
-        pointerId: e.pointerId
-      }, true);
-    }
   };
 
   // Render different states
@@ -847,40 +629,6 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         </div>
       )}
       
-      {/* Selection tools toggle button */}
-      {image && (
-        <div className="absolute top-4 right-4 z-10">
-          <button
-            onClick={toggleSelectionTools}
-            className={`p-2 rounded-full transition-colors ${
-              showSelectionTools
-                ? 'bg-[rgb(var(--primary))] text-white'
-                : 'bg-white/80 text-[rgb(var(--apple-gray-700))] border border-[rgb(var(--apple-gray-200))] shadow-sm hover:bg-[rgb(var(--apple-gray-50))]'
-            }`}
-            title="Selection Tools"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-          </button>
-        </div>
-      )}
-      
-      {/* Selection tools panel */}
-      {image && showSelectionTools && (
-        <div className="absolute right-4 top-16 w-64 bg-white/95 backdrop-blur-md shadow-lg rounded-lg border border-[rgb(var(--apple-gray-200))] z-10">
-          <SelectionToolbar
-            selectionType={selectionType}
-            setSelectionType={setSelectionType}
-            canClearSelections={selections.length > 0}
-            onClearSelections={handleClearSelections}
-            onApplyToSelection={handleApplyToSelection}
-            onApplyOutsideSelection={handleApplyOutsideSelection}
-            hasActiveSelection={!!selectedId}
-          />
-        </div>
-      )}
-      
       <Stage
         ref={stageRef}
         width={stageSize.width}
@@ -894,12 +642,6 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           zIndex: 1,
           visibility: 'visible',
         }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onTouchStart={handleMouseDown}
-        onTouchMove={handleMouseMove}
-        onTouchEnd={handleMouseUp}
       >
         {/* Main image layer */}
         <Layer>
@@ -914,21 +656,6 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
             />
           )}
         </Layer>
-        
-        {/* Selection tools layer */}
-        {image && (
-          <SelectionTool
-            stageWidth={stageSize.width}
-            stageHeight={stageSize.height}
-            selectionType={selectionType}
-            onSelectionComplete={handleSelectionComplete}
-            existingSelections={selections}
-            onSelectExisting={handleSelectExisting}
-            selectedId={selectedId}
-            onDeleteSelection={handleDeleteSelection}
-            isActive={!!selectionType || !!selectedId}
-          />
-        )}
       </Stage>
       
       {/* Control bar */}
