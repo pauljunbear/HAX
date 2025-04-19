@@ -43,8 +43,8 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [showExportOptions, setShowExportOptions] = useState(false);
   
-  // Use imperative handle to expose methods
-  useImperativeHandle(ref, () => ({
+  // Define the imperative handle methods object directly
+  const imperativeHandleMethods = {
     exportImage: () => {
       console.log("Export function called via ref"); // Log: Function entry
       if (!isBrowser) {
@@ -101,15 +101,20 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         }
       }, 50); // Short delay
     }
-  }));
+  };
 
-  // Call onReady when the component is ready (e.g., when stageRef is set)
+  // Expose the methods using useImperativeHandle
+  useImperativeHandle(ref, () => (imperativeHandleMethods));
+
+  // Call onReady when the component is ready
   useEffect(() => {
     if (stageRef.current && typeof onReady === 'function') {
       console.log("ImageEditor is ready, calling onReady callback");
-      onReady(ref); // Pass the forwarded ref itself
+      // Pass the object with the methods directly
+      onReady(imperativeHandleMethods);
     }
-  }, [stageRef, onReady, ref]);
+    // Dependency array should include the object that onReady depends on
+  }, [stageRef, onReady, imperativeHandleMethods]);
 
   // Detect browser environment to avoid SSR issues
   useEffect(() => {

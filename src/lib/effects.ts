@@ -191,36 +191,32 @@ const createContrastFilter = (settings: Record<string, number>) => {
 // Update createSaturationFilter function to handle masking
 const createSaturationFilter = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
-    const saturation = settings.value || 0;
+    const saturation = settings.value || 0; // This value is already scaled -1 to 1
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
       
-      // Convert RGB to HSL
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      let h, s, l = (max + min) / 2;
-      
-      if (max === min) {
-        h = s = 0; // achromatic
-      } else {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        
-        switch (max) {
-          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-          case g: h = (b - r) / d + 2; break;
-          case b: h = (r - g) / d + 4; break;
-          default: h = 0;
+      // Correct RGB to HSL conversion (normalize first)
+      const r_norm = r / 255, g_norm = g / 255, b_norm = b / 255;
+      const max_norm = Math.max(r_norm, g_norm, b_norm);
+      const min_norm = Math.min(r_norm, g_norm, b_norm);
+      let h = 0, s = 0, l = (max_norm + min_norm) / 2;
+
+      if (max_norm !== min_norm) {
+        const d = max_norm - min_norm;
+        s = l > 0.5 ? d / (2 - max_norm - min_norm) : d / (max_norm + min_norm);
+        switch (max_norm) {
+          case r_norm: h = (g_norm - b_norm) / d + (g_norm < b_norm ? 6 : 0); break;
+          case g_norm: h = (b_norm - r_norm) / d + 2; break;
+          case b_norm: h = (r_norm - g_norm) / d + 4; break;
         }
-        
-        h /= 6;
+        h /= 6; // h is now 0-1
       }
       
-      // Adjust saturation
-      s = Math.min(1, Math.max(0, s + saturation / 10)); // Scale saturation adjustment
+      // Adjust saturation (remove the extra division by 10)
+      s = Math.min(1, Math.max(0, s + saturation)); // Use the scaled value directly
       
       // Convert back to RGB
       const adjustedColor = hslToRgb(h, s, l);
@@ -271,48 +267,51 @@ export const applyEffect = async (
         return [createContrastFilter(settings)];
       
       case 'saturation':
+        // Scale saturation value from UI range (-10 to 10) to effect range (-1 to 1)
         const scaledSaturation = settings.value ? settings.value / 10 : 0;
+        // Use Konva's HSL filter if available
         if (Konva.Filters.HSL) {
           return [Konva.Filters.HSL, { saturation: scaledSaturation }];
         }
+        // Otherwise use our custom implementation
+        // Pass the already scaled value
         return [createSaturationFilter({ ...settings, value: scaledSaturation })];
       
       case 'hue':
+        // Use Konva's HSL filter if available
         if (Konva.Filters.HSL) {
           return [Konva.Filters.HSL, { hue: settings.value || 0 }];
         }
+        
+        // Custom hue implementation with corrected HSL conversion
         return [
           function(imageData: KonvaImageData) {
-            const hueAdjust = (settings.value || 0) / 360;
+            const hueAdjust = (settings.value || 0) / 360; // Hue is 0-360
             const data = imageData.data;
             for (let i = 0; i < data.length; i += 4) {
               const r = data[i];
               const g = data[i + 1];
               const b = data[i + 2];
               
-              // Convert RGB to HSL
-              const max = Math.max(r, g, b);
-              const min = Math.min(r, g, b);
-              let h, s, l = (max + min) / 2;
-              
-              if (max === min) {
-                h = s = 0; // achromatic
-              } else {
-                const d = max - min;
-                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-                
-                switch (max) {
-                  case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                  case g: h = (b - r) / d + 2; break;
-                  case b: h = (r - g) / d + 4; break;
-                  default: h = 0;
+              // Correct RGB to HSL conversion
+              const r_norm = r / 255, g_norm = g / 255, b_norm = b / 255;
+              const max_norm = Math.max(r_norm, g_norm, b_norm);
+              const min_norm = Math.min(r_norm, g_norm, b_norm);
+              let h = 0, s = 0, l = (max_norm + min_norm) / 2;
+
+              if (max_norm !== min_norm) {
+                const d = max_norm - min_norm;
+                s = l > 0.5 ? d / (2 - max_norm - min_norm) : d / (max_norm + min_norm);
+                switch (max_norm) {
+                  case r_norm: h = (g_norm - b_norm) / d + (g_norm < b_norm ? 6 : 0); break;
+                  case g_norm: h = (b_norm - r_norm) / d + 2; break;
+                  case b_norm: h = (r_norm - g_norm) / d + 4; break;
                 }
-                
                 h /= 6;
               }
               
               // Adjust hue
-              h = (h + hueAdjust) % 1;
+              h = (h + hueAdjust + 1) % 1; // Ensure positive modulo
               
               // Convert back to RGB
               const adjustedColor = hslToRgb(h, s, l);
@@ -626,7 +625,7 @@ export const applyEffect = async (
         return [createPencilSketchEffect(settings)];
       
       case 'oilPainting':
-        return [createOilPaintingEffect(settings)];
+        return [createKuwaharaEffect(settings)];
       
       case 'bloom':
         return [createBloomEffect(settings)];
@@ -1335,55 +1334,90 @@ const createBloomEffect = (settings: Record<string, number>) => {
   };
 };
 
-// Add new effect function for Oil Painting (Simplified)
-const createOilPaintingEffect = (settings: Record<string, number>) => {
-  return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
-    const blurRadius = Math.round(settings.blur || 4);
-    const noiseAmount = settings.noise || 0.1;
+// Add Kuwahara filter implementation
+// Adapted from https://github.com/ogus/kuwahara
+const createKuwaharaEffect = (settings: Record<string, number>) => {
+  const radius = Math.round(settings.radius || 5); // Radius for the filter kernel
 
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
+  // Helper function to calculate mean and variance for a region
+  const calculateMeanVariance = (imageData: KonvaImageData, x: number, y: number, radius: number, quadrant: number) => {
+    const { data, width, height } = imageData;
+    let meanR = 0, meanG = 0, meanB = 0;
+    let varianceR = 0, varianceG = 0, varianceB = 0;
+    let count = 0;
 
-    const kernelSize = blurRadius * 2 + 1;
-    const kernelArea = kernelSize * kernelSize;
+    let startX = x - radius, startY = y - radius;
+    let endX = x + radius, endY = y + radius;
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        let sumR = 0, sumG = 0, sumB = 0;
-        let count = 0;
+    // Adjust start/end based on quadrant (0: TL, 1: TR, 2: BL, 3: BR)
+    if (quadrant === 0) { endX = x; endY = y; }
+    if (quadrant === 1) { startX = x; endY = y; }
+    if (quadrant === 2) { endX = x; startY = y; }
+    if (quadrant === 3) { startX = x; startY = y; }
 
-        for (let ky = -blurRadius; ky <= blurRadius; ky++) {
-          for (let kx = -blurRadius; kx <= blurRadius; kx++) {
-            const px = Math.min(width - 1, Math.max(0, x + kx));
-            const py = Math.min(height - 1, Math.max(0, y + ky));
-            const index = (py * width + px) * 4;
-            
-            sumR += tempData[index];
-            sumG += tempData[index + 1];
-            sumB += tempData[index + 2];
-            count++;
-          }
-        }
-        
-        const pixelIndex = (y * width + x) * 4;
-        data[pixelIndex] = sumR / count;
-        data[pixelIndex + 1] = sumG / count;
-        data[pixelIndex + 2] = sumB / count;
+    for (let cy = startY; cy <= endY; cy++) {
+      for (let cx = startX; cx <= endX; cx++) {
+        const px = Math.min(width - 1, Math.max(0, cx));
+        const py = Math.min(height - 1, Math.max(0, cy));
+        const index = (py * width + px) * 4;
+
+        meanR += data[index];
+        meanG += data[index + 1];
+        meanB += data[index + 2];
+        count++;
+      }
+    }
+
+    if (count === 0) return { mean: { r: 0, g: 0, b: 0 }, variance: Infinity };
+
+    meanR /= count;
+    meanG /= count;
+    meanB /= count;
+
+    // Calculate variance
+    for (let cy = startY; cy <= endY; cy++) {
+      for (let cx = startX; cx <= endX; cx++) {
+        const px = Math.min(width - 1, Math.max(0, cx));
+        const py = Math.min(height - 1, Math.max(0, cy));
+        const index = (py * width + px) * 4;
+
+        varianceR += Math.pow(data[index] - meanR, 2);
+        varianceG += Math.pow(data[index + 1] - meanG, 2);
+        varianceB += Math.pow(data[index + 2] - meanB, 2);
       }
     }
     
-    for (let i = 0; i < data.length; i += 4) {
-      const pixelIndex = i / 4;
-      const x = pixelIndex % width;
-      const y = Math.floor(pixelIndex / width);
+    // Use combined variance (or just luminance variance for simplicity/performance)
+    const totalVariance = (varianceR + varianceG + varianceB) / count; 
 
-      const noise = (Math.random() - 0.5) * 2 * noiseAmount * 255;
-      data[i] = Math.min(255, Math.max(0, data[i] + noise));
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+    return { mean: { r: meanR, g: meanG, b: meanB }, variance: totalVariance };
+  };
+
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let minVariance = Infinity;
+        let bestMean = { r: 0, g: 0, b: 0 };
+
+        // Calculate mean and variance for each quadrant
+        for (let quadrant = 0; quadrant < 4; quadrant++) {
+          const { mean, variance } = calculateMeanVariance({ data: tempData, width, height }, x, y, radius, quadrant);
+          if (variance < minVariance) {
+            minVariance = variance;
+            bestMean = mean;
+          }
+        }
+
+        // Set the pixel color to the mean of the quadrant with the minimum variance
+        const index = (y * width + x) * 4;
+        data[index] = Math.round(bestMean.r);
+        data[index + 1] = Math.round(bestMean.g);
+        data[index + 2] = Math.round(bestMean.b);
+      }
     }
   };
 };
@@ -1588,8 +1622,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     label: 'Oil Painting',
     category: 'Artistic',
     settings: {
-      blur: { label: 'Blur', min: 0, max: 10, default: 4, step: 1 },
-      noise: { label: 'Noise', min: 0, max: 0.5, default: 0.1, step: 0.01 },
+      radius: { label: 'Brush Size', min: 1, max: 10, default: 5, step: 1 },
     },
   },
   
