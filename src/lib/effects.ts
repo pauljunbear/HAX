@@ -188,41 +188,65 @@ const createContrastFilter = (settings: Record<string, number>) => {
 
 // Note: The contrast case will be used in the applyEffect function switch statement below
 
-// Update createSaturationFilter function to handle masking
+// Helper function to convert HSL to RGB - Ensure this is accurate
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  let r, g, b;
+
+  if (s === 0) {
+    r = g = b = l; // achromatic
+  } else {
+    const hue2rgb = (p: number, q: number, t: number): number => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+// Update createSaturationFilter function
 const createSaturationFilter = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
-    const saturation = settings.value || 0; // This value is already scaled -1 to 1
+    const saturationAdjustment = settings.value || 0; // Scaled value (-1 to 1)
     const data = imageData.data;
     for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
+      const r = data[i], g = data[i + 1], b = data[i + 2];
       
-      // Correct RGB to HSL conversion (normalize first)
-      const r_norm = r / 255, g_norm = g / 255, b_norm = b / 255;
-      const max_norm = Math.max(r_norm, g_norm, b_norm);
-      const min_norm = Math.min(r_norm, g_norm, b_norm);
-      let h = 0, s = 0, l = (max_norm + min_norm) / 2;
+      // RGB to HSL (Normalized 0-1)
+      const r_n = r / 255, g_n = g / 255, b_n = b / 255;
+      const max = Math.max(r_n, g_n, b_n), min = Math.min(r_n, g_n, b_n);
+      let h = 0, s = 0, l = (max + min) / 2;
 
-      if (max_norm !== min_norm) {
-        const d = max_norm - min_norm;
-        s = l > 0.5 ? d / (2 - max_norm - min_norm) : d / (max_norm + min_norm);
-        switch (max_norm) {
-          case r_norm: h = (g_norm - b_norm) / d + (g_norm < b_norm ? 6 : 0); break;
-          case g_norm: h = (b_norm - r_norm) / d + 2; break;
-          case b_norm: h = (r_norm - g_norm) / d + 4; break;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch(max) {
+            case r_n: h = (g_n - b_n) / d + (g_n < b_n ? 6 : 0); break;
+            case g_n: h = (b_n - r_n) / d + 2; break;
+            case b_n: h = (r_n - g_n) / d + 4; break;
         }
-        h /= 6; // h is now 0-1
+        h /= 6;
       }
-      
-      // Adjust saturation (remove the extra division by 10)
-      s = Math.min(1, Math.max(0, s + saturation)); // Use the scaled value directly
-      
-      // Convert back to RGB
-      const adjustedColor = hslToRgb(h, s, l);
-      data[i] = adjustedColor[0];
-      data[i + 1] = adjustedColor[1];
-      data[i + 2] = adjustedColor[2];
+
+      // Adjust Saturation: Add the adjustment factor.
+      // Clamp the result between 0 and 1.
+      s = Math.max(0, Math.min(1, s + saturationAdjustment));
+
+      // HSL to RGB
+      const [newR, newG, newB] = hslToRgb(h, s, l);
+      data[i] = newR;
+      data[i + 1] = newG;
+      data[i + 2] = newB;
     }
   };
 };
@@ -269,61 +293,62 @@ export const applyEffect = async (
       case 'contrast':
         return [createContrastFilter(settings)];
       
-      case 'saturation':
-        // Scale saturation value from UI range (-10 to 10) to effect range (-1 to 1)
-        const scaledSaturation = settings.value ? settings.value / 10 : 0;
-        // Use Konva's HSL filter if available
-        if (Konva.Filters.HSL) {
+      case 'saturation': {
+        // Scale UI value (-10 to 10) to effect range (-1 to 1)
+        const scaledSaturation = settings.value !== undefined ? settings.value / 10 : 0;
+        console.log(`Saturation: UI Value=${settings.value}, Scaled=${scaledSaturation}`);
+        if (Konva && Konva.Filters && Konva.Filters.HSL) {
+          console.log("Using Konva HSL for Saturation");
           return [Konva.Filters.HSL, { saturation: scaledSaturation }];
         }
-        // Otherwise use our custom implementation
-        // Pass the already scaled value
+        console.log("Using custom Saturation filter");
         return [createSaturationFilter({ ...settings, value: scaledSaturation })];
+      }
       
-      case 'hue':
-        // Use Konva's HSL filter if available
-        if (Konva.Filters.HSL) {
-          return [Konva.Filters.HSL, { hue: settings.value || 0 }];
+      case 'hue': {
+        const hueDegrees = settings.value !== undefined ? settings.value : 0;
+        console.log(`Hue: UI Value=${hueDegrees}`);
+        if (Konva && Konva.Filters && Konva.Filters.HSL) {
+           console.log("Using Konva HSL for Hue");
+          return [Konva.Filters.HSL, { hue: hueDegrees }];
         }
-        
-        // Custom hue implementation with corrected HSL conversion
+        console.log("Using custom Hue filter");
+        // Custom hue implementation
         return [
           function(imageData: KonvaImageData) {
-            const hueAdjust = (settings.value || 0) / 360; // Hue is 0-360
+            const hueAdjust = hueDegrees / 360; // Convert degrees (0-360) to 0-1 range
             const data = imageData.data;
             for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
+              const r = data[i], g = data[i + 1], b = data[i + 2];
               
-              // Correct RGB to HSL conversion
-              const r_norm = r / 255, g_norm = g / 255, b_norm = b / 255;
-              const max_norm = Math.max(r_norm, g_norm, b_norm);
-              const min_norm = Math.min(r_norm, g_norm, b_norm);
-              let h = 0, s = 0, l = (max_norm + min_norm) / 2;
+              // RGB to HSL (Normalized 0-1)
+              const r_n = r / 255, g_n = g / 255, b_n = b / 255;
+              const max = Math.max(r_n, g_n, b_n), min = Math.min(r_n, g_n, b_n);
+              let h = 0, s = 0, l = (max + min) / 2;
 
-              if (max_norm !== min_norm) {
-                const d = max_norm - min_norm;
-                s = l > 0.5 ? d / (2 - max_norm - min_norm) : d / (max_norm + min_norm);
-                switch (max_norm) {
-                  case r_norm: h = (g_norm - b_norm) / d + (g_norm < b_norm ? 6 : 0); break;
-                  case g_norm: h = (b_norm - r_norm) / d + 2; break;
-                  case b_norm: h = (r_norm - g_norm) / d + 4; break;
+              if (max !== min) {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch(max) {
+                    case r_n: h = (g_n - b_n) / d + (g_n < b_n ? 6 : 0); break;
+                    case g_n: h = (b_n - r_n) / d + 2; break;
+                    case b_n: h = (r_n - g_n) / d + 4; break;
                 }
                 h /= 6;
               }
-              
-              // Adjust hue
-              h = (h + hueAdjust + 1) % 1; // Ensure positive modulo
-              
-              // Convert back to RGB
-              const adjustedColor = hslToRgb(h, s, l);
-              data[i] = adjustedColor[0];
-              data[i + 1] = adjustedColor[1];
-              data[i + 2] = adjustedColor[2];
+
+              // Adjust Hue: Add adjustment and wrap around using modulo
+              h = (h + hueAdjust % 1 + 1) % 1; // Ensure positive result
+
+              // HSL to RGB
+              const [newR, newG, newB] = hslToRgb(h, s, l);
+              data[i] = newR;
+              data[i + 1] = newG;
+              data[i + 2] = newB;
             }
           }
         ];
+      }
       
       case 'blur':
         const blurRadius = Math.max(0, Math.min(20, settings.radius || 0));
@@ -671,33 +696,6 @@ function getBrightness(imageData: ImageData, x: number, y: number, size: number,
 // Helper function to interpolate between two values
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
-}
-
-// Helper function to convert HSL to RGB
-function hslToRgb(h: number, s: number, l: number) {
-  let r, g, b;
-  
-  if (s === 0) {
-    r = g = b = l;
-  } else {
-    const hue2rgb = (p: number, q: number, t: number) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-      return p;
-    };
-    
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    
-    r = hue2rgb(p, q, h + 1/3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1/3);
-  }
-  
-  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
 // Implementation of geometric abstraction effect
