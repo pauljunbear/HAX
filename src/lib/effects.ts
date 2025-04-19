@@ -285,36 +285,6 @@ export const applyEffect = async (
   }
 };
 
-// Helper function to calculate average brightness of an area
-function getBrightness(imageData: ImageData, x: number, y: number, size: number, width: number, height: number) {
-  let totalBrightness = 0;
-  let pixelCount = 0;
-  
-  const startX = Math.max(0, x);
-  const startY = Math.max(0, y);
-  const endX = Math.min(width, x + size);
-  const endY = Math.min(height, y + size);
-  
-  for (let py = startY; py < endY; py++) {
-    for (let px = startX; px < endX; px++) {
-      const i = (py * width + px) * 4;
-      const r = imageData.data[i];
-      const g = imageData.data[i + 1];
-      const b = imageData.data[i + 2];
-      const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-      totalBrightness += brightness;
-      pixelCount++;
-    }
-  }
-  
-  return pixelCount > 0 ? totalBrightness / pixelCount : 0;
-}
-
-// Helper function to interpolate between two values
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
-
 // Implementation of geometric abstraction effect
 const createGeometricAbstraction = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
