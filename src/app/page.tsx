@@ -165,23 +165,21 @@ export default function Home() {
   };
 
   // Callback to get the ref from ImageEditor
-  const handleEditorReady = (ref: any) => {
-    console.log("ImageEditor ref received in Home component");
-    setImageEditorRef(ref);
+  const handleEditorReady = (editorInstance: any) => {
+    console.log("ImageEditor instance received in Home component:", editorInstance);
+    // Store the instance (which has the exportImage method)
+    setImageEditorRef(editorInstance);
   };
 
   const handleExportClick = () => {
-    // Access the .current property of the ref object
-    const editorInstance = imageEditorRef?.current;
-    
-    if (editorInstance && typeof editorInstance.exportImage === 'function') {
-      console.log("Triggering export via imageEditorRef.current");
-      editorInstance.exportImage();
+    // Now imageEditorRef directly holds the object with the method
+    if (imageEditorRef && typeof imageEditorRef.exportImage === 'function') {
+      console.log("Triggering export via stored editor instance");
+      imageEditorRef.exportImage();
     } else {
-      console.error("ImageEditor ref.current or exportImage method not available.", { 
-        refExists: !!imageEditorRef,
-        refCurrentExists: !!editorInstance,
-        isFunction: typeof editorInstance?.exportImage 
+      console.error("ImageEditor instance or exportImage method not available.", {
+        refExists: !!imageEditorRef, // Should now be true if handleEditorReady was called
+        isFunction: typeof imageEditorRef?.exportImage
       });
     }
   };
