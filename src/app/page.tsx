@@ -171,11 +171,18 @@ export default function Home() {
   };
 
   const handleExportClick = () => {
-    if (imageEditorRef && typeof imageEditorRef.exportImage === 'function') {
-      console.log("Triggering export from Home component");
-      imageEditorRef.exportImage();
+    // Access the .current property of the ref object
+    const editorInstance = imageEditorRef?.current;
+    
+    if (editorInstance && typeof editorInstance.exportImage === 'function') {
+      console.log("Triggering export via imageEditorRef.current");
+      editorInstance.exportImage();
     } else {
-      console.error("ImageEditor ref or exportImage method not available.");
+      console.error("ImageEditor ref.current or exportImage method not available.", { 
+        refExists: !!imageEditorRef,
+        refCurrentExists: !!editorInstance,
+        isFunction: typeof editorInstance?.exportImage 
+      });
     }
   };
 
