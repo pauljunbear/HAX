@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from '@/hooks/useImage';
 import { applyEffect, getFilterConfig, ensureKonvaInitialized } from '@/lib/effects';
@@ -12,17 +12,22 @@ interface ImageEditorProps {
   activeEffect?: string | null;
   effectSettings?: Record<string, number>;
   onImageUpload?: (imageDataUrl: string) => void;
+  onReady?: (ref: any) => void;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
-// Make sure nothing related to canvas/konva is imported or used until we're in the browser
-const ImageEditor: React.FC<ImageEditorProps> = ({
-  selectedImage,
-  activeEffect,
-  effectSettings,
-  onImageUpload,
-}) => {
+// Wrap component with forwardRef
+const ImageEditor = forwardRef<any, ImageEditorProps>((
+  {
+    selectedImage,
+    activeEffect,
+    effectSettings,
+    onImageUpload,
+    onReady,
+  },
+  ref
+) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stageRef = useRef<any>(null);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
@@ -44,6 +49,51 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showSelectionTools, setShowSelectionTools] = useState(false);
   const [applyMode, setApplyMode] = useState<'full' | 'selection' | 'inverse'>('full');
+
+  // Use imperative handle to expose methods
+  useImperativeHandle(ref, () => ({
+    exportImage: () => {
+      if (!isBrowser || !stageRef.current) {
+        console.error("Cannot export: Not in browser or stageRef not available");
+        return;
+      }
+      
+      setIsLoading(true);
+      console.log("Starting export process via ref");
+      
+      // Use setTimeout to allow UI to update
+      setTimeout(() => {
+        try {
+          const dataURL = stageRef.current.toDataURL({
+            mimeType: exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
+            quality: exportQuality,
+            pixelRatio: 2, // Higher quality export
+          });
+          console.log(`Exported image as ${exportFormat} with quality ${exportQuality}`);
+          
+          const link = document.createElement('a');
+          link.download = `imager-export.${exportFormat}`;
+          link.href = dataURL;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setIsLoading(false);
+        } catch (err) {
+          console.error("Export error via ref:", err);
+          setError('Error exporting image. Please try again.');
+          setIsLoading(false);
+        }
+      }, 100);
+    }
+  }));
+
+  // Call onReady when the component is ready (e.g., when stageRef is set)
+  useEffect(() => {
+    if (stageRef.current && typeof onReady === 'function') {
+      console.log("ImageEditor is ready, calling onReady callback");
+      onReady(ref); // Pass the forwarded ref itself
+    }
+  }, [stageRef, onReady, ref]);
 
   // Detect browser environment to avoid SSR issues
   useEffect(() => {
@@ -411,36 +461,17 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
     applyFilters();
   }, [activeEffect, effectSettings, image, isBrowser, applyMode, selectedId]);
 
-  // Export the image
+  // Export the image (This is the original export function, now accessible via ref)
   const handleExport = () => {
-    if (!isBrowser || !stageRef.current) return;
-    
-    setIsLoading(true);
-    console.log("Starting export process");
-    
-    // Use setTimeout to allow UI to update and show loading state
-    setTimeout(() => {
-      try {
-        const dataURL = stageRef.current.toDataURL({
-          mimeType: exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
-          quality: exportQuality,
-          pixelRatio: 2, // Higher quality export
-        });
-        console.log(`Exported image as ${exportFormat} with quality ${exportQuality}`);
-        
-        const link = document.createElement('a');
-        link.download = `imager-export.${exportFormat}`;
-        link.href = dataURL;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setIsLoading(false);
-      } catch (err) {
-        console.error("Export error:", err);
-        setError('Error exporting image. Please try again.');
-        setIsLoading(false);
-      }
-    }, 100);
+    // This internal handler can now just call the exposed method if needed,
+    // but the primary export trigger is now external via the ref.
+    // We can keep the internal button logic if we still want an export button inside ImageEditor.
+    console.log("Internal export button clicked");
+    if (ref && typeof ref === 'object' && ref.current && typeof ref.current.exportImage === 'function') {
+      ref.current.exportImage();
+    } else {
+       console.error("Ref or exportImage method not available for internal export");
+    }
   };
 
   // Export quality control
@@ -925,7 +956,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  Export
+                  Export (Internal)
                 </button>
                 
                 <div className="relative group">
@@ -1016,6 +1047,6 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default ImageEditor; 
