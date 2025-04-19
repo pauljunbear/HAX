@@ -274,6 +274,12 @@ export const applyEffect = async (
         return [createCellularAutomataEffect(settings), {}];
       case 'reaction-diffusion':
         return [createReactionDiffusionEffect(settings), {}];
+      case 'vignette':
+        return [createVignetteEffect(settings), {}];
+      case 'chromaticAberration':
+        return [createChromaticAberrationEffect(settings), {}];
+      case 'scanLines':
+        return [createScanLinesEffect(settings), {}];
         
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
@@ -1010,6 +1016,110 @@ const createKuwaharaEffect = (settings: Record<string, number>) => {
   };
 };
 
+// Add improved Vignette effect function
+const createVignetteEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const amount = settings.amount ?? 0.5; // 0 to 1
+    const falloff = settings.falloff ?? 0.5; // 0.1 to 1 (controls hardness)
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+    
+    // Pre-calculate for efficiency
+    const scale = maxDist * falloff;
+    const invAmount = 1.0 - amount;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Calculate vignette factor (0 at edge, 1 at center)
+        const factor = Math.max(0, Math.min(1, 1.0 - dist / scale));
+        // Apply vignette: lerp between original color and black based on factor and amount
+        const multiplier = factor * amount + invAmount;
+
+        const index = (y * width + x) * 4;
+        data[index] *= multiplier;
+        data[index + 1] *= multiplier;
+        data[index + 2] *= multiplier;
+      }
+    }
+  };
+};
+
+// Add improved Chromatic Aberration effect function
+const createChromaticAberrationEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const amount = settings.amount ?? 5;
+    const angleRad = (settings.angle ?? 45) * (Math.PI / 180);
+    const cosAngle = Math.cos(angleRad);
+    const sinAngle = Math.sin(angleRad);
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        
+        // Calculate offsets for R and B channels based on angle and amount
+        const rOffsetX = Math.round(amount * cosAngle);
+        const rOffsetY = Math.round(amount * sinAngle);
+        const bOffsetX = -Math.round(amount * cosAngle);
+        const bOffsetY = -Math.round(amount * sinAngle);
+
+        // Sample Red channel from offset position
+        const rX = Math.min(width - 1, Math.max(0, x + rOffsetX));
+        const rY = Math.min(height - 1, Math.max(0, y + rOffsetY));
+        const rIndex = (rY * width + rX) * 4;
+        data[index] = tempData[rIndex]; // Red
+
+        // Green channel remains at original position
+        data[index + 1] = tempData[index + 1]; // Green
+
+        // Sample Blue channel from offset position
+        const bX = Math.min(width - 1, Math.max(0, x + bOffsetX));
+        const bY = Math.min(height - 1, Math.max(0, y + bOffsetY));
+        const bIndex = (bY * width + bX) * 4;
+        data[index + 2] = tempData[bIndex + 2]; // Blue
+        
+        data[index + 3] = tempData[index + 3]; // Alpha
+      }
+    }
+  };
+};
+
+// Add improved Scan Lines effect function
+const createScanLinesEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const frequency = Math.max(1, settings.frequency ?? 5);
+    const opacity = settings.opacity ?? 0.3;
+    const multiplier = 1.0 - opacity; // How much to darken
+
+    for (let y = 0; y < height; y++) {
+      if (y % frequency === 0) { // Apply darkening every `frequency` pixels
+        for (let x = 0; x < width; x++) {
+          const index = (y * width + x) * 4;
+          data[index] *= multiplier;
+          data[index + 1] *= multiplier;
+          data[index + 2] *= multiplier;
+        }
+      }
+    }
+  };
+};
+
 // Initialize Konva when in browser environment
 if (typeof window !== 'undefined') {
   console.log("Browser environment detected, initializing Konva");
@@ -1211,6 +1321,30 @@ export const effectsConfig: Record<string, EffectConfig> = {
     category: 'Artistic',
     settings: {
       radius: { label: 'Brush Size', min: 1, max: 10, default: 5, step: 1 },
+    },
+  },
+  vignette: {
+    label: 'Vignette',
+    category: 'Artistic',
+    settings: {
+      amount: { label: 'Amount', min: 0, max: 1, default: 0.5, step: 0.05 },
+      falloff: { label: 'Falloff', min: 0.1, max: 1, default: 0.5, step: 0.05 },
+    },
+  },
+  chromaticAberration: {
+    label: 'Chromatic Aberration',
+    category: 'Artistic',
+    settings: {
+      amount: { label: 'Amount', min: 0, max: 20, default: 5, step: 1 },
+      angle: { label: 'Angle', min: 0, max: 360, default: 45, step: 5 },
+    },
+  },
+  scanLines: {
+    label: 'Scan Lines',
+    category: 'Artistic',
+    settings: {
+      frequency: { label: 'Frequency', min: 1, max: 20, default: 5, step: 1 },
+      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.3, step: 0.05 },
     },
   },
   
