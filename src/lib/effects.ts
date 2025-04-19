@@ -282,12 +282,8 @@ export const applyEffect = async (
         return [createScanLinesEffect(settings), {}];
         
       // Add cases for the newly added effects
-      case 'watercolor':
-        return [createWatercolorEffect(settings), {}];
       case 'crosshatch':
         return [createCrosshatchEffect(settings), {}];
-      case 'tiltShift':
-        return [createTiltShiftEffect(settings), {}];
       case 'dotScreen':
         return [createDotScreenEffect(settings), {}];
       case 'oldPhoto':
@@ -1138,70 +1134,6 @@ const createScanLinesEffect = (settings: Record<string, number>) => {
   };
 };
 
-// Watercolor Effect (Simplified: Blur + Noise + Edge Darkening)
-const createWatercolorEffect = (settings: Record<string, number>) => {
-  return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
-    const blurRadius = Math.round(settings.blur ?? 5);
-    const bleed = settings.bleed ?? 0.3; // Not directly used in this simple version
-    const edgeDarken = settings.edgeDarken ?? 0.1;
-
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
-
-    // 1. Apply Blur (Box Blur)
-    const kernelSize = blurRadius * 2 + 1;
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        let sumR = 0, sumG = 0, sumB = 0, count = 0;
-        for (let ky = -blurRadius; ky <= blurRadius; ky++) {
-          for (let kx = -blurRadius; kx <= blurRadius; kx++) {
-            const px = Math.min(width - 1, Math.max(0, x + kx));
-            const py = Math.min(height - 1, Math.max(0, y + ky));
-            const index = (py * width + px) * 4;
-            sumR += tempData[index]; sumG += tempData[index + 1]; sumB += tempData[index + 2];
-            count++;
-          }
-        }
-        const pixelIndex = (y * width + x) * 4;
-        data[pixelIndex] = sumR / count;
-        data[pixelIndex + 1] = sumG / count;
-        data[pixelIndex + 2] = sumB / count;
-      }
-    }
-
-    // 2. Add Noise
-    const noiseAmount = 0.05; // Fixed noise amount for watercolor feel
-    for (let i = 0; i < data.length; i += 4) {
-      const noise = (Math.random() - 0.5) * 2 * noiseAmount * 255;
-      data[i] = Math.min(255, Math.max(0, data[i] + noise));
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
-    }
-    
-    // 3. Edge Darkening (Simple Vignette-like)
-    if (edgeDarken > 0) {
-      const centerX = width / 2;
-      const centerY = height / 2;
-      const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
-      for (let i = 0; i < data.length; i += 4) {
-        const pixelIndex = i / 4;
-        const x = pixelIndex % width;
-        const y = Math.floor(pixelIndex / width);
-        const dx = x - centerX;
-        const dy = y - centerY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const factor = 1.0 - Math.min(1.0, (dist / maxDist) * edgeDarken * 2); // Darken edges
-        data[i] *= factor;
-        data[i + 1] *= factor;
-        data[i + 2] *= factor;
-      }
-    }
-  };
-};
-
 // Crosshatch Effect
 const createCrosshatchEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
@@ -1242,72 +1174,6 @@ const createCrosshatchEffect = (settings: Record<string, number>) => {
     }
     // Copy result back
     data.set(outputData);
-  };
-};
-
-// Tilt-Shift Effect
-const createTiltShiftEffect = (settings: Record<string, number>) => {
-  return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
-    const blurAmount = Math.round(settings.blurAmount ?? 8);
-    const focusPosition = settings.focusPosition ?? 0.5;
-    const focusWidth = settings.focusWidth ?? 0.3;
-
-    if (blurAmount <= 0) return; // No blur needed
-
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
-    const blurredData = new Uint8ClampedArray(data.length);
-    blurredData.set(data);
-
-    // Apply full blur first (using box blur)
-    const radius = blurAmount;
-    const kernelSize = radius * 2 + 1;
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        let sumR = 0, sumG = 0, sumB = 0, count = 0;
-        for (let ky = -radius; ky <= radius; ky++) {
-          for (let kx = -radius; kx <= radius; kx++) {
-            const px = Math.min(width - 1, Math.max(0, x + kx));
-            const py = Math.min(height - 1, Math.max(0, y + ky));
-            const index = (py * width + px) * 4;
-            sumR += tempData[index]; sumG += tempData[index + 1]; sumB += tempData[index + 2];
-            count++;
-          }
-        }
-        const pixelIndex = (y * width + x) * 4;
-        blurredData[pixelIndex] = sumR / count;
-        blurredData[pixelIndex + 1] = sumG / count;
-        blurredData[pixelIndex + 2] = sumB / count;
-      }
-    }
-
-    // Blend original and blurred based on focus area
-    const focusCenterY = height * focusPosition;
-    const focusHalfWidth = height * focusWidth * 0.5;
-    const focusStart = focusCenterY - focusHalfWidth;
-    const focusEnd = focusCenterY + focusHalfWidth;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const y = Math.floor((i / 4) / width);
-      let focusFactor = 0; // 0 = fully blurred, 1 = fully sharp
-      
-      if (y >= focusStart && y <= focusEnd) {
-        focusFactor = 1; // Inside sharp focus area
-      } else {
-        // Calculate distance outside focus area for gradient
-        const dist = y < focusStart ? focusStart - y : y - focusEnd;
-        // Simple linear falloff (adjust transition sharpness here if needed)
-        focusFactor = Math.max(0, 1 - dist / (height * (1-focusWidth) * 0.5)); 
-      }
-      
-      // Linear interpolation between blurred and original
-      data[i] = tempData[i] * focusFactor + blurredData[i] * (1 - focusFactor);
-      data[i + 1] = tempData[i + 1] * focusFactor + blurredData[i + 1] * (1 - focusFactor);
-      data[i + 2] = tempData[i + 2] * focusFactor + blurredData[i + 2] * (1 - focusFactor);
-    }
   };
 };
 
@@ -1356,33 +1222,52 @@ const createDotScreenEffect = (settings: Record<string, number>) => {
 // Old Photo Effect (Sepia + Noise + Vignette)
 const createOldPhotoEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
     const sepiaAmount = settings.sepia ?? 0.6;
     const noiseAmount = settings.noise ?? 0.1;
     const vignetteAmount = settings.vignette ?? 0.4;
     
-    // Apply Sepia first
-    Konva.Filters.Sepia(imageData); // Use Konva's built-in Sepia
-    
-    // Apply Noise
-    const noiseFilter = Konva.Filters.Noise;
-    if (noiseFilter) {
-      imageNodeTemp = { noise: noiseAmount }; // Need a way to pass settings
-      noiseFilter.call(imageNodeTemp, imageData); // Call Konva Noise - requires adaptation
-       // TODO: Adapt Konva noise or use custom noise from before
-       // For now, using simple custom noise:
-       const data = imageData.data;
-       const noiseFactor = noiseAmount * 255 * 0.5; // Scale noise
+    // 1. Apply Sepia (Custom implementation)
+    if (sepiaAmount > 0) {
        for (let i = 0; i < data.length; i += 4) {
-         const rand = (Math.random() - 0.5) * noiseFactor;
-         data[i] = Math.min(255, Math.max(0, data[i] + rand));
-         data[i+1] = Math.min(255, Math.max(0, data[i+1] + rand));
-         data[i+2] = Math.min(255, Math.max(0, data[i+2] + rand));
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          
+          const tr = 0.393 * r + 0.769 * g + 0.189 * b;
+          const tg = 0.349 * r + 0.686 * g + 0.168 * b;
+          const tb = 0.272 * r + 0.534 * g + 0.131 * b;
+
+          // Lerp between original and sepia based on amount
+          data[i] = r * (1 - sepiaAmount) + tr * sepiaAmount;
+          data[i + 1] = g * (1 - sepiaAmount) + tg * sepiaAmount;
+          data[i + 2] = b * (1 - sepiaAmount) + tb * sepiaAmount;
+          
+          // Clamp values
+          data[i] = Math.min(255, data[i]);
+          data[i + 1] = Math.min(255, data[i + 1]);
+          data[i + 2] = Math.min(255, data[i + 2]);
        }
     }
-    
-    // Apply Vignette
-    const vignetteFilter = createVignetteEffect({ amount: vignetteAmount, falloff: 0.6 });
-    vignetteFilter(imageData);
+
+    // 2. Apply Noise (Custom implementation)
+    if (noiseAmount > 0) {
+        const noiseFactor = noiseAmount * 255 * 0.5; // Scale noise
+        for (let i = 0; i < data.length; i += 4) {
+            const rand = (Math.random() - 0.5) * noiseFactor;
+            data[i] = Math.min(255, Math.max(0, data[i] + rand));
+            data[i+1] = Math.min(255, Math.max(0, data[i+1] + rand));
+            data[i+2] = Math.min(255, Math.max(0, data[i+2] + rand));
+        }
+    }
+
+    // 3. Apply Vignette (using the existing vignette function logic)
+    if (vignetteAmount > 0) {
+        const vignetteFunc = createVignetteEffect({ amount: vignetteAmount, falloff: 0.6 });
+        vignetteFunc(imageData); // Apply vignette to the already modified data
+    }
   };
 };
 
@@ -1889,30 +1774,12 @@ export const effectsConfig: Record<string, EffectConfig> = {
       },
     },
   },
-  watercolor: {
-    label: 'Watercolor',
-    category: 'Artistic',
-    settings: {
-      blur: { label: 'Blur Amount', min: 1, max: 15, default: 5, step: 1 },
-      bleed: { label: 'Color Bleed', min: 0, max: 1, default: 0.3, step: 0.05 },
-      edgeDarken: { label: 'Edge Darken', min: 0, max: 0.5, default: 0.1, step: 0.01 },
-    },
-  },
   crosshatch: {
     label: 'Crosshatch',
     category: 'Artistic',
     settings: {
       spacing: { label: 'Line Spacing', min: 2, max: 10, default: 5, step: 1 },
       strength: { label: 'Line Strength', min: 0.1, max: 1, default: 0.5, step: 0.05 },
-    },
-  },
-  tiltShift: {
-    label: 'Tilt-Shift',
-    category: 'Artistic',
-    settings: {
-      blurAmount: { label: 'Blur Amount', min: 0, max: 20, default: 8, step: 1 },
-      focusPosition: { label: 'Focus Position', min: 0, max: 1, default: 0.5, step: 0.01 }, // 0=top, 1=bottom
-      focusWidth: { label: 'Focus Width', min: 0.1, max: 1, default: 0.3, step: 0.01 }, // Width of sharp area
     },
   },
   dotScreen: {
@@ -1925,7 +1792,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
   },
   oldPhoto: {
     label: 'Old Photo',
-    category: 'Artistic',
+    category: 'Filters', // Changed category
     settings: {
       sepia: { label: 'Sepia', min: 0, max: 1, default: 0.6, step: 0.05 },
       noise: { label: 'Noise', min: 0, max: 0.3, default: 0.1, step: 0.01 },
