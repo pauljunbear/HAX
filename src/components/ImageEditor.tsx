@@ -43,32 +43,60 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [showExportOptions, setShowExportOptions] = useState(false);
   
-  // Define the imperative handle methods object directly
-  const imperativeHandleMethods = {
+  // Use imperative handle to expose methods
+  useImperativeHandle(ref, () => ({
     exportImage: () => {
-      console.log("Export function called via ref"); // Log: Function entry
-      if (!isBrowser) {
-        console.error("Export failed: Not in browser environment.");
+      console.log("Export function called via ref");
+      if (!isBrowser || !stageRef.current) {
+        console.error("Export failed: Ref or browser context not available.");
         return;
       }
-      if (!stageRef.current) {
-        console.error("Export failed: Stage ref is not available.");
+
+      const imageNode = stageRef.current.findOne('Image');
+      if (!imageNode) {
+        console.error("Export failed: Image node not found in the stage.");
         return;
       }
       
       console.log(`Attempting export with format: ${exportFormat}, quality: ${exportQuality}`);
       setIsLoading(true);
       
-      // Use setTimeout to ensure loading state updates before potentially blocking operation
       setTimeout(() => {
         try {
-          console.log("Calling stageRef.current.toDataURL...");
-          const dataURL = stageRef.current.toDataURL({
+          // --- Create Temporary Stage for Export ---
+          console.log("Creating temporary stage for export...");
+          const tempStage = new Konva.Stage({
+            container: document.createElement('div'), // Hidden container
+            width: imageNode.width(),
+            height: imageNode.height(),
+          });
+          const tempLayer = new Konva.Layer();
+          tempStage.add(tempLayer);
+          
+          // Clone the image node - this should preserve its current state including filters
+          const imageClone = imageNode.clone(); 
+          imageClone.x(0); // Position at top-left in temp stage
+          imageClone.y(0);
+          tempLayer.add(imageClone);
+          tempStage.draw(); // Draw the temporary stage
+          console.log("Temporary stage created and drawn.");
+          // --- End Temporary Stage --- 
+
+          console.log("Calling tempStage.toDataURL...");
+          const dataURL = tempStage.toDataURL({
             mimeType: exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
             quality: exportQuality,
-            pixelRatio: 2, // Export at 2x resolution
+            pixelRatio: 2, // Keep high-res export
+            x: 0,
+            y: 0,
+            width: imageNode.width(), // Export only the image area
+            height: imageNode.height()
           });
           
+          // Clean up temporary stage
+          tempStage.destroy();
+          console.log("Temporary stage destroyed.");
+
           if (!dataURL) {
             console.error("Export failed: toDataURL returned null or empty.");
             setError('Failed to generate image data for export.');
@@ -77,18 +105,13 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           }
           
           console.log(`Exported image dataURL length: ${dataURL.length}`);
-          console.log(`DataURL start: ${dataURL.substring(0, 100)}...`);
           
           const link = document.createElement('a');
           link.download = `imager-export.${exportFormat}`;
           link.href = dataURL;
           
-          // Append, click, and remove the link to trigger download
-          console.log("Appending link to body...");
           document.body.appendChild(link);
-          console.log("Clicking link...");
           link.click();
-          console.log("Removing link from body...");
           document.body.removeChild(link);
           
           console.log("Export process completed successfully.");
@@ -98,13 +121,12 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           console.error("Export error caught:", err);
           setError(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
           setIsLoading(false);
+          // Ensure cleanup even on error
+          // if (tempStage) tempStage.destroy(); 
         }
-      }, 50); // Short delay
+      }, 50); 
     }
-  };
-
-  // Expose the methods using useImperativeHandle
-  useImperativeHandle(ref, () => (imperativeHandleMethods));
+  }));
 
   // Call onReady when the component is ready
   useEffect(() => {

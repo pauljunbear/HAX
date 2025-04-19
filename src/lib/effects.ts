@@ -1509,8 +1509,8 @@ export const effectsConfig: Record<string, EffectConfig> = {
     label: 'Duotone',
     category: 'Color Effects',
     settings: {
-      color1: { label: 'Color 1', default: 0x0000ff, type: 'color' },
-      color2: { label: 'Color 2', default: 0xffff00, type: 'color' },
+      color1: { label: 'Color 1 (Hex#)', default: 0x0000ff },
+      color2: { label: 'Color 2 (Hex#)', default: 0xffff00 },
     },
   },
   
