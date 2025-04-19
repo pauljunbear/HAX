@@ -454,56 +454,86 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     return () => window.removeEventListener('resize', handleResize);
   }, [image, imageSize, isBrowser]);
 
-  // Apply filters effect - now considers masking mode
   // Apply filters to the image
   useEffect(() => {
     if (!isBrowser || !image || !stageRef.current) return;
     
-    const applyFilters = async () => {
+    const applyFiltersAsync = async () => {
       const imageNode = stageRef.current.findOne('Image');
       if (!imageNode) {
         console.error("Image node not found in Stage");
         return;
       }
       
-      try {
-        imageNode.filters([]);
+      // Always reset filters first
+      imageNode.filters([]);
+      
+      // Clear any previously set filter properties
+      // (Need to know which properties were set, or reset all filter-related ones)
+      imageNode.brightness(0); // Reset example properties
+      imageNode.contrast(0);
+      imageNode.saturation(0);
+      imageNode.hue(0);
+      imageNode.blurRadius(0);
+      imageNode.enhance(0);
+      imageNode.pixelSize(1);
+      imageNode.noise(0);
+      imageNode.threshold(0.5);
+      imageNode.levels(1); // Posterize levels (1 effectively means no posterization)
+      // We might need a more robust way to reset custom filter props if any exist
+      
+      if (!activeEffect) {
+        console.log("No active effect, clearing filters and resetting properties.");
         imageNode.cache();
+        imageNode.getLayer().batchDraw();
+        return;
+      }
+      
+      try {
+        console.log("Applying effect:", activeEffect, "with settings:", effectSettings);
         
-        if (!activeEffect) {
-          console.log("No active effect, clearing all filters");
+        // Get the Konva filter function and parameters
+        const [filterFunc, filterParams] = await applyEffect(activeEffect, effectSettings || {});
+        
+        if (!filterFunc) {
+          console.warn("No filter function returned for effect:", activeEffect);
+          imageNode.cache(); // Still cache and draw to clear previous filters
           imageNode.getLayer().batchDraw();
           return;
         }
         
-        console.log("Applying effect:", activeEffect, "with settings:", effectSettings);
+        // Apply the filter function to the node
+        imageNode.filters([filterFunc]);
         
-        // Call applyEffect without selection/masking parameters
-        const filterResult = await applyEffect(activeEffect, effectSettings || {});
-        
-        if (!filterResult || !filterResult[0]) {
-          console.warn("No filter class returned for effect:", activeEffect);
-          return;
+        // Set filter-specific parameters directly on the node
+        if (filterParams) {
+          console.log("Setting filter params on node:", filterParams);
+          for (const key in filterParams) {
+            if (typeof imageNode[key] === 'function') {
+              // Check if the key corresponds to a method (like brightness, contrast)
+              imageNode[key](filterParams[key]); 
+            } else {
+              // Otherwise, try setting as a property (less common for filters)
+              imageNode[key] = filterParams[key];
+            }
+          }
         }
         
-        const [filterClass, filterConfig] = filterResult;
-        imageNode.filters([filterClass]);
-        
-        if (filterConfig) {
-          Object.entries(filterConfig).forEach(([key, value]) => {
-            imageNode[key] = value;
-          });
-        }
-        
+        // Update the canvas
         imageNode.cache();
         imageNode.getLayer().batchDraw();
         console.log(`Applied ${activeEffect} effect successfully`);
+        
       } catch (error) {
         console.error("Error applying filters:", error);
+        // Attempt to reset filters on error
+        imageNode.filters([]);
+        imageNode.cache();
+        imageNode.getLayer()?.batchDraw();
       }
     };
     
-    applyFilters();
+    applyFiltersAsync();
   }, [activeEffect, effectSettings, image, isBrowser]);
 
   // Export the image (This is the original export function, now accessible via ref)
