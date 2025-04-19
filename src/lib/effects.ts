@@ -281,6 +281,24 @@ export const applyEffect = async (
       case 'scanLines':
         return [createScanLinesEffect(settings), {}];
         
+      // Add cases for the newly added effects
+      case 'watercolor':
+        return [createWatercolorEffect(settings), {}];
+      case 'crosshatch':
+        return [createCrosshatchEffect(settings), {}];
+      case 'tiltShift':
+        return [createTiltShiftEffect(settings), {}];
+      case 'dotScreen':
+        return [createDotScreenEffect(settings), {}];
+      case 'oldPhoto':
+        return [createOldPhotoEffect(settings), {}];
+      case 'pixelSort':
+        return [createPixelSortEffect(settings), {}];
+      case 'rgbShift':
+        return [createRgbShiftEffect(settings), {}];
+      case 'flowField':
+        return [createFlowFieldEffect(settings), {}];
+
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
         return [null, null];
@@ -1120,6 +1138,420 @@ const createScanLinesEffect = (settings: Record<string, number>) => {
   };
 };
 
+// Watercolor Effect (Simplified: Blur + Noise + Edge Darkening)
+const createWatercolorEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const blurRadius = Math.round(settings.blur ?? 5);
+    const bleed = settings.bleed ?? 0.3; // Not directly used in this simple version
+    const edgeDarken = settings.edgeDarken ?? 0.1;
+
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    // 1. Apply Blur (Box Blur)
+    const kernelSize = blurRadius * 2 + 1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let sumR = 0, sumG = 0, sumB = 0, count = 0;
+        for (let ky = -blurRadius; ky <= blurRadius; ky++) {
+          for (let kx = -blurRadius; kx <= blurRadius; kx++) {
+            const px = Math.min(width - 1, Math.max(0, x + kx));
+            const py = Math.min(height - 1, Math.max(0, y + ky));
+            const index = (py * width + px) * 4;
+            sumR += tempData[index]; sumG += tempData[index + 1]; sumB += tempData[index + 2];
+            count++;
+          }
+        }
+        const pixelIndex = (y * width + x) * 4;
+        data[pixelIndex] = sumR / count;
+        data[pixelIndex + 1] = sumG / count;
+        data[pixelIndex + 2] = sumB / count;
+      }
+    }
+
+    // 2. Add Noise
+    const noiseAmount = 0.05; // Fixed noise amount for watercolor feel
+    for (let i = 0; i < data.length; i += 4) {
+      const noise = (Math.random() - 0.5) * 2 * noiseAmount * 255;
+      data[i] = Math.min(255, Math.max(0, data[i] + noise));
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+    }
+    
+    // 3. Edge Darkening (Simple Vignette-like)
+    if (edgeDarken > 0) {
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+      for (let i = 0; i < data.length; i += 4) {
+        const pixelIndex = i / 4;
+        const x = pixelIndex % width;
+        const y = Math.floor(pixelIndex / width);
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const factor = 1.0 - Math.min(1.0, (dist / maxDist) * edgeDarken * 2); // Darken edges
+        data[i] *= factor;
+        data[i + 1] *= factor;
+        data[i + 2] *= factor;
+      }
+    }
+  };
+};
+
+// Crosshatch Effect
+const createCrosshatchEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const spacing = settings.spacing ?? 5;
+    const strength = settings.strength ?? 0.5;
+    const lineOpacity = 1 - strength; // Darker lines for higher strength
+
+    // Create a white background copy
+    const outputData = new Uint8ClampedArray(data.length);
+    for(let i=0; i<outputData.length; i+=4) {
+      outputData[i] = outputData[i+1] = outputData[i+2] = 255;
+      outputData[i+3] = data[i+3]; // Preserve alpha
+    }
+
+    // Draw diagonal lines based on original brightness
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        const r = data[index], g = data[index+1], b = data[index+2];
+        const brightness = (r + g + b) / (3 * 255); // 0 (black) to 1 (white)
+        const darkness = 1 - brightness;
+
+        const angle1 = 45 * (Math.PI / 180);
+        const angle2 = 135 * (Math.PI / 180);
+        
+        // Check if pixel falls on a line for angle 1
+        if (Math.abs((x * Math.cos(angle1) + y * Math.sin(angle1))) % spacing < darkness * (spacing / 2)) {
+          outputData[index] = outputData[index+1] = outputData[index+2] = 0; // Draw black line segment
+        }
+        // Check if pixel falls on a line for angle 2 (crosshatch)
+        if (darkness > 0.5 && Math.abs((x * Math.cos(angle2) + y * Math.sin(angle2))) % spacing < (darkness - 0.5) * (spacing)) { 
+          outputData[index] = outputData[index+1] = outputData[index+2] = 0; // Draw second set of lines for darker areas
+        }
+      }
+    }
+    // Copy result back
+    data.set(outputData);
+  };
+};
+
+// Tilt-Shift Effect
+const createTiltShiftEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const blurAmount = Math.round(settings.blurAmount ?? 8);
+    const focusPosition = settings.focusPosition ?? 0.5;
+    const focusWidth = settings.focusWidth ?? 0.3;
+
+    if (blurAmount <= 0) return; // No blur needed
+
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    const blurredData = new Uint8ClampedArray(data.length);
+    blurredData.set(data);
+
+    // Apply full blur first (using box blur)
+    const radius = blurAmount;
+    const kernelSize = radius * 2 + 1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let sumR = 0, sumG = 0, sumB = 0, count = 0;
+        for (let ky = -radius; ky <= radius; ky++) {
+          for (let kx = -radius; kx <= radius; kx++) {
+            const px = Math.min(width - 1, Math.max(0, x + kx));
+            const py = Math.min(height - 1, Math.max(0, y + ky));
+            const index = (py * width + px) * 4;
+            sumR += tempData[index]; sumG += tempData[index + 1]; sumB += tempData[index + 2];
+            count++;
+          }
+        }
+        const pixelIndex = (y * width + x) * 4;
+        blurredData[pixelIndex] = sumR / count;
+        blurredData[pixelIndex + 1] = sumG / count;
+        blurredData[pixelIndex + 2] = sumB / count;
+      }
+    }
+
+    // Blend original and blurred based on focus area
+    const focusCenterY = height * focusPosition;
+    const focusHalfWidth = height * focusWidth * 0.5;
+    const focusStart = focusCenterY - focusHalfWidth;
+    const focusEnd = focusCenterY + focusHalfWidth;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const y = Math.floor((i / 4) / width);
+      let focusFactor = 0; // 0 = fully blurred, 1 = fully sharp
+      
+      if (y >= focusStart && y <= focusEnd) {
+        focusFactor = 1; // Inside sharp focus area
+      } else {
+        // Calculate distance outside focus area for gradient
+        const dist = y < focusStart ? focusStart - y : y - focusEnd;
+        // Simple linear falloff (adjust transition sharpness here if needed)
+        focusFactor = Math.max(0, 1 - dist / (height * (1-focusWidth) * 0.5)); 
+      }
+      
+      // Linear interpolation between blurred and original
+      data[i] = tempData[i] * focusFactor + blurredData[i] * (1 - focusFactor);
+      data[i + 1] = tempData[i + 1] * focusFactor + blurredData[i + 1] * (1 - focusFactor);
+      data[i + 2] = tempData[i + 2] * focusFactor + blurredData[i + 2] * (1 - focusFactor);
+    }
+  };
+};
+
+// Dot Screen Effect
+const createDotScreenEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const scale = settings.scale ?? 5;
+    const angle = (settings.angle ?? 25) * (Math.PI / 180);
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+
+    const outputData = new Uint8ClampedArray(data.length);
+    for(let i=0; i<outputData.length; i+=4) {
+      outputData[i] = outputData[i+1] = outputData[i+2] = 255;
+      outputData[i+3] = data[i+3]; // Preserve alpha
+    }
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        const r = data[index], g = data[index+1], b = data[index+2];
+        const avg = (r + g + b) / 3;
+        
+        // Rotate coordinate system
+        const rotatedX = x * cosA - y * sinA;
+        const rotatedY = x * sinA + y * cosA;
+        
+        // Calculate distance to nearest grid center & dot size
+        const cellX = Math.round(rotatedX / scale);
+        const cellY = Math.round(rotatedY / scale);
+        const distToCenter = Math.sqrt(Math.pow(rotatedX - cellX * scale, 2) + Math.pow(rotatedY - cellY * scale, 2));
+        const dotRadius = (1 - avg / 255) * (scale * 0.6); // Max dot size related to scale
+
+        if (distToCenter <= dotRadius) {
+          outputData[index] = outputData[index+1] = outputData[index+2] = 0; // Draw dot pixel
+        }
+      }
+    }
+    data.set(outputData);
+  };
+};
+
+// Old Photo Effect (Sepia + Noise + Vignette)
+const createOldPhotoEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const sepiaAmount = settings.sepia ?? 0.6;
+    const noiseAmount = settings.noise ?? 0.1;
+    const vignetteAmount = settings.vignette ?? 0.4;
+    
+    // Apply Sepia first
+    Konva.Filters.Sepia(imageData); // Use Konva's built-in Sepia
+    
+    // Apply Noise
+    const noiseFilter = Konva.Filters.Noise;
+    if (noiseFilter) {
+      imageNodeTemp = { noise: noiseAmount }; // Need a way to pass settings
+      noiseFilter.call(imageNodeTemp, imageData); // Call Konva Noise - requires adaptation
+       // TODO: Adapt Konva noise or use custom noise from before
+       // For now, using simple custom noise:
+       const data = imageData.data;
+       const noiseFactor = noiseAmount * 255 * 0.5; // Scale noise
+       for (let i = 0; i < data.length; i += 4) {
+         const rand = (Math.random() - 0.5) * noiseFactor;
+         data[i] = Math.min(255, Math.max(0, data[i] + rand));
+         data[i+1] = Math.min(255, Math.max(0, data[i+1] + rand));
+         data[i+2] = Math.min(255, Math.max(0, data[i+2] + rand));
+       }
+    }
+    
+    // Apply Vignette
+    const vignetteFilter = createVignetteEffect({ amount: vignetteAmount, falloff: 0.6 });
+    vignetteFilter(imageData);
+  };
+};
+
+// Pixel Sort Effect
+const createPixelSortEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const threshold = (settings.threshold ?? 0.3) * 255;
+    const axis = settings.axis ?? 0; // 0 for X, 1 for Y
+
+    const getBrightness = (r:number, g:number, b:number) => 0.299 * r + 0.587 * g + 0.114 * b;
+
+    if (axis === 0) { // Sort horizontally
+      for (let y = 0; y < height; y++) {
+        let sortStart = -1;
+        for (let x = 0; x < width; x++) {
+          const index = (y * width + x) * 4;
+          const brightness = getBrightness(data[index], data[index+1], data[index+2]);
+          if (brightness < threshold && sortStart === -1) {
+            sortStart = x;
+          } else if (brightness >= threshold && sortStart !== -1) {
+            // Sort the segment
+            const segment = [];
+            for (let sx = sortStart; sx < x; sx++) {
+              const sIndex = (y * width + sx) * 4;
+              segment.push({ r: data[sIndex], g: data[sIndex+1], b: data[sIndex+2], brightness: getBrightness(data[sIndex], data[sIndex+1], data[sIndex+2]) });
+            }
+            segment.sort((a, b) => a.brightness - b.brightness);
+            // Write back sorted segment
+            for (let sx = sortStart; sx < x; sx++) {
+              const sIndex = (y * width + sx) * 4;
+              const sortedPixel = segment[sx - sortStart];
+              data[sIndex] = sortedPixel.r; data[sIndex+1] = sortedPixel.g; data[sIndex+2] = sortedPixel.b;
+            }
+            sortStart = -1;
+          }
+        }
+         // Handle segment reaching end of row
+         if (sortStart !== -1) {
+           const segment = [];
+           for (let sx = sortStart; sx < width; sx++) {
+             const sIndex = (y * width + sx) * 4;
+             segment.push({ r: data[sIndex], g: data[sIndex+1], b: data[sIndex+2], brightness: getBrightness(data[sIndex], data[sIndex+1], data[sIndex+2]) });
+           }
+           segment.sort((a, b) => a.brightness - b.brightness);
+           for (let sx = sortStart; sx < width; sx++) {
+             const sIndex = (y * width + sx) * 4;
+             const sortedPixel = segment[sx - sortStart];
+             data[sIndex] = sortedPixel.r; data[sIndex+1] = sortedPixel.g; data[sIndex+2] = sortedPixel.b;
+           }
+         }
+      }
+    } else { // Sort vertically
+      for (let x = 0; x < width; x++) {
+        let sortStart = -1;
+        for (let y = 0; y < height; y++) {
+          const index = (y * width + x) * 4;
+          const brightness = getBrightness(data[index], data[index+1], data[index+2]);
+          if (brightness < threshold && sortStart === -1) {
+            sortStart = y;
+          } else if (brightness >= threshold && sortStart !== -1) {
+            const segment = [];
+            for (let sy = sortStart; sy < y; sy++) {
+              const sIndex = (sy * width + x) * 4;
+              segment.push({ r: data[sIndex], g: data[sIndex+1], b: data[sIndex+2], brightness: getBrightness(data[sIndex], data[sIndex+1], data[sIndex+2]) });
+            }
+            segment.sort((a, b) => a.brightness - b.brightness);
+            for (let sy = sortStart; sy < y; sy++) {
+              const sIndex = (sy * width + x) * 4;
+              const sortedPixel = segment[sy - sortStart];
+              data[sIndex] = sortedPixel.r; data[sIndex+1] = sortedPixel.g; data[sIndex+2] = sortedPixel.b;
+            }
+            sortStart = -1;
+          }
+        }
+         if (sortStart !== -1) {
+          const segment = [];
+          for (let sy = sortStart; sy < height; sy++) {
+            const sIndex = (sy * width + x) * 4;
+            segment.push({ r: data[sIndex], g: data[sIndex+1], b: data[sIndex+2], brightness: getBrightness(data[sIndex], data[sIndex+1], data[sIndex+2]) });
+          }
+          segment.sort((a, b) => a.brightness - b.brightness);
+          for (let sy = sortStart; sy < height; sy++) {
+            const sIndex = (sy * width + x) * 4;
+            const sortedPixel = segment[sy - sortStart];
+            data[sIndex] = sortedPixel.r; data[sIndex+1] = sortedPixel.g; data[sIndex+2] = sortedPixel.b;
+          }
+        }
+      }
+    }
+  };
+};
+
+// RGB Channel Shift Effect
+const createRgbShiftEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const rOffset = Math.round(settings.rOffset ?? 4);
+    const gOffset = Math.round(settings.gOffset ?? 0);
+    const bOffset = Math.round(settings.bOffset ?? -4);
+
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+
+        // Sample Red from offset
+        const rX = Math.min(width - 1, Math.max(0, x + rOffset));
+        const rIndex = (y * width + rX) * 4;
+        data[index] = tempData[rIndex];
+
+        // Sample Green from offset
+        const gX = Math.min(width - 1, Math.max(0, x + gOffset));
+        const gIndex = (y * width + gX) * 4;
+        data[index + 1] = tempData[gIndex + 1];
+
+        // Sample Blue from offset
+        const bX = Math.min(width - 1, Math.max(0, x + bOffset));
+        const bIndex = (y * width + bX) * 4;
+        data[index + 2] = tempData[bIndex + 2];
+        
+        data[index + 3] = tempData[index + 3]; // Alpha
+      }
+    }
+  };
+};
+
+// Flow Field Distortion (Simplified - displace based on noise angle)
+// Requires a noise function (e.g., Perlin/Simplex). Placeholder for now.
+// Simple random angle displacement:
+const createFlowFieldEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const scale = settings.scale ?? 0.05; // Controls 'frequency' of noise
+    const strength = settings.strength ?? 5; // Controls displacement distance
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        
+        // Simplified: Use random angle instead of noise field
+        const angle = Math.random() * Math.PI * 2; 
+        const displaceX = Math.round(Math.cos(angle) * strength);
+        const displaceY = Math.round(Math.sin(angle) * strength);
+
+        const sourceX = Math.min(width - 1, Math.max(0, x + displaceX));
+        const sourceY = Math.min(height - 1, Math.max(0, y + displaceY));
+        const sourceIndex = (sourceY * width + sourceX) * 4;
+
+        data[index] = tempData[sourceIndex];
+        data[index + 1] = tempData[sourceIndex + 1];
+        data[index + 2] = tempData[sourceIndex + 2];
+        data[index + 3] = tempData[sourceIndex + 3];
+      }
+    }
+  };
+};
+
 // Initialize Konva when in browser environment
 if (typeof window !== 'undefined') {
   console.log("Browser environment detected, initializing Konva");
@@ -1455,6 +1887,74 @@ export const effectsConfig: Record<string, EffectConfig> = {
         default: 0.062,
         step: 0.001,
       },
+    },
+  },
+  watercolor: {
+    label: 'Watercolor',
+    category: 'Artistic',
+    settings: {
+      blur: { label: 'Blur Amount', min: 1, max: 15, default: 5, step: 1 },
+      bleed: { label: 'Color Bleed', min: 0, max: 1, default: 0.3, step: 0.05 },
+      edgeDarken: { label: 'Edge Darken', min: 0, max: 0.5, default: 0.1, step: 0.01 },
+    },
+  },
+  crosshatch: {
+    label: 'Crosshatch',
+    category: 'Artistic',
+    settings: {
+      spacing: { label: 'Line Spacing', min: 2, max: 10, default: 5, step: 1 },
+      strength: { label: 'Line Strength', min: 0.1, max: 1, default: 0.5, step: 0.05 },
+    },
+  },
+  tiltShift: {
+    label: 'Tilt-Shift',
+    category: 'Artistic',
+    settings: {
+      blurAmount: { label: 'Blur Amount', min: 0, max: 20, default: 8, step: 1 },
+      focusPosition: { label: 'Focus Position', min: 0, max: 1, default: 0.5, step: 0.01 }, // 0=top, 1=bottom
+      focusWidth: { label: 'Focus Width', min: 0.1, max: 1, default: 0.3, step: 0.01 }, // Width of sharp area
+    },
+  },
+  dotScreen: {
+    label: 'Dot Screen',
+    category: 'Artistic',
+    settings: {
+      scale: { label: 'Scale', min: 1, max: 15, default: 5, step: 1 }, // Size/density relationship
+      angle: { label: 'Angle', min: 0, max: 180, default: 25, step: 5 },
+    },
+  },
+  oldPhoto: {
+    label: 'Old Photo',
+    category: 'Artistic',
+    settings: {
+      sepia: { label: 'Sepia', min: 0, max: 1, default: 0.6, step: 0.05 },
+      noise: { label: 'Noise', min: 0, max: 0.3, default: 0.1, step: 0.01 },
+      vignette: { label: 'Vignette', min: 0, max: 0.8, default: 0.4, step: 0.05 },
+    },
+  },
+  pixelSort: {
+    label: 'Pixel Sort',
+    category: 'Distortion',
+    settings: {
+      threshold: { label: 'Brightness Threshold', min: 0, max: 1, default: 0.3, step: 0.01 },
+      axis: { label: 'Axis (0=X, 1=Y)', min: 0, max: 1, default: 0, step: 1 },
+    },
+  },
+  rgbShift: {
+    label: 'RGB Shift',
+    category: 'Distortion',
+    settings: {
+      rOffset: { label: 'Red Offset X', min: -20, max: 20, default: 4, step: 1 },
+      gOffset: { label: 'Green Offset X', min: -20, max: 20, default: 0, step: 1 },
+      bOffset: { label: 'Blue Offset X', min: -20, max: 20, default: -4, step: 1 },
+    },
+  },
+  flowField: {
+    label: 'Flow Field',
+    category: 'Generative',
+    settings: {
+      scale: { label: 'Noise Scale', min: 0.01, max: 0.2, default: 0.05, step: 0.005 },
+      strength: { label: 'Distortion Strength', min: 1, max: 20, default: 5, step: 1 },
     },
   },
 }; 
