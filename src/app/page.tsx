@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 
@@ -10,6 +10,7 @@ import HistoryPanel from '@/components/HistoryPanel';
 import LayersPanel from '@/components/LayersPanel';
 import useHistory, { HistoryState } from '@/hooks/useHistory';
 import useLayers, { Layer } from '@/hooks/useLayers';
+import { Button } from '@/components/ui/button';
 
 // Dynamically import ImageEditor with SSR disabled
 const ImageEditor = dynamic(
@@ -23,6 +24,7 @@ export default function Home() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState<boolean>(false);
   const [showLayers, setShowLayers] = useState<boolean>(false);
+  const [imageEditorRef, setImageEditorRef] = useState<any>(null);
 
   // Initialize history with empty state
   const { 
@@ -163,6 +165,21 @@ export default function Home() {
     });
   };
 
+  // Callback to get the ref from ImageEditor
+  const handleEditorReady = (ref: any) => {
+    console.log("ImageEditor ref received in Home component");
+    setImageEditorRef(ref);
+  };
+
+  const handleExportClick = () => {
+    if (imageEditorRef && typeof imageEditorRef.exportImage === 'function') {
+      console.log("Triggering export from Home component");
+      imageEditorRef.exportImage();
+    } else {
+      console.error("ImageEditor ref or exportImage method not available.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[rgb(var(--background-start-rgb))] font-sans">
       {/* Header */}
@@ -192,6 +209,18 @@ export default function Home() {
       <main className="flex h-[calc(100vh-4rem)]">
         {/* Left sidebar */}
         <div className="w-80 border-r border-[rgb(var(--apple-gray-200))] bg-white/80 backdrop-blur-sm overflow-y-auto flex flex-col shadow-sm">
+          <div className="p-4 border-b border-[rgb(var(--apple-gray-200))]">
+            <Button 
+              onClick={handleExportClick} 
+              disabled={!selectedImage || imageLoading}
+              className="w-full"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Export Image
+            </Button>
+          </div>
           <ControlPanel 
             activeEffect={activeEffect}
             effectSettings={effectSettings}
@@ -285,6 +314,7 @@ export default function Home() {
               activeEffect={activeEffect}
               effectSettings={effectSettings}
               onImageUpload={handleImageUpload}
+              onReady={handleEditorReady}
             />
           )}
         </div>

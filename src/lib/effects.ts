@@ -665,118 +665,11 @@ export const applyEffect = async (
       
       // Implement proper duotone effect based on color mapping
       case 'duotone':
-        const darkHue = settings.darkColor / 360 || 0.67;
-        const lightHue = settings.lightColor / 360 || 0.17;
-        const duotoneIntensity = settings.intensity || 0.5;
-        
-        console.log("Applying duotone with dark:", settings.darkColor, "light:", settings.lightColor, "intensity:", duotoneIntensity);
-        
-        return [
-          function(imageData: KonvaImageData) {
-            if (!imageData || !imageData.data) return;
-            
-            const data = imageData.data;
-            
-            // First convert to grayscale
-            for (let i = 0; i < data.length; i += 4) {
-              // Use proper luminance formula for grayscale
-              const gray = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-              
-              // Normalize to 0-1 range for mapping
-              const normalizedGray = gray / 255;
-              
-              // Get the dark and light colors from hue
-              const darkColor = hslToRgb(darkHue, 0.8, 0.2);
-              const lightColor = hslToRgb(lightHue, 0.8, 0.8);
-              
-              // Map grayscale to gradient between dark and light colors
-              // based on the duotone algorithm from Simeon Nortey's approach
-              data[i] = lerp(darkColor[0], lightColor[0], normalizedGray * duotoneIntensity + (1 - duotoneIntensity) * normalizedGray);
-              data[i + 1] = lerp(darkColor[1], lightColor[1], normalizedGray * duotoneIntensity + (1 - duotoneIntensity) * normalizedGray);
-              data[i + 2] = lerp(darkColor[2], lightColor[2], normalizedGray * duotoneIntensity + (1 - duotoneIntensity) * normalizedGray);
-            }
-          }
-        ];
+        return [createDuotoneEffect(settings, filterRegion)];
       
       // Implement proper halftone effect
       case 'halftone':
-        const dotSize = Math.max(1, Math.min(20, settings.size || 4));
-        const spacing = Math.max(1, Math.min(20, settings.spacing || 5));
-        
-        console.log("Applying halftone with dotSize:", dotSize, "spacing:", spacing);
-        
-        return [
-          function(imageData: KonvaImageData) {
-            const width = imageData.width;
-            const height = imageData.height;
-            const data = imageData.data;
-            
-            // Create a temporary copy of the image data
-            const tempData = new Uint8ClampedArray(data.length);
-            tempData.set(data);
-            
-            // Clear the original data to white
-            for (let i = 0; i < data.length; i += 4) {
-              data[i] = data[i + 1] = data[i + 2] = 255;
-            }
-            
-            // Calculate cell size (spacing + dotSize)
-            const cellSize = spacing + dotSize;
-            
-            // Draw halftone dots
-            for (let y = 0; y < height; y += cellSize) {
-              for (let x = 0; x < width; x += cellSize) {
-                // Average the brightness in this cell
-                let totalBrightness = 0;
-                let count = 0;
-                
-                // Sample pixels in this cell
-                for (let cy = 0; cy < cellSize && y + cy < height; cy++) {
-                  for (let cx = 0; cx < cellSize && x + cx < width; cx++) {
-                    const index = ((y + cy) * width + (x + cx)) * 4;
-                    const r = tempData[index];
-                    const g = tempData[index + 1];
-                    const b = tempData[index + 2];
-                    totalBrightness += (r + g + b) / 3;
-                    count++;
-                  }
-                }
-                
-                if (count === 0) continue;
-                
-                // Calculate average brightness
-                const avgBrightness = totalBrightness / count;
-                
-                // Scale dot radius based on brightness (invert so darker areas have bigger dots)
-                const radius = (255 - avgBrightness) / 255 * dotSize;
-                
-                if (radius <= 0) continue;
-                
-                // Draw a dot centered in the cell
-                const centerX = x + cellSize / 2;
-                const centerY = y + cellSize / 2;
-                
-                // Draw filled circle
-                for (let dy = -radius; dy <= radius; dy++) {
-                  for (let dx = -radius; dx <= radius; dx++) {
-                    // Check if point is in circle
-                    if (dx * dx + dy * dy <= radius * radius) {
-                      const pixelX = Math.floor(centerX + dx);
-                      const pixelY = Math.floor(centerY + dy);
-                      
-                      // Check bounds
-                      if (pixelX >= 0 && pixelX < width && pixelY >= 0 && pixelY < height) {
-                        const index = (pixelY * width + pixelX) * 4;
-                        // Set to black
-                        data[index] = data[index + 1] = data[index + 2] = 0;
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        ];
+        return [createHalftoneEffect(settings, filterRegion)];
         
       // Implement proper dithering effect based on Floyd-Steinberg algorithm
       case 'dithering':
@@ -846,6 +739,17 @@ export const applyEffect = async (
       // Implement reaction-diffusion effect (Gray-Scott model)
       case 'reaction-diffusion':
         return [createReactionDiffusionEffect(settings)];
+      
+      case 'pencilSketch':
+        // Use the new pencil sketch filter
+        return [createPencilSketchEffect(settings, filterRegion)];
+      
+      case 'oilPainting':
+        // Implementation of oil painting effect
+        return [createOilPaintingEffect(settings, filterRegion)];
+      
+      case 'bloom':
+        return [createBloomEffect(settings, filterRegion)];
       
       default:
         console.warn(`Unknown effect: ${effectName}`);
@@ -1401,6 +1305,394 @@ const createReactionDiffusionEffect = (settings: Record<string, number>) => {
   };
 };
 
+// Add new effect function for Pencil Sketch
+const createPencilSketchEffect = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    
+    // Check if we have a filter region
+    const hasRegion = !!filterRegion && !!filterRegion.selection;
+    
+    // First, convert to grayscale
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const avg = (r + g + b) / 3;
+      data[i] = data[i + 1] = data[i + 2] = avg;
+    }
+
+    // Apply edge detection (simplified Sobel-like kernel)
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    const strength = settings.strength || 1.0; // Add setting later if needed
+
+    for (let i = 0; i < data.length; i += 4) {
+      const pixelIndex = i / 4;
+      const x = pixelIndex % width;
+      const y = Math.floor(pixelIndex / width);
+      
+      // Skip edge pixels for kernel calculation
+      if (x === 0 || x === width - 1 || y === 0 || y === height - 1) {
+        continue;
+      }
+
+      // Check if this pixel should be affected
+      if (hasRegion) {
+        const inSelection = isPointInSelection(x, y, filterRegion.selection);
+        if ((filterRegion.mode === 'selection' && !inSelection) || 
+            (filterRegion.mode === 'inverse' && inSelection)) {
+          continue;
+        }
+      }
+
+      // Simplified 3x3 kernel for edge detection
+      const kernelX = [
+        -1, 0, 1,
+        -2, 0, 2,
+        -1, 0, 1
+      ];
+      const kernelY = [
+        -1, -2, -1,
+         0,  0,  0,
+         1,  2,  1
+      ];
+
+      let gx = 0;
+      let gy = 0;
+
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const kernelIndex = (ky + 1) * 3 + (kx + 1);
+          const neighborIndex = ((y + ky) * width + (x + kx)) * 4;
+          const pixelValue = tempData[neighborIndex]; // Use grayscale value
+          
+          gx += pixelValue * kernelX[kernelIndex];
+          gy += pixelValue * kernelY[kernelIndex];
+        }
+      }
+
+      // Calculate gradient magnitude and invert (lighter edges on dark background)
+      const magnitude = 255 - Math.sqrt(gx * gx + gy * gy);
+      const edgeValue = Math.min(255, Math.max(0, magnitude * strength));
+
+      data[i] = data[i + 1] = data[i + 2] = edgeValue;
+    }
+  };
+};
+
+// Add new effect function for Halftone
+const createHalftoneEffect = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    
+    // Settings
+    const dotSize = settings.dotSize || 4;
+    const spacing = settings.spacing || 5;
+    const angle = (settings.angle || 45) * (Math.PI / 180); // Convert angle to radians
+    
+    // Check if we have a filter region
+    const hasRegion = !!filterRegion && !!filterRegion.selection;
+    
+    // Create a temporary canvas to draw the halftone pattern
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return; // Return if context cannot be obtained
+
+    // Fill with white initially
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, width, height);
+
+    // Rotation matrix components
+    const cosAngle = Math.cos(angle);
+    const sinAngle = Math.sin(angle);
+
+    // Iterate through the grid based on spacing
+    for (let y = 0; y < height; y += spacing) {
+      for (let x = 0; x < width; x += spacing) {
+        // Calculate rotated coordinates for grid point
+        const rotatedX = x * cosAngle - y * sinAngle;
+        const rotatedY = x * sinAngle + y * cosAngle;
+
+        // Get the center of the cell
+        const centerX = Math.round(rotatedX / spacing) * spacing * cosAngle + Math.round(rotatedY / spacing) * spacing * sinAngle;
+        const centerY = Math.round(rotatedY / spacing) * spacing * cosAngle - Math.round(rotatedX / spacing) * spacing * sinAngle;
+        
+        // Ensure center is within bounds
+        if (centerX < 0 || centerX >= width || centerY < 0 || centerY >= height) continue;
+
+        // Check if the center point is within the selection region
+        if (hasRegion) {
+          const inSelection = isPointInSelection(Math.floor(centerX), Math.floor(centerY), filterRegion.selection);
+          if ((filterRegion.mode === 'selection' && !inSelection) || 
+              (filterRegion.mode === 'inverse' && inSelection)) {
+            continue;
+          }
+        }
+        
+        // Sample the original image color/brightness at the center
+        const originalIndex = (Math.floor(centerY) * width + Math.floor(centerX)) * 4;
+        const r = imageData.data[originalIndex];
+        const g = imageData.data[originalIndex + 1];
+        const b = imageData.data[originalIndex + 2];
+        const brightness = (r + g + b) / (3 * 255); // Normalize brightness 0-1
+
+        // Calculate dot radius based on brightness (darker = larger dot)
+        const radius = (1 - brightness) * dotSize;
+
+        // Draw the dot
+        if (radius > 0.5) { // Draw only if dot is reasonably large
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI, false);
+          ctx.fillStyle = 'black';
+          ctx.fill();
+        }
+      }
+    }
+
+    // Copy the halftone pattern back to the original image data
+    const halftoneData = ctx.getImageData(0, 0, width, height).data;
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = halftoneData[i];
+      data[i + 1] = halftoneData[i + 1];
+      data[i + 2] = halftoneData[i + 2];
+      data[i + 3] = halftoneData[i + 3]; // Keep original alpha
+    }
+  };
+};
+
+// Add new effect function for Duotone
+const createDuotoneEffect = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+
+    // Default colors (Blue and Yellow)
+    const color1 = settings.color1 ? hexToRgb(settings.color1) : { r: 0, g: 0, b: 255 }; 
+    const color2 = settings.color2 ? hexToRgb(settings.color2) : { r: 255, g: 255, b: 0 };
+    
+    // Check if we have a filter region
+    const hasRegion = !!filterRegion && !!filterRegion.selection;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const pixelIndex = i / 4;
+      const x = pixelIndex % width;
+      const y = Math.floor(pixelIndex / width);
+
+      // Check if this pixel should be affected
+      if (hasRegion) {
+        const inSelection = isPointInSelection(x, y, filterRegion.selection);
+        if ((filterRegion.mode === 'selection' && !inSelection) || 
+            (filterRegion.mode === 'inverse' && inSelection)) {
+          continue;
+        }
+      }
+
+      // Calculate grayscale value (brightness)
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255; // Luminance-based grayscale
+
+      // Interpolate between the two colors based on brightness
+      const newR = color1.r * (1 - brightness) + color2.r * brightness;
+      const newG = color1.g * (1 - brightness) + color2.g * brightness;
+      const newB = color1.b * (1 - brightness) + color2.b * brightness;
+
+      data[i] = Math.round(newR);
+      data[i + 1] = Math.round(newG);
+      data[i + 2] = Math.round(newB);
+    }
+  };
+};
+
+// Helper function to convert hex color (as number) to RGB object
+const hexToRgb = (hex: number) => {
+  const r = (hex >> 16) & 255;
+  const g = (hex >> 8) & 255;
+  const b = hex & 255;
+  return { r, g, b };
+};
+
+// Add new effect function for Bloom
+const createBloomEffect = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const strength = settings.strength || 0.5;
+    const radius = Math.round(settings.radius || 10);
+
+    // Check if we have a filter region
+    const hasRegion = !!filterRegion && !!filterRegion.selection;
+
+    // Create temporary copy of image data
+    const originalData = new Uint8ClampedArray(data.length);
+    originalData.set(data);
+
+    // Apply blur (using the existing Konva blur logic if available, or a simple box blur)
+    // For simplicity here, let's use a basic box blur concept
+    const blurData = new Uint8ClampedArray(data.length);
+    blurData.set(data); // Start with original data for blurring
+
+    // Simple Box Blur implementation (replace with Konva.Filters.Blur if possible in final integration)
+    const kernelSize = radius * 2 + 1;
+    const kernelArea = kernelSize * kernelSize;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let sumR = 0, sumG = 0, sumB = 0;
+        let count = 0;
+
+        for (let ky = -radius; ky <= radius; ky++) {
+          for (let kx = -radius; kx <= radius; kx++) {
+            const px = Math.min(width - 1, Math.max(0, x + kx));
+            const py = Math.min(height - 1, Math.max(0, y + ky));
+            const index = (py * width + px) * 4;
+            
+            sumR += blurData[index];
+            sumG += blurData[index + 1];
+            sumB += blurData[index + 2];
+            count++;
+          }
+        }
+        
+        const pixelIndex = (y * width + x) * 4;
+        // Temporarily store blurred result in the original data array (will be overwritten)
+        data[pixelIndex] = sumR / count;
+        data[pixelIndex + 1] = sumG / count;
+        data[pixelIndex + 2] = sumB / count;
+      }
+    }
+    // At this point, `data` holds the blurred version
+    
+    // Additive blend of original and blurred data
+    for (let i = 0; i < data.length; i += 4) {
+      const pixelIndex = i / 4;
+      const x = pixelIndex % width;
+      const y = Math.floor(pixelIndex / width);
+
+      // Check if this pixel should be affected
+      if (hasRegion) {
+        const inSelection = isPointInSelection(x, y, filterRegion.selection);
+        if ((filterRegion.mode === 'selection' && !inSelection) || 
+            (filterRegion.mode === 'inverse' && inSelection)) {
+           // If not affected, restore original pixel
+           data[i] = originalData[i];
+           data[i+1] = originalData[i+1];
+           data[i+2] = originalData[i+2];
+           data[i+3] = originalData[i+3];
+          continue;
+        }
+      }
+
+      // Add blurred pixel to original pixel (Screen blend mode approximation)
+      data[i] = Math.min(255, originalData[i] + data[i] * strength);
+      data[i + 1] = Math.min(255, originalData[i + 1] + data[i + 1] * strength);
+      data[i + 2] = Math.min(255, originalData[i + 2] + data[i + 2] * strength);
+      // Keep original alpha
+      data[i + 3] = originalData[i + 3]; 
+    }
+  };
+};
+
+// Add new effect function for Oil Painting (Simplified)
+const createOilPaintingEffect = (settings: Record<string, number>, filterRegion?: FilterRegion) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const blurRadius = Math.round(settings.blur || 4);
+    const noiseAmount = settings.noise || 0.1;
+
+    // Check if we have a filter region
+    const hasRegion = !!filterRegion && !!filterRegion.selection;
+
+    // Create temporary copy of image data
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    // --- 1. Apply Blur (Simplified Box Blur) ---
+    const kernelSize = blurRadius * 2 + 1;
+    const kernelArea = kernelSize * kernelSize;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        // Check if this pixel should be affected (for blur pass)
+        if (hasRegion) {
+          const inSelection = isPointInSelection(x, y, filterRegion.selection);
+          if ((filterRegion.mode === 'selection' && !inSelection) || 
+              (filterRegion.mode === 'inverse' && inSelection)) {
+            continue; // Skip blurring this pixel
+          }
+        }
+
+        let sumR = 0, sumG = 0, sumB = 0;
+        let count = 0;
+
+        for (let ky = -blurRadius; ky <= blurRadius; ky++) {
+          for (let kx = -blurRadius; kx <= blurRadius; kx++) {
+            const px = Math.min(width - 1, Math.max(0, x + kx));
+            const py = Math.min(height - 1, Math.max(0, y + ky));
+            const index = (py * width + px) * 4;
+            
+            sumR += tempData[index];
+            sumG += tempData[index + 1];
+            sumB += tempData[index + 2];
+            count++;
+          }
+        }
+        
+        const pixelIndex = (y * width + x) * 4;
+        data[pixelIndex] = sumR / count;
+        data[pixelIndex + 1] = sumG / count;
+        data[pixelIndex + 2] = sumB / count;
+      }
+    }
+    // At this point, `data` holds the blurred version
+
+    // --- 2. Add Noise --- 
+    for (let i = 0; i < data.length; i += 4) {
+      const pixelIndex = i / 4;
+      const x = pixelIndex % width;
+      const y = Math.floor(pixelIndex / width);
+
+      // Check if this pixel should be affected (for noise pass)
+      if (hasRegion) {
+        const inSelection = isPointInSelection(x, y, filterRegion.selection);
+        if ((filterRegion.mode === 'selection' && !inSelection) || 
+            (filterRegion.mode === 'inverse' && inSelection)) {
+          // If skipped during blur, restore original pixel before potentially adding noise
+          // Or, simply skip adding noise if it wasn't blurred.
+          // Let's restore original if skipped in blur:
+          if (!isPointInSelection(x, y, filterRegion.selection) && filterRegion.mode === 'selection' ||
+              isPointInSelection(x, y, filterRegion.selection) && filterRegion.mode === 'inverse') {
+             data[i] = tempData[i];
+             data[i+1] = tempData[i+1];
+             data[i+2] = tempData[i+2];
+             data[i+3] = tempData[i+3];
+          }
+          continue; // Skip noise for this pixel
+        }
+      }
+
+      // Add noise (scaled by noiseAmount)
+      const noise = (Math.random() - 0.5) * 2 * noiseAmount * 255;
+      data[i] = Math.min(255, Math.max(0, data[i] + noise));
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+    }
+  };
+};
+
 // Initialize Konva when in browser environment
 if (typeof window !== 'undefined') {
   console.log("Browser environment detected, initializing Konva");
@@ -1414,7 +1706,7 @@ export const ensureKonvaInitialized = initKonva;
 export const getFilterConfig = () => effectsConfig;
 
 // Define all available effects with their settings
-export const effectsConfig: Record<string, any> = {
+export const effectsConfig: Record<string, EffectConfig> = {
   // Basic Adjustments
   brightness: {
     label: 'Brightness',
@@ -1488,27 +1780,8 @@ export const effectsConfig: Record<string, any> = {
     label: 'Duotone',
     category: 'Color Effects',
     settings: {
-      darkColor: {
-        label: 'Dark Tone',
-        min: 0,
-        max: 360,
-        default: 240,
-        step: 1,
-      },
-      lightColor: {
-        label: 'Light Tone',
-        min: 0,
-        max: 360,
-        default: 60,
-        step: 1,
-      },
-      intensity: {
-        label: 'Intensity',
-        min: 0,
-        max: 1,
-        default: 0.5,
-        step: 0.01,
-      },
+      color1: { label: 'Color 1', default: 0x0000ff, type: 'color' }, // Placeholder, needs color picker UI
+      color2: { label: 'Color 2', default: 0xffff00, type: 'color' }, // Placeholder, needs color picker UI
     },
   },
   
@@ -1530,7 +1803,7 @@ export const effectsConfig: Record<string, any> = {
     label: 'Sharpen',
     category: 'Blur & Sharpen',
     settings: {
-      amount: {
+      value: {
         label: 'Amount',
         min: 0,
         max: 5,
@@ -1558,7 +1831,7 @@ export const effectsConfig: Record<string, any> = {
     label: 'Noise',
     category: 'Distortion',
     settings: {
-      noise: {
+      value: {
         label: 'Amount',
         min: 0,
         max: 1,
@@ -1568,12 +1841,12 @@ export const effectsConfig: Record<string, any> = {
     },
   },
   
-  // Artistic
+  // Updated Artistic Category
   threshold: {
     label: 'Threshold',
     category: 'Artistic',
     settings: {
-      threshold: {
+      value: {
         label: 'Level',
         min: 0,
         max: 1,
@@ -1586,7 +1859,7 @@ export const effectsConfig: Record<string, any> = {
     label: 'Posterize',
     category: 'Artistic',
     settings: {
-      levels: {
+      value: {
         label: 'Levels',
         min: 2,
         max: 8,
@@ -1595,39 +1868,37 @@ export const effectsConfig: Record<string, any> = {
       },
     },
   },
+  pencilSketch: {
+    label: 'Pencil Sketch',
+    category: 'Artistic',
+    // Settings can be added later if needed (e.g., line strength)
+  },
   halftone: {
     label: 'Halftone',
     category: 'Artistic',
     settings: {
-      size: {
-        label: 'Dot Size',
-        min: 1,
-        max: 20,
-        default: 4,
-        step: 1,
-      },
-      spacing: {
-        label: 'Spacing',
-        min: 1,
-        max: 20,
-        default: 5,
-        step: 1,
-      },
+      dotSize: { label: 'Dot Size', min: 1, max: 10, default: 4, step: 1 },
+      spacing: { label: 'Spacing', min: 1, max: 15, default: 5, step: 1 },
+      angle: { label: 'Angle', min: 0, max: 180, default: 45, step: 5 },
     },
   },
-  dithering: {
-    label: 'Dithering',
+  bloom: {
+    label: 'Bloom',
     category: 'Artistic',
     settings: {
-      threshold: {
-        label: 'Threshold',
-        min: 0,
-        max: 1,
-        default: 0.5,
-        step: 0.01,
-      },
+      strength: { label: 'Strength', min: 0, max: 2, default: 0.5, step: 0.1 },
+      radius: { label: 'Radius', min: 0, max: 20, default: 10, step: 1 },
     },
   },
+  oilPainting: {
+    label: 'Oil Painting',
+    category: 'Artistic',
+    settings: {
+      blur: { label: 'Blur', min: 0, max: 10, default: 4, step: 1 },
+      noise: { label: 'Noise', min: 0, max: 0.5, default: 0.1, step: 0.01 },
+    },
+  },
+  
   // Generative
   geometric: {
     label: 'Geometric',

@@ -43,7 +43,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     setLocalSliderValues({});
   }, [activeEffect]);
   
-  // Get unique categories from effects without using Set
+  // Get unique categories from effects
   const allCategories = Object.values(effectsConfig).map(effect => effect.category);
   const categories = allCategories.filter((category, index) => {
     return allCategories.indexOf(category) === index;
@@ -55,14 +55,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     .map(([key, effect]) => ({
       id: key,
       label: effect.label,
+      hasSettings: !!effect.settings && Object.keys(effect.settings).length > 0,
     }));
   
   // Get settings for the active effect
   const currentEffectSettings = activeEffect && effectsConfig[activeEffect]?.settings
     ? Object.entries(effectsConfig[activeEffect].settings).map(([key, setting]) => ({
         id: key,
-        ...(setting as any),
-        currentValue: effectSettings[key] !== undefined 
+        ...(setting as any), // Cast to any to handle potential type issues for now
+        currentValue: effectSettings && effectSettings[key] !== undefined 
           ? effectSettings[key] 
           : (setting as any).default,
       }))
@@ -158,10 +159,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <button
               key={effect.id}
               onClick={() => onEffectChange?.(effect.id)}
-              className={`px-2 py-2 text-xs rounded-lg transition-all ${
+              title={effect.label}
+              className={`px-2 py-2 text-xs rounded-lg transition-all truncate text-center ${
                 activeEffect === effect.id
                   ? 'bg-[rgb(var(--primary))] text-white font-medium shadow-sm'
-                  : 'bg-white border border-[rgb(var(--apple-gray-200))] text-[rgb(var(--apple-gray-700))] hover:bg-[rgb(var(--apple-gray-50))] hover:shadow-sm'
+                  : 'bg-white border border-[rgb(var(--apple-gray-200))] text-[rgb(var(--apple-gray-700))] hover:bg-[rgb(var(--apple-gray-50))]'
               }`}
             >
               {effect.label}
@@ -180,21 +182,26 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             Adjust Settings
           </h3>
           {currentEffectSettings.map(setting => {
-            const displayValue = activeEffect === 'blur' && setting.id === 'radius' && localSliderValues.radius !== undefined 
-              ? localSliderValues.radius 
-              : setting.currentValue;
+            if (setting.type === 'color') {
+              return (
+                <div key={setting.id} className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-xs text-yellow-700">Color settings for '{setting.label}' require a color picker UI (not implemented yet).</p>
+                </div>
+              );
+            }
+
+            const displayValue = (
+              localSliderValues[setting.id] !== undefined ? 
+              localSliderValues[setting.id] :
+              setting.currentValue
+            ) ?? setting.default;
               
             return (
               <div key={setting.id} className="mb-3">
                 <div className="flex justify-between mb-1">
                   <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">{setting.label}</label>
                   <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono bg-[rgb(var(--apple-gray-100))] px-1.5 py-0.5 rounded-full">
-                    {displayValue.toFixed(1)}
-                    {activeEffect === 'blur' && setting.id === 'radius' && (
-                      localSliderValues.radius !== undefined && localSliderValues.radius !== setting.currentValue 
-                        ? ' (adjusting...)'
-                        : ''
-                    )}
+                    {typeof displayValue === 'number' ? displayValue.toFixed(setting.step >= 0.1 ? 1 : 0) : 'N/A'}
                   </span>
                 </div>
                 <input
@@ -202,15 +209,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   min={setting.min}
                   max={setting.max}
                   step={setting.step}
-                  value={displayValue}
+                  value={typeof displayValue === 'number' ? displayValue : setting.default}
                   onChange={e => handleSliderChange(setting.id, parseFloat(e.target.value))}
-                  className={`w-full appearance-none cursor-pointer h-1.5 ${activeEffect === 'blur' ? 'accent-[rgb(var(--primary))]' : ''}`}
+                  className={`w-full appearance-none cursor-pointer h-1.5 accent-[rgb(var(--primary))]`}
                 />
-                {activeEffect === 'blur' && setting.id === 'radius' && (
-                  <div className="mt-0.5 text-[10px] text-[rgb(var(--apple-gray-500))]">
-                    <span className="opacity-75">Adjustments applied after sliding</span>
-                  </div>
-                )}
               </div>
             );
           })}
