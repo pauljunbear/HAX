@@ -1452,20 +1452,18 @@ const createRgbShiftEffect = (settings: Record<string, number>) => {
 // Simple random angle displacement:
 const createFlowFieldEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
-    const scale = settings.scale ?? 0.05; // Controls 'frequency' of noise
-    const strength = settings.strength ?? 5; // Controls displacement distance
+    const { data, width, height } = imageData;
+    // const scale = settings.scale ?? 0.05; // Noise scale - not used in random version
+    const strength = settings.strength ?? 5;
     
     const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
+    tempData.set(data); // Read source pixels from tempData
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const index = (y * width + x) * 4;
+        const destIndex = (y * width + x) * 4;
         
-        // Simplified: Use random angle instead of noise field
+        // Simplified random displacement
         const angle = Math.random() * Math.PI * 2; 
         const displaceX = Math.round(Math.cos(angle) * strength);
         const displaceY = Math.round(Math.sin(angle) * strength);
@@ -1474,10 +1472,11 @@ const createFlowFieldEffect = (settings: Record<string, number>) => {
         const sourceY = Math.min(height - 1, Math.max(0, y + displaceY));
         const sourceIndex = (sourceY * width + sourceX) * 4;
 
-        data[index] = tempData[sourceIndex];
-        data[index + 1] = tempData[sourceIndex + 1];
-        data[index + 2] = tempData[sourceIndex + 2];
-        data[index + 3] = tempData[sourceIndex + 3];
+        // Write to destination pixel (data) from source pixel (tempData)
+        data[destIndex] = tempData[sourceIndex];
+        data[destIndex + 1] = tempData[sourceIndex + 1];
+        data[destIndex + 2] = tempData[sourceIndex + 2];
+        data[destIndex + 3] = tempData[sourceIndex + 3];
       }
     }
   };
@@ -1488,9 +1487,7 @@ const createFlowFieldEffect = (settings: Record<string, number>) => {
 // 1. Glitch Art Implementation
 const createGlitchArtEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
+    const { data, width, height } = imageData;
     const blockiness = settings.blockiness ?? 0.05;
     const colorShift = Math.round(settings.colorShift ?? 5);
 
@@ -1570,9 +1567,7 @@ const createColorQuantizationEffect = (settings: Record<string, number>) => {
 // 3. ASCII Art Implementation (Visual Approximation)
 const createAsciiArtEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
+    const { data, width, height } = imageData;
     const scale = Math.max(1, Math.floor(settings.scale ?? 5)); // Size of the 'character' block
     
     const tempData = new Uint8ClampedArray(data.length);
@@ -1632,9 +1627,7 @@ const createAsciiArtEffect = (settings: Record<string, number>) => {
 // 4. Edge Detection Implementation (Sobel)
 const createEdgeDetectionEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
+    const { data, width, height } = imageData;
     const threshold = settings.threshold ?? 50;
     const shouldInvert = (settings.invert ?? 0) > 0.5;
 
@@ -1679,9 +1672,7 @@ const createEdgeDetectionEffect = (settings: Record<string, number>) => {
 // Implementation of Swirl Distortion (FIXED ANGLE LOGIC)
 const createSwirlEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
+    const { data, width, height } = imageData;
     const radius = settings.radius ?? Math.min(width, height) / 2;
     const strength = settings.strength ?? 3;
     const centerX = (settings.centerX ?? 0.5) * width;
@@ -1723,11 +1714,139 @@ const createSwirlEffect = (settings: Record<string, number>) => {
   };
 };
 
-// Implementation of Mosaic (Review OK, seems correct)
-const createMosaicEffect = (settings: Record<string, number>) => { /* ... existing correct implementation ... */ };
+// Implementation of Mosaic (REWRITTEN for clarity/safety)
+const createMosaicEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const tileSize = Math.max(1, Math.floor(settings.tileSize ?? 10));
+    const outputData = new Uint8ClampedArray(data.length); // Write to output, read from original data
 
-// 12. Kaleidoscope Implementation (Review OK, seems correct)
-const createKaleidoscopeEffect = (settings: Record<string, number>) => { /* ... existing correct implementation ... */ };
+    for (let y = 0; y < height; y += tileSize) {
+      for (let x = 0; x < width; x += tileSize) {
+        let sumR = 0, sumG = 0, sumB = 0, sumA = 0;
+        let count = 0;
+
+        // Calculate average color within the tile (reading from original `data`)
+        const endY = Math.min(y + tileSize, height);
+        const endX = Math.min(x + tileSize, width);
+        for (let ty = y; ty < endY; ty++) {
+          for (let tx = x; tx < endX; tx++) {
+            const index = (ty * width + tx) * 4;
+            sumR += data[index];
+            sumG += data[index + 1];
+            sumB += data[index + 2];
+            sumA += data[index + 3];
+            count++;
+          }
+        }
+
+        if (count > 0) {
+          const avgR = sumR / count;
+          const avgG = sumG / count;
+          const avgB = sumB / count;
+          const avgA = sumA / count;
+
+          // Fill the tile in the outputData with the average color
+          for (let ty = y; ty < endY; ty++) {
+            for (let tx = x; tx < endX; tx++) {
+              const index = (ty * width + tx) * 4;
+              outputData[index] = avgR;
+              outputData[index + 1] = avgG;
+              outputData[index + 2] = avgB;
+              outputData[index + 3] = avgA;
+            }
+          }
+        }
+      }
+    }
+    // Copy the result back to the original data array
+    data.set(outputData);
+  };
+};
+
+// 12. Kaleidoscope Implementation (REWRITTEN for clarity/safety)
+const createKaleidoscopeEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const segments = Math.max(2, Math.floor(settings.segments ?? 6));
+    const centerX = (settings.centerX ?? 0.5) * width;
+    const centerY = (settings.centerY ?? 0.5) * height;
+    const anglePerSegment = (Math.PI * 2) / segments;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data); // Use temp for reading source pixels
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const dx = x - centerX;
+        const dy = y - centerY;
+        let angle = Math.atan2(dy, dx);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Map angle to the first segment, reflecting if needed
+        let segmentAngle = ((angle % anglePerSegment) + anglePerSegment) % anglePerSegment;
+        if (segmentAngle > anglePerSegment / 2) {
+            segmentAngle = anglePerSegment - segmentAngle;
+        }
+        
+        // Calculate source coordinates
+        const srcX = Math.round(centerX + Math.cos(segmentAngle) * distance);
+        const srcY = Math.round(centerY + Math.sin(segmentAngle) * distance);
+        const destIndex = (y * width + x) * 4;
+
+        if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+            const srcIndex = (srcY * width + srcX) * 4;
+            data[destIndex] = tempData[srcIndex];
+            data[destIndex + 1] = tempData[srcIndex + 1];
+            data[destIndex + 2] = tempData[srcIndex + 2];
+            data[destIndex + 3] = tempData[srcIndex + 3];
+        } else {
+            data[destIndex] = 0;
+            data[destIndex + 1] = 0;
+            data[destIndex + 2] = 0;
+            data[destIndex + 3] = 0; // Make out-of-bounds transparent black
+        }
+      }
+    }
+  };
+};
+
+// 15. Anaglyph 3D Implementation (REWRITTEN for clarity/safety)
+const createAnaglyphEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const shift = Math.round(settings.shift ?? 5);
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data); // Read source pixels from tempData
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const destIndex = (y * width + x) * 4;
+        
+        // Left eye pixel (for Red channel)
+        const leftX = Math.min(width - 1, Math.max(0, x - shift));
+        const leftIndex = (y * width + leftX) * 4;
+        const leftR = tempData[leftIndex];
+        const leftG = tempData[leftIndex + 1];
+        const leftB = tempData[leftIndex + 2];
+        const redValue = 0.299 * leftR + 0.587 * leftG + 0.114 * leftB; // Luminance
+
+        // Right eye pixel (for Green, Blue channels)
+        const rightX = Math.min(width - 1, Math.max(0, x + shift));
+        const rightIndex = (y * width + rightX) * 4;
+        const rightG = tempData[rightIndex + 1];
+        const rightB = tempData[rightIndex + 2];
+        const originalAlpha = tempData[destIndex + 3]; // Use original alpha
+
+        // Combine into destination pixel (writing to `data`)
+        data[destIndex] = Math.round(redValue);
+        data[destIndex + 1] = rightG;
+        data[destIndex + 2] = rightB;
+        data[destIndex + 3] = originalAlpha; 
+      }
+    }
+  };
+};
 
 // 14. Heatmap Implementation (Review OK, added divide-by-zero check)
 const createHeatmapEffect = (settings: Record<string, number>) => { /* ... existing correct implementation ... */ };
@@ -1735,9 +1854,7 @@ const createHeatmapEffect = (settings: Record<string, number>) => { /* ... exist
 // 17. Circuit Board Trace Implementation
 const createCircuitBoardEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
+    const { data, width, height } = imageData;
     const threshold = settings.threshold ?? 60;
     const glowAmount = settings.glow ?? 2;
     
@@ -1819,9 +1936,7 @@ const createCircuitBoardEffect = (settings: Record<string, number>) => {
 // 18. Pixel Explosion Implementation (Simplified)
 const createPixelExplosionEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
+    const { data, width, height } = imageData;
     const strength = settings.strength ?? 30;
     const numPoints = Math.max(1, Math.floor(settings.numPoints ?? 5));
 
@@ -1882,9 +1997,7 @@ const createPixelExplosionEffect = (settings: Record<string, number>) => {
 // 19. Fisheye Warp Implementation
 const createFisheyeWarpEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
+    const { data, width, height } = imageData;
     const strength = settings.strength ?? 0.3; // -1 to 1
     const centerX = width / 2;
     const centerY = height / 2;
