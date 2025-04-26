@@ -111,21 +111,21 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
   ];
   
   return (
-    <div className="border-t border-[rgb(var(--apple-gray-200))] bg-white/80">
-      <div className="py-2 px-4 border-b border-[rgb(var(--apple-gray-100))]">
+    <div className="border-t border-apple-gray-200 dark:border-dark-border bg-white/80 dark:bg-dark-surface/80">
+      <div className="py-2 px-4 border-b border-apple-gray-100 dark:border-dark-border">
         <div 
           className="flex items-center justify-between cursor-pointer" 
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          <h2 className="text-sm font-medium text-[rgb(var(--apple-gray-800))] flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-[rgb(var(--primary))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <h2 className="text-sm font-medium text-apple-gray-800 dark:text-dark-text flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-primary dark:text-primary-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
             Layers
           </h2>
           <svg 
             xmlns="http://www.w3.org/2000/svg" 
-            className={`h-4 w-4 text-[rgb(var(--apple-gray-500))] transition-transform ${isExpanded ? 'transform rotate-180' : ''}`} 
+            className={`h-4 w-4 text-apple-gray-500 dark:text-dark-textMuted transition-transform ${isExpanded ? 'transform rotate-180' : ''}`} 
             fill="none" 
             viewBox="0 0 24 24" 
             stroke="currentColor"
@@ -138,7 +138,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
         <div className="flex justify-between mt-2">
           <button
             onClick={onAddLayer}
-            className="btn-apple-secondary py-1 px-3 text-xs"
+            className="btn-apple-secondary dark:bg-dark-surface dark:text-dark-text dark:border-dark-border dark:hover:bg-dark-border py-1 px-3 text-xs"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -152,7 +152,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
       {isExpanded && (
         <div className="max-h-40 overflow-y-auto p-2">
           {layers.length === 0 ? (
-            <div className="text-center text-[rgb(var(--apple-gray-400))] py-2">
+            <div className="text-center text-apple-gray-400 dark:text-dark-textMuted py-2">
               <p className="text-xs">No layers yet</p>
             </div>
           ) : (
@@ -164,16 +164,16 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                   className={`
                     border rounded-md overflow-hidden transition-colors
                     ${layer.id === activeLayerId 
-                      ? 'border-[rgb(var(--primary))]' 
-                      : 'border-[rgb(var(--apple-gray-200))]'
+                      ? 'border-primary dark:border-primary-accent' 
+                      : 'border-apple-gray-200 dark:border-dark-border'
                     }
-                    ${layer.locked ? 'opacity-60' : 'hover:border-[rgb(var(--primary-300))]'}
+                    ${layer.locked ? 'opacity-60' : 'hover:border-primary/50 dark:hover:border-primary-accent/50'}
                     cursor-pointer text-xs
                   `}
                 >
                   <div className={`
                     p-1.5 flex items-center justify-between
-                    ${layer.id === activeLayerId ? 'bg-[rgb(var(--primary-50))]' : 'bg-white'}
+                    ${layer.id === activeLayerId ? 'bg-primary-50 dark:bg-primary-accent/10' : 'bg-white dark:bg-dark-surface'}
                   `}>
                     <div className="flex items-center min-w-0 flex-1">
                       <button 
@@ -181,7 +181,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                           e.stopPropagation(); 
                           onToggleVisibility(layer.id); 
                         }}
-                        className="mr-1.5 text-[rgb(var(--apple-gray-600))] hover:text-[rgb(var(--apple-gray-800))]"
+                        className="mr-1.5 text-apple-gray-600 dark:text-dark-textMuted hover:text-apple-gray-800 dark:hover:text-dark-text"
                       >
                         {layer.visible ? (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -205,13 +205,13 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                             if (e.key === 'Enter') finishRenaming();
                             if (e.key === 'Escape') cancelRenaming();
                           }}
-                          className="w-full text-xs border border-[rgb(var(--apple-gray-300))] rounded px-1 py-0.5"
+                          className="w-full text-xs border border-apple-gray-300 dark:border-dark-border dark:bg-dark-bg rounded px-1 py-0.5"
                           autoFocus
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (
                         <span
-                          className="text-xs font-medium text-[rgb(var(--apple-gray-800))] truncate block flex-1"
+                          className="text-xs font-medium text-apple-gray-800 dark:text-dark-text truncate block flex-1"
                           onDoubleClick={() => startRenaming(layer)}
                         >
                           {layer.name}
@@ -226,8 +226,8 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                           onToggleLock(layer.id); 
                         }}
                         className={`
-                          p-0.5 rounded-sm hover:bg-[rgb(var(--apple-gray-100))]
-                          ${layer.locked ? 'text-[rgb(var(--primary))]' : 'text-[rgb(var(--apple-gray-500))]'}
+                          p-0.5 rounded-sm hover:bg-apple-gray-100 dark:hover:bg-dark-border
+                          ${layer.locked ? 'text-primary dark:text-primary-accent' : 'text-apple-gray-500 dark:text-dark-textMuted'}
                         `}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -245,7 +245,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                               setEditLayerId(layer.id);
                             }
                           }}
-                          className="p-0.5 rounded-sm text-[rgb(var(--apple-gray-500))] hover:bg-[rgb(var(--apple-gray-100))]"
+                          className="p-0.5 rounded-sm text-apple-gray-500 dark:text-dark-textMuted hover:bg-apple-gray-100 dark:hover:bg-dark-border"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
@@ -254,7 +254,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                         
                         {editLayerId === layer.id && (
                           <div 
-                            className="absolute right-0 mt-1 z-10 bg-white rounded-md shadow-lg border border-[rgb(var(--apple-gray-200))] py-1 w-36"
+                            className="absolute right-0 mt-1 z-10 bg-white dark:bg-dark-surface rounded-md shadow-lg border border-apple-gray-200 dark:border-dark-border py-1 w-36"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <button 
@@ -262,23 +262,23 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                                 onDuplicateLayer(layer.id);
                                 setEditLayerId(null);
                               }}
-                              className="w-full text-left px-2 py-1 text-xs text-[rgb(var(--apple-gray-700))] hover:bg-[rgb(var(--apple-gray-100))]"
+                              className="w-full text-left px-2 py-1 text-xs text-apple-gray-700 dark:text-dark-text hover:bg-apple-gray-100 dark:hover:bg-dark-border"
                             >
                               Duplicate Layer
                             </button>
                             <button 
                               onClick={() => startRenaming(layer)}
-                              className="w-full text-left px-2 py-1 text-xs text-[rgb(var(--apple-gray-700))] hover:bg-[rgb(var(--apple-gray-100))]"
+                              className="w-full text-left px-2 py-1 text-xs text-apple-gray-700 dark:text-dark-text hover:bg-apple-gray-100 dark:hover:bg-dark-border"
                             >
                               Rename Layer
                             </button>
-                            <div className="border-t border-[rgb(var(--apple-gray-200))] my-0.5"></div>
+                            <div className="border-t border-apple-gray-200 dark:border-dark-border my-0.5"></div>
                             <button 
                               onClick={() => {
                                 onRemoveLayer(layer.id);
                                 setEditLayerId(null);
                               }}
-                              className="w-full text-left px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                              className="w-full text-left px-2 py-1 text-xs text-red-600 dark:text-apple-red hover:bg-red-50 dark:hover:bg-red-900/50"
                             >
                               Delete Layer
                             </button>
