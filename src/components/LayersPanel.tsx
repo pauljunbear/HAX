@@ -112,7 +112,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
   
   return (
     <div className="border-t border-apple-gray-200 dark:border-dark-border bg-white/80 dark:bg-dark-surface/80">
-      <div className="py-2 px-4 border-b border-apple-gray-100 dark:border-dark-border">
+      <div className="py-3 px-5 border-b border-apple-gray-100 dark:border-dark-border">
         <div 
           className="flex items-center justify-between cursor-pointer" 
           onClick={() => setIsExpanded(!isExpanded)}
@@ -134,8 +134,8 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
           </svg>
         </div>
 
-        {/* Add Layer button - always visible */}
-        <div className="flex justify-between mt-2">
+        {/* Add Layer button - Increased margin-top */}
+        <div className="flex justify-between mt-3">
           <button
             onClick={onAddLayer}
             className="btn-apple-secondary dark:bg-dark-surface dark:text-dark-text dark:border-dark-border dark:hover:bg-dark-border py-1 px-3 text-xs"
@@ -148,15 +148,15 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
         </div>
       </div>
 
-      {/* Collapsible layers list */}
+      {/* Collapsible layers list - Increased padding */}
       {isExpanded && (
-        <div className="max-h-40 overflow-y-auto p-2">
+        <div className="max-h-40 overflow-y-auto p-3">
           {layers.length === 0 ? (
             <div className="text-center text-apple-gray-400 dark:text-dark-textMuted py-2">
               <p className="text-xs">No layers yet</p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {layers.map((layer) => (
                 <div
                   key={layer.id}
@@ -172,7 +172,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                   `}
                 >
                   <div className={`
-                    p-1.5 flex items-center justify-between
+                    p-2 flex items-center justify-between
                     ${layer.id === activeLayerId ? 'bg-primary-50 dark:bg-primary-accent/10' : 'bg-white dark:bg-dark-surface'}
                   `}>
                     <div className="flex items-center min-w-0 flex-1">

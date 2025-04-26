@@ -211,9 +211,10 @@ export default function Home() {
       
       {/* Main content */}
       <main className="flex h-[calc(100vh-4rem)]">
-        {/* Left sidebar */}
+        {/* Left sidebar - Increased width slightly */}
         <div className="w-80 border-r border-apple-gray-200 dark:border-dark-border bg-white/80 dark:bg-dark-surface/80 backdrop-blur-sm overflow-y-auto flex flex-col shadow-sm">
-          <div className="p-4 border-b border-apple-gray-200 dark:border-dark-border">
+          {/* Increased padding for Export button container */}
+          <div className="p-5 border-b border-apple-gray-200 dark:border-dark-border">
             <button 
               onClick={handleExportClick} 
               disabled={!selectedImage || imageLoading}
@@ -263,7 +264,7 @@ export default function Home() {
           )}
         </div>
         
-        {/* Main editor area */}
+        {/* Main editor area - Adjusted background */}
         <div className="flex-1 relative overflow-hidden bg-apple-gray-50 dark:bg-dark-bg">
           {imageLoading ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-apple-gray-400 dark:text-dark-textMuted">
