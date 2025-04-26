@@ -21,9 +21,9 @@ module.exports = {
         dark: {
           bg: 'rgb(var(--dark-bg, 10 10 10))',
           surface: 'rgb(var(--dark-surface, 18 18 18))',
-          border: 'rgb(var(--dark-border, 30 30 30))',
-          text: 'rgb(var(--dark-text, 240 240 240))',
-          textMuted: 'rgb(var(--dark-text-muted, 153 153 153))',
+          border: 'rgb(var(--dark-border, 28 28 28))',
+          text: 'rgb(var(--dark-text, 235 235 235))',
+          textMuted: 'rgb(var(--dark-text-muted, 140 140 140))',
         },
         apple: {
           blue: 'rgb(var(--apple-blue))',
