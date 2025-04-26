@@ -318,6 +318,29 @@ export const applyEffect = async (
         return [createFractalNoiseEffect(settings), {}];
       // --- END NEW effects cases ---
 
+      // --- Add cases for MORE UNIQUE effects ---
+      case 'voronoi':
+        return [createVoronoiEffect(settings), {}];
+      case 'kaleidoscope':
+        return [createKaleidoscopeEffect(settings), {}];
+      case 'inkBleed':
+        return [createInkBleedEffect(settings), {}];
+      case 'heatmap':
+        return [createHeatmapEffect(settings), {}];
+      case 'anaglyph':
+        return [createAnaglyphEffect(settings), {}];
+      case 'scratchedFilm':
+        return [createScratchedFilmEffect(settings), {}];
+      case 'circuitBoard':
+        return [createCircuitBoardEffect(settings), {}];
+      case 'pixelExplosion':
+        return [createPixelExplosionEffect(settings), {}];
+      case 'fisheyeWarp':
+        return [createFisheyeWarpEffect(settings), {}];
+      case 'procTexture':
+        return [createProcTextureEffect(settings), {}];
+      // --- END MORE UNIQUE effects cases ---
+
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
         return [null, null];
@@ -1735,6 +1758,169 @@ const createFractalNoiseEffect = (settings: Record<string, number>) => {
   };
 };
 
+// --- PLACEHOLDER FUNCTIONS FOR MORE UNIQUE EFFECTS ---
+
+const createVoronoiEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) { /* TODO: Implement Voronoi */ };
+};
+
+// 12. Kaleidoscope Implementation
+const createKaleidoscopeEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const segments = Math.max(2, Math.floor(settings.segments ?? 6));
+    const centerX = (settings.centerX ?? 0.5) * width;
+    const centerY = (settings.centerY ?? 0.5) * height;
+
+    const anglePerSegment = (Math.PI * 2) / segments;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const dx = x - centerX;
+        const dy = y - centerY;
+        
+        // Calculate angle and distance from center
+        let angle = Math.atan2(dy, dx);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Normalize angle to be within the first segment (0 to anglePerSegment)
+        angle = ((angle % anglePerSegment) + anglePerSegment) % anglePerSegment;
+        
+        // Reflect angle if in the second half of the base segment (mirroring)
+        if (angle > anglePerSegment / 2) {
+          angle = anglePerSegment - angle;
+        }
+        
+        // Calculate source coordinates based on rotated angle and distance
+        const srcX = Math.round(centerX + Math.cos(angle) * distance);
+        const srcY = Math.round(centerY + Math.sin(angle) * distance);
+
+        const index = (y * width + x) * 4;
+
+        if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+          const srcIndex = (srcY * width + srcX) * 4;
+          data[index] = tempData[srcIndex];
+          data[index + 1] = tempData[srcIndex + 1];
+          data[index + 2] = tempData[srcIndex + 2];
+          data[index + 3] = tempData[srcIndex + 3];
+        } else {
+          // Handle out-of-bounds pixels (e.g., make transparent or black)
+          data[index + 3] = 0;
+        }
+      }
+    }
+  };
+};
+
+// 13. Liquid Distortion / Ink Bleed
+const createInkBleedEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) { /* TODO: Implement Ink Bleed */ };
+};
+
+// 14. Heatmap Implementation
+const createHeatmapEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const gradientType = Math.floor(settings.gradientType ?? 0);
+
+    // Define color gradients (example: [position, r, g, b])
+    const gradients = [
+      // Classic Rainbow (careful, often perceptually poor)
+      [[0, 0, 0, 255], [0.25, 0, 255, 255], [0.5, 0, 255, 0], [0.75, 255, 255, 0], [1, 255, 0, 0]],
+      // Inferno (perceptually uniform)
+      [[0, 0, 0, 4], [0.25, 59, 18, 77], [0.5, 144, 41, 49], [0.75, 218, 87, 4], [1, 252, 175, 62]],
+       // Grayscale
+      [[0, 0, 0, 0], [1, 255, 255, 255]],
+      // Viridis (perceptually uniform)
+      [[0, 68, 1, 84], [0.25, 59, 82, 139], [0.5, 33, 145, 140], [0.75, 94, 201, 98], [1, 253, 231, 37]]
+    ];
+    const selectedGradient = gradients[gradientType % gradients.length];
+
+    const getColorFromGradient = (value: number) => {
+      for (let i = 1; i < selectedGradient.length; i++) {
+        const [prevPos, prevR, prevG, prevB] = selectedGradient[i - 1];
+        const [currPos, currR, currG, currB] = selectedGradient[i];
+        if (value <= currPos) {
+          const t = (value - prevPos) / (currPos - prevPos);
+          return [
+            Math.round(lerp(prevR, currR, t)),
+            Math.round(lerp(prevG, currG, t)),
+            Math.round(lerp(prevB, currB, t))
+          ];
+        }
+      }
+      return selectedGradient[selectedGradient.length - 1].slice(1); // Return last color if value > 1
+    };
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      // Use luminance for heatmap value
+      const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      
+      const [newR, newG, newB] = getColorFromGradient(brightness);
+      data[i] = newR;
+      data[i + 1] = newG;
+      data[i + 2] = newB;
+      // Keep original alpha: data[i + 3] stays the same
+    }
+  };
+};
+
+// 15. Anaglyph 3D Implementation
+const createAnaglyphEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const shift = Math.round(settings.shift ?? 5);
+
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        
+        // Left eye (Red channel)
+        const leftX = Math.min(width - 1, Math.max(0, x - shift));
+        const leftIndex = (y * width + leftX) * 4;
+        const leftR = tempData[leftIndex];
+        const leftG = tempData[leftIndex + 1];
+        const leftB = tempData[leftIndex + 2];
+        // Use luminance for red channel contribution (common method)
+        const redValue = 0.299 * leftR + 0.587 * leftG + 0.114 * leftB;
+
+        // Right eye (Cyan channel)
+        const rightX = Math.min(width - 1, Math.max(0, x + shift));
+        const rightIndex = (y * width + rightX) * 4;
+        const rightG = tempData[rightIndex + 1];
+        const rightB = tempData[rightIndex + 2];
+
+        // Combine channels
+        data[index] = Math.round(redValue); // Red channel from left eye luminance
+        data[index + 1] = rightG;           // Green channel from right eye
+        data[index + 2] = rightB;           // Blue channel from right eye
+        data[index + 3] = tempData[index + 3]; // Keep original alpha
+      }
+    }
+  };
+};
+
+// ... placeholder for Scratched Film ...
+// ... placeholder for Circuit Board ...
+// ... placeholder for Pixel Explosion ...
+// ... placeholder for Fisheye Warp ...
+// ... placeholder for Proc Texture ...
+
 // Initialize Konva when in browser environment
 if (typeof window !== 'undefined') {
   console.log("Browser environment detected, initializing Konva");
@@ -2231,4 +2417,107 @@ export const effectsConfig: Record<string, EffectConfig> = {
     },
   },
   // --- NEW EFFECTS END HERE ---
+  
+  // --- MORE UNIQUE EFFECTS START HERE ---
+  
+  // 11. Voronoi Diagram Pattern
+  voronoi: {
+    label: 'Voronoi Pattern',
+    category: 'Generative',
+    settings: {
+      numPoints: { label: 'Number of Points', min: 10, max: 500, default: 100, step: 10 },
+      showLines: { label: 'Show Lines (0=No, 1=Yes)', min: 0, max: 1, default: 0, step: 1 },
+    },
+  },
+  
+  // 12. Kaleidoscope Effect
+  kaleidoscope: {
+    label: 'Kaleidoscope',
+    category: 'Distortion',
+    settings: {
+      segments: { label: 'Segments', min: 2, max: 20, default: 6, step: 1 },
+      centerX: { label: 'Center X (0-1)', min: 0, max: 1, default: 0.5, step: 0.01 },
+      centerY: { label: 'Center Y (0-1)', min: 0, max: 1, default: 0.5, step: 0.01 },
+    },
+  },
+  
+  // 13. Liquid Distortion / Ink Bleed
+  inkBleed: {
+    label: 'Ink Bleed',
+    category: 'Artistic Simulation',
+    settings: {
+      amount: { label: 'Bleed Amount', min: 1, max: 15, default: 5, step: 1 },
+      intensity: { label: 'Intensity Threshold', min: 0, max: 1, default: 0.3, step: 0.05 }, // Darker pixels bleed more
+    },
+  },
+  
+  // 14. Heatmap / False Color
+  heatmap: {
+    label: 'Heatmap',
+    category: 'Color Effects',
+    settings: {
+      gradientType: { label: 'Gradient (0=Classic, 1=Inferno, ...)', min: 0, max: 3, default: 0, step: 1 }, // Needs mapping
+    },
+  },
+  
+  // 15. Anaglyph 3D (Red/Cyan)
+  anaglyph: {
+    label: 'Anaglyph 3D',
+    category: 'Distortion',
+    settings: {
+      shift: { label: 'Horizontal Shift', min: 1, max: 20, default: 5, step: 1 },
+    },
+  },
+  
+  // 16. Scratched Film / CRT
+  scratchedFilm: {
+    label: 'Scratched Film',
+    category: 'Filters',
+    settings: {
+      scratchDensity: { label: 'Scratch Density', min: 0, max: 0.1, default: 0.02, step: 0.005 },
+      dustOpacity: { label: 'Dust Opacity', min: 0, max: 0.5, default: 0.1, step: 0.02 },
+      flicker: { label: 'Flicker Amount', min: 0, max: 0.1, default: 0.03, step: 0.01 },
+    },
+  },
+  
+  // 17. Circuit Board Trace
+  circuitBoard: {
+    label: 'Circuit Board',
+    category: 'Artistic',
+    settings: {
+      threshold: { label: 'Edge Threshold', min: 20, max: 150, default: 60, step: 5 },
+      glow: { label: 'Glow Amount', min: 0, max: 5, default: 2, step: 0.5 },
+    },
+  },
+  
+  // 18. Pixel Explosion/Shatter
+  pixelExplosion: {
+    label: 'Pixel Explosion',
+    category: 'Distortion',
+    settings: {
+      strength: { label: 'Explosion Strength', min: 5, max: 100, default: 30, step: 5 },
+      numPoints: { label: 'Number of Centers', min: 1, max: 20, default: 5, step: 1 },
+    },
+  },
+  
+  // 19. Non-Linear Warp (Fisheye)
+  fisheyeWarp: {
+    label: 'Fisheye Warp',
+    category: 'Distortion',
+    settings: {
+      strength: { label: 'Distortion Strength', min: -1, max: 1, default: 0.3, step: 0.05 },
+    },
+  },
+  
+  // 20. Procedural Texture Overlay
+  procTexture: {
+    label: 'Procedural Texture',
+    category: 'Filters',
+    settings: {
+      textureType: { label: 'Texture (0=Wood, 1=Marble, ...)', min: 0, max: 2, default: 0, step: 1 }, // Needs mapping
+      scale: { label: 'Texture Scale', min: 0.01, max: 0.5, default: 0.05, step: 0.01 },
+      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.4, step: 0.05 },
+    },
+  },
+  // --- MORE UNIQUE EFFECTS END HERE ---
 }; 
