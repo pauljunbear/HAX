@@ -27,7 +27,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
 
   return (
     <div className="border-t border-apple-gray-200 dark:border-dark-border bg-white/80 dark:bg-dark-surface/80">
-      <div className="py-2 px-4 border-b border-apple-gray-100 dark:border-dark-border">
+      <div className="py-3 px-5 border-b border-apple-gray-100 dark:border-dark-border">
         <div 
           className="flex items-center justify-between cursor-pointer" 
           onClick={() => setIsExpanded(!isExpanded)}
@@ -49,8 +49,8 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
           </svg>
         </div>
 
-        {/* Always visible undo/redo controls */}
-        <div className="flex items-center space-x-2 mt-2">
+        {/* Always visible undo/redo controls - Increased margin-top and gap */}
+        <div className="flex items-center space-x-3 mt-3">
           <button
             onClick={onUndo}
             disabled={!canUndo}
@@ -74,20 +74,20 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
         </div>
       </div>
 
-      {/* Collapsible history list */}
+      {/* Collapsible history list - Increased padding */}
       {isExpanded && (
-        <div className="max-h-40 overflow-y-auto p-2">
+        <div className="max-h-40 overflow-y-auto p-3">
           {history.length === 0 ? (
             <div className="text-center text-apple-gray-400 dark:text-dark-textMuted py-2">
               <p className="text-xs">No history yet</p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {history.map((state, index) => (
                 <button
                   key={index}
                   onClick={() => onJumpToState(index)}
-                  className={`w-full text-left px-2 py-1 rounded-md text-xs transition-colors ${
+                  className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors ${
                     index === currentIndex
                       ? 'bg-primary dark:bg-primary-accent text-white'
                       : 'bg-white dark:bg-dark-surface hover:bg-apple-gray-50 dark:hover:bg-dark-border text-apple-gray-700 dark:text-dark-text border border-apple-gray-200 dark:border-dark-border'

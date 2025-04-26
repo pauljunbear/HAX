@@ -124,8 +124,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   
   return (
     <div className="h-full overflow-y-auto">
-      <div className="py-3 px-4 border-b border-apple-gray-100 dark:border-dark-border">
-        <h2 className="text-sm font-medium text-apple-gray-800 dark:text-dark-text mb-3 flex items-center">
+      <div className="py-4 px-5 border-b border-apple-gray-100 dark:border-dark-border">
+        <h2 className="text-sm font-medium text-apple-gray-800 dark:text-dark-text mb-4 flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-primary dark:text-primary-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
           </svg>
@@ -133,7 +133,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </h2>
         
         {/* Primary Category tabs - Use dark:bg-dark-border for background, dark:text-dark-textMuted for inactive, dark:bg-dark-surface dark:text-dark-text for active */}
-        <div className="flex flex-wrap bg-apple-gray-100 dark:bg-dark-border p-0.5 rounded-lg mb-3">
+        <div className="flex flex-wrap bg-apple-gray-100 dark:bg-dark-border p-0.5 rounded-lg mb-4">
           {categories.map(category => (
             <button
               key={category}
@@ -153,7 +153,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
         
         {/* Effect buttons - Update for dark mode */}
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-2">
           {categoryEffects.map(effect => (
             <button
               key={effect.id}
@@ -173,8 +173,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       
       {/* Settings sliders */}
       {activeEffect && currentEffectSettings.length > 0 && (
-        <div className="py-3 px-4 border-b border-apple-gray-100 dark:border-dark-border">
-          <h3 className="text-xs font-medium text-apple-gray-700 dark:text-dark-text mb-3 flex items-center">
+        <div className="py-4 px-5 border-b border-apple-gray-100 dark:border-dark-border">
+          <h3 className="text-xs font-medium text-apple-gray-700 dark:text-dark-text mb-4 flex items-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5 text-primary dark:text-primary-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
             </svg>
@@ -183,7 +183,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           {currentEffectSettings.map(setting => {
             if (setting.type === 'color') {
               return (
-                <div key={setting.id} className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-700/50 rounded-md">
+                <div key={setting.id} className="mb-4 p-2 bg-yellow-50 dark:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-700/50 rounded-md">
                   <p className="text-xs text-yellow-700 dark:text-yellow-300">Color settings for '{setting.label}' require a color picker UI (not implemented yet).</p>
                 </div>
               );
@@ -196,8 +196,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             ) ?? setting.default;
               
             return (
-              <div key={setting.id} className="mb-3">
-                <div className="flex justify-between mb-1">
+              <div key={setting.id} className="mb-4">
+                <div className="flex justify-between mb-1.5">
                   <label className="text-xs text-apple-gray-600 dark:text-dark-textMuted font-medium">{setting.label}</label>
                   <span className="text-xs text-apple-gray-500 dark:text-dark-textMuted font-mono bg-apple-gray-100 dark:bg-dark-border px-1.5 py-0.5 rounded-full">
                     {typeof displayValue === 'number' ? displayValue.toFixed(setting.step >= 0.1 ? 1 : 0) : 'N/A'}
@@ -228,7 +228,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       
       {/* Action buttons - Update for dark mode */}
       {activeEffect && (
-        <div className="py-3 px-4 space-y-2">
+        <div className="py-4 px-5 space-y-3">
           <button
             onClick={() => {
               console.log("Resetting effect:", activeEffect);
