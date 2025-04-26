@@ -90,6 +90,10 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           imageClone.x(0); // Position at top-left in temp stage
           imageClone.y(0);
           tempLayer.add(imageClone);
+          
+          // Ensure filters are applied to the clone's cache before export
+          imageClone.cache(); 
+          
           tempStage.draw(); // Draw the temporary stage
           console.log("Temporary stage created and drawn.");
           // --- End Temporary Stage --- 
