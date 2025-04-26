@@ -295,6 +295,29 @@ export const applyEffect = async (
       case 'flowField':
         return [createFlowFieldEffect(settings), {}];
 
+      // --- Add cases for NEW effects ---
+      case 'glitchArt':
+        return [createGlitchArtEffect(settings), {}];
+      case 'colorQuantization':
+        return [createColorQuantizationEffect(settings), {}];
+      case 'asciiArt':
+        return [createAsciiArtEffect(settings), {}];
+      case 'edgeDetection':
+        return [createEdgeDetectionEffect(settings), {}];
+      case 'swirl':
+        return [createSwirlEffect(settings), {}];
+      case 'lensFlare':
+        return [createLensFlareEffect(settings), {}];
+      case 'colorTemperature':
+        return [createColorTemperatureEffect(settings), {}];
+      case 'mosaic':
+        return [createMosaicEffect(settings), {}];
+      case 'selectiveColor':
+        return [createSelectiveColorEffect(settings), {}];
+      case 'fractalNoise':
+        return [createFractalNoiseEffect(settings), {}];
+      // --- END NEW effects cases ---
+
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
         return [null, null];
@@ -1437,6 +1460,181 @@ const createFlowFieldEffect = (settings: Record<string, number>) => {
   };
 };
 
+// --- PLACEHOLDER FUNCTIONS FOR NEW EFFECTS ---
+
+const createGlitchArtEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) { /* TODO: Implement Glitch */ };
+};
+
+const createColorQuantizationEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) { /* TODO: Implement Quantization */ };
+};
+
+const createAsciiArtEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) { /* TODO: Implement ASCII */ };
+};
+
+const createEdgeDetectionEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) { /* TODO: Implement Edge Detection */ };
+};
+
+const createSwirlEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const radius = settings.radius ?? Math.min(width, height) / 2;
+    const strength = settings.strength ?? 3;
+    const centerX = (settings.centerX ?? 0.5) * width;
+    const centerY = (settings.centerY ?? 0.5) * height;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        const index = (y * width + x) * 4;
+
+        if (distance < radius) {
+          const percent = distance / radius;
+          // Simple swirl: angle increases closer to center? Let's try angle decreases.
+          const angle = (1 - percent) * strength * Math.PI / 2; // Max angle at center
+          const cosAngle = Math.cos(angle);
+          const sinAngle = Math.sin(angle);
+          
+          const srcX = Math.round(centerX + dx * cosAngle - dy * sinAngle);
+          const srcY = Math.round(centerY + dx * sinAngle + dy * cosAngle);
+
+          if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+            const srcIndex = (srcY * width + srcX) * 4;
+            data[index] = tempData[srcIndex];
+            data[index + 1] = tempData[srcIndex + 1];
+            data[index + 2] = tempData[srcIndex + 2];
+            data[index + 3] = tempData[srcIndex + 3];
+          } else {
+             // Outside source, set to transparent or edge color?
+             data[index + 3] = 0;
+          }
+        } else {
+          // Outside radius, keep original
+          data[index] = tempData[index];
+          data[index + 1] = tempData[index + 1];
+          data[index + 2] = tempData[index + 2];
+          data[index + 3] = tempData[index + 3];
+        }
+      }
+    }
+  };
+};
+
+const createLensFlareEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) { /* TODO: Implement Lens Flare */ };
+};
+
+const createColorTemperatureEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const temperature = settings.temperature ?? 0; // -100 to 100
+    const tint = settings.tint ?? 0;           // -100 to 100
+    
+    // Normalize values (e.g., to +/- 1 or similar small range for multipliers)
+    const tempAdjust = temperature / 100.0;
+    const tintAdjust = tint / 100.0;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      let r = data[i];
+      let g = data[i + 1];
+      let b = data[i + 2];
+
+      // Temperature: Increase R/Decrease B for warm, Decrease R/Increase B for cool
+      if (tempAdjust > 0) { // Warm
+        r = Math.min(255, r + r * tempAdjust * 0.4); 
+        b = Math.max(0, b - b * tempAdjust * 0.4);
+      } else { // Cool
+        r = Math.max(0, r + r * tempAdjust * 0.4); // tempAdjust is negative
+        b = Math.min(255, b - b * tempAdjust * 0.4);
+      }
+
+      // Tint: Increase G/Decrease R&B for green, Decrease G/Increase R&B for magenta
+      if (tintAdjust > 0) { // Green
+        g = Math.min(255, g + g * tintAdjust * 0.4);
+        r = Math.max(0, r - r * tintAdjust * 0.2); 
+        b = Math.max(0, b - b * tintAdjust * 0.2);
+      } else { // Magenta
+        g = Math.max(0, g + g * tintAdjust * 0.4);
+        r = Math.min(255, r - r * tintAdjust * 0.2);
+        b = Math.min(255, b - b * tintAdjust * 0.2);
+      }
+      
+      // Clamp values just in case
+      data[i] = Math.max(0, Math.min(255, r));
+      data[i + 1] = Math.max(0, Math.min(255, g));
+      data[i + 2] = Math.max(0, Math.min(255, b));
+    }
+  };
+};
+
+const createMosaicEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const tileSize = Math.max(1, Math.floor(settings.tileSize ?? 10));
+
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    for (let y = 0; y < height; y += tileSize) {
+      for (let x = 0; x < width; x += tileSize) {
+        let sumR = 0, sumG = 0, sumB = 0, sumA = 0;
+        let count = 0;
+
+        // Calculate average color within the tile
+        for (let tileY = 0; tileY < tileSize && y + tileY < height; tileY++) {
+          for (let tileX = 0; tileX < tileSize && x + tileX < width; tileX++) {
+            const index = ((y + tileY) * width + (x + tileX)) * 4;
+            sumR += tempData[index];
+            sumG += tempData[index + 1];
+            sumB += tempData[index + 2];
+            sumA += tempData[index + 3];
+            count++;
+          }
+        }
+
+        if (count > 0) {
+          const avgR = sumR / count;
+          const avgG = sumG / count;
+          const avgB = sumB / count;
+          const avgA = sumA / count;
+
+          // Fill the tile with the average color
+          for (let tileY = 0; tileY < tileSize && y + tileY < height; tileY++) {
+            for (let tileX = 0; tileX < tileSize && x + tileX < width; tileX++) {
+              const index = ((y + tileY) * width + (x + tileX)) * 4;
+              data[index] = avgR;
+              data[index + 1] = avgG;
+              data[index + 2] = avgB;
+              data[index + 3] = avgA;
+            }
+          }
+        }
+      }
+    }
+  };
+};
+
+const createSelectiveColorEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) { /* TODO: Implement Selective Color */ };
+};
+
+const createFractalNoiseEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) { /* TODO: Implement Fractal Noise */ };
+};
+
 // Initialize Konva when in browser environment
 if (typeof window !== 'undefined') {
   console.log("Browser environment detected, initializing Konva");
@@ -1824,4 +2022,113 @@ export const effectsConfig: Record<string, EffectConfig> = {
       strength: { label: 'Distortion Strength', min: 1, max: 20, default: 5, step: 1 },
     },
   },
+  
+  // --- NEW EFFECTS START HERE ---
+  
+  // 1. Glitch Art
+  glitchArt: {
+    label: 'Glitch Art',
+    category: 'Distortion', // Or maybe Artistic?
+    settings: {
+      blockiness: { label: 'Blockiness', min: 0, max: 0.3, default: 0.05, step: 0.01 },
+      colorShift: { label: 'Color Shift', min: 0, max: 15, default: 5, step: 1 },
+    },
+  },
+  
+  // 2. Color Quantization
+  colorQuantization: {
+    label: 'Quantize Colors',
+    category: 'Color Effects',
+    settings: {
+      numColors: { label: 'Number of Colors', min: 2, max: 64, default: 16, step: 1 },
+      dithering: { label: 'Dithering (0=No, 1=Yes)', min: 0, max: 1, default: 0, step: 1 },
+    },
+  },
+  
+  // 3. ASCII Art Conversion
+  asciiArt: {
+    label: 'ASCII Art',
+    category: 'Artistic',
+    settings: {
+      // ASCII settings might be complex (charset, scale), placeholder for now
+      scale: { label: 'Scale', min: 1, max: 10, default: 5, step: 1 }, 
+    },
+  },
+  
+  // 4. Edge Detection (Sobel)
+  edgeDetection: {
+    label: 'Edge Detection',
+    category: 'Filters',
+    settings: {
+      threshold: { label: 'Threshold', min: 10, max: 150, default: 50, step: 5 },
+      invert: { label: 'Invert Output (0=No, 1=Yes)', min: 0, max: 1, default: 0, step: 1 },
+    },
+  },
+  
+  // 5. Swirl Distortion
+  swirl: {
+    label: 'Swirl',
+    category: 'Distortion',
+    settings: {
+      radius: { label: 'Radius', min: 10, max: 500, default: 150, step: 10 },
+      strength: { label: 'Strength', min: -10, max: 10, default: 3, step: 0.5 },
+      centerX: { label: 'Center X (0-1)', min: 0, max: 1, default: 0.5, step: 0.01 },
+      centerY: { label: 'Center Y (0-1)', min: 0, max: 1, default: 0.5, step: 0.01 },
+    },
+  },
+  
+  // 6. Lens Flare Simulation
+  lensFlare: {
+    label: 'Lens Flare',
+    category: 'Filters',
+    settings: {
+      x: { label: 'Position X (0-1)', min: 0, max: 1, default: 0.2, step: 0.01 },
+      y: { label: 'Position Y (0-1)', min: 0, max: 1, default: 0.2, step: 0.01 },
+      strength: { label: 'Strength', min: 0.1, max: 2, default: 0.8, step: 0.05 },
+    },
+  },
+  
+  // 7. Color Temperature/Tint
+  colorTemperature: {
+    label: 'Temperature/Tint',
+    category: 'Color Effects',
+    settings: {
+      temperature: { label: 'Temperature (Warm/Cool)', min: -100, max: 100, default: 0, step: 1 },
+      tint: { label: 'Tint (Green/Magenta)', min: -100, max: 100, default: 0, step: 1 },
+    },
+  },
+  
+  // 8. Mosaic
+  mosaic: {
+    label: 'Mosaic',
+    category: 'Artistic',
+    settings: {
+      tileSize: { label: 'Tile Size', min: 2, max: 50, default: 10, step: 1 },
+      // shape: { label: 'Shape (0=Square, 1=Hex)', min: 0, max: 1, default: 0, step: 1 }, // Hex is more complex
+    },
+  },
+  
+  // 9. Selective Color
+  selectiveColor: {
+    label: 'Selective Color',
+    category: 'Color Effects',
+    settings: {
+      // Needs a color picker UI. Placeholder settings.
+      hue: { label: 'Target Hue (0-360)', min: 0, max: 360, default: 0, step: 1 },
+      range: { label: 'Hue Range', min: 5, max: 90, default: 30, step: 1 },
+      saturation: { label: 'Saturation Boost', min: 1, max: 5, default: 1.5, step: 0.1 },
+    },
+  },
+  
+  // 10. Fractal Noise Texture
+  fractalNoise: {
+    label: 'Fractal Noise',
+    category: 'Filters',
+    settings: {
+      scale: { label: 'Scale', min: 0.01, max: 0.5, default: 0.1, step: 0.01 },
+      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.3, step: 0.05 },
+      blendMode: { label: 'Blend (0=Overlay, 1=Multiply, ...)', min: 0, max: 5, default: 0, step: 1 }, // Needs mapping
+    },
+  },
+  // --- NEW EFFECTS END HERE ---
 }; 
