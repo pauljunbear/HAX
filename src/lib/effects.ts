@@ -1714,7 +1714,7 @@ const createSwirlEffect = (settings: Record<string, number>) => {
   };
 };
 
-// Implementation of Mosaic (REWRITTEN for clarity/safety)
+// Implementation of Mosaic (Adding data.set)
 const createMosaicEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
     const { data, width, height } = imageData;
@@ -2649,6 +2649,201 @@ const createProcTextureEffect = (settings: Record<string, number>) => {
         data[index + 1] = data[index + 1] * (1 - opacity) + data[index + 1] * (woodColor / 255) * 0.8 * opacity; // Slightly less green
         data[index + 2] = data[index + 2] * (1 - opacity) + data[index + 2] * (woodColor / 255) * 0.6 * opacity; // Even less blue
       }
+    }
+  };
+};
+
+// 17. Circuit Board Trace Implementation (REWRITTEN for clarity/safety)
+const createCircuitBoardEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const threshold = settings.threshold ?? 60;
+    const glowAmount = settings.glow ?? 2;
+
+    // Create intermediate buffers
+    const grayData = new Uint8ClampedArray(data.length);
+    const edgeMap = new Uint8ClampedArray(width * height); // Store edge magnitudes
+    const outputData = new Uint8ClampedArray(data.length); // Final output buffer
+
+    // --- Edge Detection (Sobel) --- 
+    // Grayscale conversion (read from `data`, write to `grayData`)
+    for (let i = 0; i < data.length; i += 4) {
+      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      grayData[i] = grayData[i + 1] = grayData[i + 2] = avg;
+      grayData[i + 3] = data[i + 3];
+    }
+    
+    // Apply Sobel operator (read from `grayData`, store magnitude in `edgeMap`)
+    const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+    const kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+    let maxMagnitude = 0; // For potential normalization later if needed
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        let gx = 0, gy = 0;
+        for (let ky = -1; ky <= 1; ky++) {
+          for (let kx = -1; kx <= 1; kx++) {
+            const kIdx = (ky + 1) * 3 + (kx + 1);
+            const pIdx = ((y + ky) * width + (x + kx)) * 4;
+            gx += grayData[pIdx] * kernelX[kIdx];
+            gy += grayData[pIdx] * kernelY[kIdx];
+          }
+        }
+        const magnitude = Math.sqrt(gx * gx + gy * gy);
+        if (magnitude > threshold) {
+          edgeMap[y * width + x] = Math.min(255, magnitude); // Store magnitude
+          if(magnitude > maxMagnitude) maxMagnitude = magnitude;
+        }
+      }
+    }
+    // --- End Edge Detection ---
+
+    // Set background in outputData
+    const bgColor = [5, 10, 5, 255]; // Dark green background
+    for (let i = 0; i < outputData.length; i += 4) {
+        outputData[i]   = bgColor[0];
+        outputData[i+1] = bgColor[1];
+        outputData[i+2] = bgColor[2];
+        outputData[i+3] = bgColor[3];
+    }
+    
+    // Draw circuit lines with glow onto outputData
+    const traceColor = [100, 255, 100, 255]; // Light green for traces (RGBA)
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const edgeMagnitude = edgeMap[y * width + x];
+        if (edgeMagnitude > 0) { // If it's an edge pixel
+          const index = (y * width + x) * 4;
+          // Draw the main trace directly
+          outputData[index]   = traceColor[0];
+          outputData[index+1] = traceColor[1];
+          outputData[index+2] = traceColor[2];
+          outputData[index+3] = traceColor[3];
+        }
+      }
+    }
+    
+    // Apply glow (reading edgeMap, writing to outputData)
+    if (glowAmount > 0) {
+        const glowRadius = Math.ceil(glowAmount);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                 // If current pixel is NOT an edge, check neighbors for glow
+                 if (edgeMap[y * width + x] === 0) { 
+                     let glowAccum = [0, 0, 0];
+                     let totalWeight = 0;
+                     for (let dy = -glowRadius; dy <= glowRadius; dy++) {
+                         for (let dx = -glowRadius; dx <= glowRadius; dx++) {
+                             if (dx === 0 && dy === 0) continue;
+                             const nx = x + dx;
+                             const ny = y + dy;
+                             if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                 const neighborEdge = edgeMap[ny * width + nx];
+                                 if (neighborEdge > 0) { // If neighbor is an edge
+                                    const distSq = dx*dx + dy*dy;
+                                    if (distSq <= glowRadius * glowRadius) {
+                                        const weight = 1.0 - Math.sqrt(distSq) / glowRadius;
+                                        glowAccum[0] += traceColor[0] * weight;
+                                        glowAccum[1] += traceColor[1] * weight;
+                                        glowAccum[2] += traceColor[2] * weight;
+                                        totalWeight += weight;
+                                    }
+                                 }
+                             }
+                         }
+                     }
+                     if (totalWeight > 0) {
+                         const index = (y * width + x) * 4;
+                         const factor = 0.6 / totalWeight; // Adjust glow intensity/spread
+                         outputData[index]   = Math.min(255, outputData[index] + glowAccum[0] * factor);
+                         outputData[index+1] = Math.min(255, outputData[index+1] + glowAccum[1] * factor);
+                         outputData[index+2] = Math.min(255, outputData[index+2] + glowAccum[2] * factor);
+                     }
+                 }
+            }
+        }
+    }
+
+    // Copy the final result back to the original data array
+    data.set(outputData);
+  };
+};
+
+// Implementation of Voronoi Pattern (Simplified - Nearest Point Color)
+const createVoronoiEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const numPoints = Math.max(2, Math.floor(settings.numPoints ?? 100));
+    const showLines = (settings.showLines ?? 0) > 0.5;
+    const tempData = new Uint8ClampedArray(data.length); 
+    tempData.set(data); // Keep original for color sampling
+
+    // Generate random points
+    const points: {x: number, y: number, r: number, g: number, b: number, a: number}[] = [];
+    for (let i = 0; i < numPoints; i++) {
+      const px = Math.floor(Math.random() * width);
+      const py = Math.floor(Math.random() * height);
+      const pIndex = (py * width + px) * 4;
+      points.push({ 
+          x: px, 
+          y: py, 
+          r: tempData[pIndex], 
+          g: tempData[pIndex + 1], 
+          b: tempData[pIndex + 2],
+          a: tempData[pIndex + 3]
+      });
+    }
+
+    // For each pixel, find the nearest point and assign its color
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let minDistSq = Infinity;
+        let nearestPoint = points[0];
+        for (const p of points) {
+          const dx = x - p.x;
+          const dy = y - p.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < minDistSq) {
+            minDistSq = distSq;
+            nearestPoint = p;
+          }
+        }
+        const index = (y * width + x) * 4;
+        data[index] = nearestPoint.r;
+        data[index + 1] = nearestPoint.g;
+        data[index + 2] = nearestPoint.b;
+        data[index + 3] = nearestPoint.a;
+      }
+    }
+
+    // Optional: Draw lines (simple check for neighbor difference)
+    if (showLines) {
+        const lineColor = [0,0,0,255];
+        const outputData = new Uint8ClampedArray(data.length); 
+        outputData.set(data); // Draw lines on top of colored cells
+         for (let y = 1; y < height-1; y++) {
+           for (let x = 1; x < width-1; x++) {
+              const index = (y * width + x) * 4;
+              const r = data[index]; const g = data[index+1]; const b = data[index+2];
+              // Check immediate neighbors
+              const neighbors = [
+                 (y * width + (x+1)) * 4, (y * width + (x-1)) * 4,
+                 ((y+1) * width + x) * 4, ((y-1) * width + x) * 4
+              ];
+              let isBoundary = false;
+              for(const nIndex of neighbors) {
+                  if(data[nIndex] !== r || data[nIndex+1] !== g || data[nIndex+2] !== b) {
+                     isBoundary = true; break;
+                  }
+              }
+              if (isBoundary) {
+                  outputData[index]   = lineColor[0];
+                  outputData[index+1] = lineColor[1];
+                  outputData[index+2] = lineColor[2];
+                  outputData[index+3] = lineColor[3];
+              }
+           }
+        }
+        data.set(outputData);
     }
   };
 };
