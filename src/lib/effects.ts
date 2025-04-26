@@ -337,9 +337,8 @@ export const applyEffect = async (
         return [createPixelExplosionEffect(settings), {}];
       case 'fisheyeWarp':
         return [createFisheyeWarpEffect(settings), {}];
-      case 'procTexture':
-        return [createProcTextureEffect(settings), {}];
-      // --- END MORE UNIQUE effects cases ---
+
+      // --- MORE UNIQUE EFFECTS END HERE ---
 
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
@@ -2849,4 +2848,167 @@ const createVoronoiEffect = (settings: Record<string, number>) => {
 };
 
 // 13. Liquid Distortion / Ink Bleed
-const createInkBleedEffect = (settings: Record<string, number>) => { /* TODO: Implement Ink Bleed */ };
+const createInkBleedEffect = (settings: Record<string, number>) => {
+    return function(imageData: KonvaImageData) {
+        const { data, width, height } = imageData;
+        const amount = Math.max(1, Math.floor(settings.amount ?? 5)); // Bleed radius
+        const intensityThreshold = settings.intensity ?? 0.3; // Only dark pixels bleed significantly
+        
+        const tempData = new Uint8ClampedArray(data.length);
+        tempData.set(data);
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = (y * width + x) * 4;
+                const r = tempData[index];
+                const g = tempData[index + 1];
+                const b = tempData[index + 2];
+                const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+                // Determine bleed factor (darker pixels bleed more)
+                const bleedFactor = brightness < intensityThreshold ? (intensityThreshold - brightness) / intensityThreshold : 0;
+                
+                if (bleedFactor > 0) {
+                    let sumR = 0, sumG = 0, sumB = 0, sumA = 0;
+                    let count = 0;
+                    const bleedRadius = Math.floor(amount * bleedFactor); // Bleed radius depends on darkness
+
+                    // Average neighbor pixels within bleed radius
+                    for (let dy = -bleedRadius; dy <= bleedRadius; dy++) {
+                        for (let dx = -bleedRadius; dx <= bleedRadius; dx++) {
+                            const nx = x + dx;
+                            const ny = y + dy;
+                            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                const nIndex = (ny * width + nx) * 4;
+                                sumR += tempData[nIndex];
+                                sumG += tempData[nIndex + 1];
+                                sumB += tempData[nIndex + 2];
+                                sumA += tempData[nIndex + 3];
+                                count++;
+                            }
+                        }
+                    }
+                    if (count > 0) {
+                        // Set pixel to the averaged color of its bleeding neighbors
+                        data[index]   = sumR / count;
+                        data[index+1] = sumG / count;
+                        data[index+2] = sumB / count;
+                        data[index+3] = sumA / count;
+                    }
+                } else {
+                    // If pixel doesn't bleed, keep original color (already in data)
+                }
+            }
+        }
+    };
+};
+
+// 18. Pixel Explosion Implementation (REWRITTEN using output buffer)
+const createPixelExplosionEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const strength = settings.strength ?? 30;
+    const numPoints = Math.max(1, Math.floor(settings.numPoints ?? 5));
+
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    const outputData = new Uint8ClampedArray(data.length); // Use output buffer
+    
+    // Generate explosion centers
+    const centers: {x: number, y: number}[] = [];
+    for (let i = 0; i < numPoints; i++) {
+      centers.push({ x: Math.random() * width, y: Math.random() * height });
+    }
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const srcIndex = (y * width + x) * 4;
+
+        // Find nearest center
+        let nearestDistSq = Infinity;
+        let nearestCenter = centers[0];
+        for (const center of centers) {
+          const dx = x - center.x;
+          const dy = y - center.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < nearestDistSq) {
+            nearestDistSq = distSq;
+            nearestCenter = center;
+          }
+        }
+
+        // Calculate displacement (ensure dist is not zero)
+        const dist = Math.sqrt(nearestDistSq) || 1;
+        const dx = x - nearestCenter.x;
+        const dy = y - nearestCenter.y;
+        // Normalize distance for consistent displacement feel across image sizes
+        const normalizedDist = dist / Math.max(width, height);
+        const displacement = normalizedDist * strength;
+        
+        // Calculate target coords, clamping to bounds
+        const targetX = Math.round(Math.min(width - 1, Math.max(0, x + (dx / dist) * displacement)));
+        const targetY = Math.round(Math.min(height - 1, Math.max(0, y + (dy / dist) * displacement)));
+
+        const targetIndex = (targetY * width + targetX) * 4;
+
+        // Copy pixel data to the new location in output buffer
+        outputData[targetIndex]   = tempData[srcIndex];
+        outputData[targetIndex+1] = tempData[srcIndex + 1];
+        outputData[targetIndex+2] = tempData[srcIndex + 2];
+        outputData[targetIndex+3] = tempData[srcIndex + 3];
+      }
+    }
+    // Copy the result back to the original data array
+    data.set(outputData);
+  };
+};
+
+// 19. Fisheye Warp Implementation (REFINED out-of-bounds handling)
+const createFisheyeWarpEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const strength = settings.strength ?? 0.3; // -1 to 1
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.min(centerX, centerY);
+
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const index = (y * width + x) * 4;
+
+        let srcX = x; // Default to original if outside radius or calculation fails
+        let srcY = y;
+
+        if (dist < radius) {
+          const normalizedDist = dist / radius;
+          const factor = 1.0 + strength;
+          // Ensure factor isn't zero to avoid division issues
+          const adjustedFactor = factor === 0 ? 0.0001 : factor; 
+          const newDist = Math.atan(normalizedDist * adjustedFactor * 2) / (adjustedFactor * 2) * radius;
+          
+          const angle = Math.atan2(dy, dx);
+          
+          srcX = centerX + Math.cos(angle) * newDist;
+          srcY = centerY + Math.sin(angle) * newDist;
+        } 
+
+        // Clamp source coordinates and handle potential floating point issues
+        srcX = Math.round(Math.min(width - 1, Math.max(0, srcX)));
+        srcY = Math.round(Math.min(height - 1, Math.max(0, srcY)));
+        const srcIndex = (srcY * width + srcX) * 4;
+
+        // Copy pixel from tempData to data
+        data[index]   = tempData[srcIndex];
+        data[index+1] = tempData[srcIndex + 1];
+        data[index+2] = tempData[srcIndex + 2];
+        data[index+3] = tempData[srcIndex + 3];
+      }
+    }
+  };
+};
