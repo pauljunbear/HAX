@@ -1848,208 +1848,106 @@ const createAnaglyphEffect = (settings: Record<string, number>) => {
   };
 };
 
-// 14. Heatmap Implementation (Review OK, added divide-by-zero check)
-const createHeatmapEffect = (settings: Record<string, number>) => { /* ... existing correct implementation ... */ };
-
-// 17. Circuit Board Trace Implementation
-const createCircuitBoardEffect = (settings: Record<string, number>) => {
+// 14. Heatmap Implementation (REVISED)
+const createHeatmapEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const threshold = settings.threshold ?? 60;
-    const glowAmount = settings.glow ?? 2;
-    
-    // --- Edge Detection (Sobel) --- 
-    const grayData = new Uint8ClampedArray(data.length);
-    for (let i = 0; i < data.length; i += 4) {
-      const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-      grayData[i] = grayData[i + 1] = grayData[i + 2] = avg;
-      grayData[i + 3] = data[i + 3]; // Keep alpha
-    }
-    const edgeMap = new Uint8ClampedArray(width * height);
-    const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
-    const kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
-    for (let y = 1; y < height - 1; y++) {
-      for (let x = 1; x < width - 1; x++) {
-        let gx = 0, gy = 0;
-        for (let ky = -1; ky <= 1; ky++) {
-          for (let kx = -1; kx <= 1; kx++) {
-            const kIdx = (ky + 1) * 3 + (kx + 1);
-            const pIdx = ((y + ky) * width + (x + kx)) * 4;
-            gx += grayData[pIdx] * kernelX[kIdx];
-            gy += grayData[pIdx] * kernelY[kIdx];
-          }
-        }
-        const magnitude = Math.sqrt(gx * gx + gy * gy);
-        if (magnitude > threshold) {
-          edgeMap[y * width + x] = 255; // Mark as edge
-        }
-      }
-    }
-    // --- End Edge Detection ---
+    const gradientType = Math.floor(settings.gradientType ?? 0);
 
-    // Clear original data (set to dark background)
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = 5; data[i+1] = 10; data[i+2] = 5; // Dark green background
-      data[i+3] = 255;
-    }
-    
-    // Draw circuit lines with glow
-    const traceColor = [100, 255, 100]; // Light green for traces
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (edgeMap[y * width + x] === 255) {
-          // Draw the main trace
-          const index = (y * width + x) * 4;
-          data[index] = traceColor[0];
-          data[index + 1] = traceColor[1];
-          data[index + 2] = traceColor[2];
-          
-          // Add simple glow around the trace
-          if (glowAmount > 0) {
-            for (let dy = -glowAmount; dy <= glowAmount; dy++) {
-              for (let dx = -glowAmount; dx <= glowAmount; dx++) {
-                 if (dx === 0 && dy === 0) continue;
-                 const distSq = dx*dx + dy*dy;
-                 if (distSq <= glowAmount * glowAmount) {
-                    const nx = x + dx;
-                    const ny = y + dy;
-                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                       const glowIndex = (ny * width + nx) * 4;
-                       // Only apply glow if it's not overriding another trace pixel
-                       if (edgeMap[ny * width + nx] !== 255) { 
-                           const falloff = 1.0 - Math.sqrt(distSq) / glowAmount;
-                           data[glowIndex] = Math.min(255, data[glowIndex] + traceColor[0] * falloff * 0.5);
-                           data[glowIndex + 1] = Math.min(255, data[glowIndex + 1] + traceColor[1] * falloff * 0.5);
-                           data[glowIndex + 2] = Math.min(255, data[glowIndex + 2] + traceColor[2] * falloff * 0.5);
-                       }
-                    }
-                 }
-              }
+    // Define color gradients (example: [position, r, g, b])
+    const gradients = [
+      // Classic Rainbow (0)
+      [[0, 0, 0, 255], [0.25, 0, 255, 255], [0.5, 0, 255, 0], [0.75, 255, 255, 0], [1, 255, 0, 0]],
+      // Inferno (1) (perceptually uniform)
+      [[0, 0, 0, 4], [0.25, 59, 18, 77], [0.5, 144, 41, 49], [0.75, 218, 87, 4], [1, 252, 175, 62]],
+      // Grayscale (2)
+      [[0, 0, 0, 0], [1, 255, 255, 255]],
+      // Viridis (3) (perceptually uniform)
+      [[0, 68, 1, 84], [0.25, 59, 82, 139], [0.5, 33, 145, 140], [0.75, 94, 201, 98], [1, 253, 231, 37]]
+    ];
+    const selectedGradient = gradients[gradientType % gradients.length];
+
+    // Ensure lerp handles edge cases correctly
+    const safeLerp = (a: number, b: number, t: number) => a + (b - a) * Math.max(0, Math.min(1, t));
+
+    const getColorFromGradient = (value: number) => {
+        value = Math.max(0, Math.min(1, value)); // Clamp value to 0-1
+        for (let i = 1; i < selectedGradient.length; i++) {
+            const [prevPos, prevR, prevG, prevB] = selectedGradient[i - 1];
+            const [currPos, currR, currG, currB] = selectedGradient[i];
+            if (value <= currPos) {
+                const range = currPos - prevPos;
+                // Handle potential division by zero if positions are identical
+                const t = (range === 0) ? 0 : (value - prevPos) / range;
+                return [
+                    Math.round(safeLerp(prevR, currR, t)),
+                    Math.round(safeLerp(prevG, currG, t)),
+                    Math.round(safeLerp(prevB, currB, t))
+                ];
             }
-          }
         }
-      }
+        // Should only reach here if value > 1 (handled by clamp), return last color
+        const lastColor = selectedGradient[selectedGradient.length - 1];
+        return [lastColor[1], lastColor[2], lastColor[3]]; 
+    };
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      // Calculate luminance (brightness)
+      const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      
+      const [newR, newG, newB] = getColorFromGradient(brightness);
+      data[i] = newR;
+      data[i + 1] = newG;
+      data[i + 2] = newB;
+      // Keep original alpha: data[i + 3] stays the same
     }
   };
 };
 
-// 18. Pixel Explosion Implementation (Simplified)
-const createPixelExplosionEffect = (settings: Record<string, number>) => {
-  return function(imageData: KonvaImageData) {
-    const { data, width, height } = imageData;
-    const strength = settings.strength ?? 30;
-    const numPoints = Math.max(1, Math.floor(settings.numPoints ?? 5));
-
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
-    
-    // Generate explosion centers
-    const centers: {x: number, y: number}[] = [];
-    for (let i = 0; i < numPoints; i++) {
-      centers.push({ x: Math.random() * width, y: Math.random() * height });
-    }
-
-    // Clear data for writing displaced pixels
-    for (let i = 0; i < data.length; i += 4) { data[i+3] = 0; } // Make transparent initially
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const srcIndex = (y * width + x) * 4;
-
-        // Find nearest center
-        let nearestDistSq = Infinity;
-        let nearestCenter = centers[0];
-        for (const center of centers) {
-          const dx = x - center.x;
-          const dy = y - center.y;
-          const distSq = dx * dx + dy * dy;
-          if (distSq < nearestDistSq) {
-            nearestDistSq = distSq;
-            nearestCenter = center;
-          }
-        }
-
-        // Calculate displacement
-        const dist = Math.sqrt(nearestDistSq);
-        const dx = x - nearestCenter.x;
-        const dy = y - nearestCenter.y;
-        const displacement = (dist / Math.max(width, height)) * strength; // Normalize displacement
+// Implementation of Color Temperature/Tint (REVISED for accuracy)
+const createColorTemperatureEffect = (settings: Record<string, number>) => {
+    return function(imageData: KonvaImageData) {
+        const data = imageData.data;
+        const temperature = settings.temperature ?? 0; // -100 to 100 (Cool to Warm)
+        const tint = settings.tint ?? 0;           // -100 to 100 (Green to Magenta)
         
-        const targetX = Math.round(x + (dx / dist) * displacement);
-        const targetY = Math.round(y + (dy / dist) * displacement);
+        // Convert temperature/tint sliders to approximate RGB multipliers
+        // These are simplified approximations
+        const tempFactor = temperature / 200.0; // Range -0.5 to 0.5
+        const tintFactor = tint / 200.0;     // Range -0.5 to 0.5
+        
+        // Temperature affects Red and Blue inversely
+        const redTempMultiplier = 1.0 + tempFactor; 
+        const blueTempMultiplier = 1.0 - tempFactor;
+        
+        // Tint affects Green and Red/Blue inversely
+        const greenTintMultiplier = 1.0 - tintFactor;
+        const redBlueTintMultiplier = 1.0 + tintFactor;
 
-        if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
-          const targetIndex = (targetY * width + targetX) * 4;
-          // Copy pixel if target is empty (or implement overwrite logic)
-          if(data[targetIndex+3] === 0) { 
-            data[targetIndex] = tempData[srcIndex];
-            data[targetIndex + 1] = tempData[srcIndex + 1];
-            data[targetIndex + 2] = tempData[srcIndex + 2];
-            data[targetIndex + 3] = tempData[srcIndex + 3];
-          }
+        for (let i = 0; i < data.length; i += 4) {
+            let r = data[i];
+            let g = data[i + 1];
+            let b = data[i + 2];
+
+            // Apply Temperature Shift
+            r *= redTempMultiplier;
+            b *= blueTempMultiplier;
+
+            // Apply Tint Shift (affecting R/B and G)
+            r *= redBlueTintMultiplier;
+            g *= greenTintMultiplier;
+            b *= redBlueTintMultiplier;
+            
+            // Clamp values
+            data[i] = Math.max(0, Math.min(255, r));
+            data[i + 1] = Math.max(0, Math.min(255, g));
+            data[i + 2] = Math.max(0, Math.min(255, b));
         }
-      }
-    }
-    // Fill any remaining transparent pixels?
-  };
+    };
 };
-
-// 19. Fisheye Warp Implementation
-const createFisheyeWarpEffect = (settings: Record<string, number>) => {
-  return function(imageData: KonvaImageData) {
-    const { data, width, height } = imageData;
-    const strength = settings.strength ?? 0.3; // -1 to 1
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const radius = Math.min(centerX, centerY);
-
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const dx = x - centerX;
-        const dy = y - centerY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const index = (y * width + x) * 4;
-
-        if (dist < radius) {
-          // Fisheye transformation
-          const normalizedDist = dist / radius;
-          // Adjust distance non-linearly based on strength
-          // Simple formula: newDist = r * (1 + strength * (r^2 - 1)) - needs refinement
-          // Try atan approach: newDist = atan(dist * factor) / factor 
-          const factor = 1.0 + strength; // Adjust this for different curves
-          const newDist = Math.atan(normalizedDist * factor * 2) / (factor*2) * radius;
-          
-          const angle = Math.atan2(dy, dx);
-          
-          const srcX = Math.round(centerX + Math.cos(angle) * newDist);
-          const srcY = Math.round(centerY + Math.sin(angle) * newDist);
-
-          if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
-            const srcIndex = (srcY * width + srcX) * 4;
-            data[index] = tempData[srcIndex];
-            data[index + 1] = tempData[srcIndex + 1];
-            data[index + 2] = tempData[srcIndex + 2];
-            data[index + 3] = tempData[srcIndex + 3];
-          } else {
-            data[index + 3] = 0; // Transparent outside
-          }
-        } else {
-           // Outside radius - keep original or make transparent/black?
-           data[index+3] = 0; 
-        }
-      }
-    }
-  };
-};
-
-// Placeholders remain for: Voronoi, InkBleed, ScratchedFilm, ProcTexture
-const createVoronoiEffect = (settings: Record<string, number>) => { /* ... */ };
-const createInkBleedEffect = (settings: Record<string, number>) => { /* ... */ };
-const createScratchedFilmEffect = (settings: Record<string, number>) => { /* ... */ };
-const createProcTextureEffect = (settings: Record<string, number>) => { /* ... */ };
 
 // Initialize Konva when in browser environment
 if (typeof window !== 'undefined') {
@@ -2651,3 +2549,110 @@ export const effectsConfig: Record<string, EffectConfig> = {
   },
   // --- MORE UNIQUE EFFECTS END HERE ---
 }; 
+
+// 16. Scratched Film Implementation
+const createScratchedFilmEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const scratchDensity = settings.scratchDensity ?? 0.02;
+    const dustOpacity = settings.dustOpacity ?? 0.1;
+    const flicker = settings.flicker ?? 0.03;
+
+    // Apply flicker (slight random brightness change per frame)
+    const flickerAmount = (Math.random() - 0.5) * flicker * 2;
+    const brightnessMultiplier = 1.0 + flickerAmount;
+    for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.min(255, data[i] * brightnessMultiplier);
+        data[i+1] = Math.min(255, data[i+1] * brightnessMultiplier);
+        data[i+2] = Math.min(255, data[i+2] * brightnessMultiplier);
+    }
+
+    // Add scratches
+    const numScratches = Math.floor(width * height * scratchDensity * 0.01); // Adjust density scaling
+    for (let i = 0; i < numScratches; i++) {
+        const startX = Math.random() * width;
+        const scratchLength = height * (0.2 + Math.random() * 0.8);
+        const scratchColor = Math.random() * 50 + 20; // Darkish gray scratches
+        for (let y = 0; y < scratchLength; y++) {
+            const currentY = Math.floor(y + Math.random() * (height - scratchLength));
+            if (currentY < 0 || currentY >= height) continue;
+            const currentX = Math.floor(startX + (Math.random() - 0.5) * 2); // Slight horizontal jitter
+             if (currentX < 0 || currentX >= width) continue;
+            
+            const index = (currentY * width + currentX) * 4;
+            data[index] = scratchColor;
+            data[index + 1] = scratchColor;
+            data[index + 2] = scratchColor;
+        }
+    }
+    
+    // Add dust
+    const numDust = Math.floor(width * height * 0.01); // Fixed dust amount for now
+    for (let i = 0; i < numDust; i++) {
+        const x = Math.floor(Math.random() * width);
+        const y = Math.floor(Math.random() * height);
+        const index = (y * width + x) * 4;
+        const dustValue = Math.random() * 50; // Dark dust
+        const alpha = dustOpacity * 255;
+        // Simple blend (could be improved)
+        data[index] = data[index] * (1 - dustOpacity) + dustValue * dustOpacity;
+        data[index+1] = data[index+1] * (1 - dustOpacity) + dustValue * dustOpacity;
+        data[index+2] = data[index+2] * (1 - dustOpacity) + dustValue * dustOpacity;
+    }
+  };
+};
+
+// 10. Fractal Noise Implementation (Using Simple Random Noise as Placeholder)
+const createFractalNoiseEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) { 
+      const { data, width, height } = imageData;
+      const opacity = settings.opacity ?? 0.3;
+      // const scale = settings.scale ?? 0.1; // Scale not used in simple random noise
+
+      for (let i = 0; i < data.length; i += 4) {
+        // Generate simple random gray noise value
+        const noiseVal = Math.random() * 255;
+        // Blend with original pixel based on opacity (Overlay-like blend approx)
+        data[i] = lerp(data[i], noiseVal, opacity);
+        data[i+1] = lerp(data[i+1], noiseVal, opacity);
+        data[i+2] = lerp(data[i+2], noiseVal, opacity);
+      }
+  };
+};
+
+// 20. Procedural Texture Implementation (Simple Wood Grain Placeholder)
+const createProcTextureEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const scale = settings.scale ?? 0.05;
+    const opacity = settings.opacity ?? 0.4;
+    // textureType setting is ignored for this simple version
+
+    // Basic pseudo-random function (replace with Perlin/Simplex if available)
+    const pseudoRandom = (seed: number) => {
+        let t = seed + 0.5;
+        t = Math.sin(t * 12.9898);
+        return t - Math.floor(t); 
+    };
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        
+        // Simulate wood grain: noise influenced strongly by Y coordinate
+        const noiseInput = (x * scale * 0.2) + (pseudoRandom(y * scale * 5.0) * 0.5); // Distort x based on y noise
+        const noiseVal = (Math.sin(noiseInput * Math.PI * 2) + 1) / 2; // Create bands
+        const woodColor = 100 + noiseVal * 80; // Brownish tones
+
+        // Blend texture (Multiply blend approx)
+        data[index] = data[index] * (1 - opacity) + data[index] * (woodColor / 255) * opacity;
+        data[index + 1] = data[index + 1] * (1 - opacity) + data[index + 1] * (woodColor / 255) * 0.8 * opacity; // Slightly less green
+        data[index + 2] = data[index + 2] * (1 - opacity) + data[index + 2] * (woodColor / 255) * 0.6 * opacity; // Even less blue
+      }
+    }
+  };
+};
+
+// Placeholders remain for: Voronoi, InkBleed
+const createVoronoiEffect = (settings: Record<string, number>) => { /* ... */ };
+const createInkBleedEffect = (settings: Record<string, number>) => { /* ... */ };
