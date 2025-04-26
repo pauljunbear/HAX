@@ -101,6 +101,38 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
   }, [debouncedBlurValue, activeEffect, onSettingChange]);
   
+  // Debounce Bloom settings
+  const debouncedBloomStrength = useDebounce(
+    activeEffect === 'bloom' && localSliderValues.strength !== undefined ? localSliderValues.strength : null,
+    200
+  );
+  const debouncedBloomRadius = useDebounce(
+    activeEffect === 'bloom' && localSliderValues.radius !== undefined ? localSliderValues.radius : null,
+    200
+  );
+  
+  useEffect(() => {
+    if (activeEffect === 'bloom' && onSettingChange) {
+      if (debouncedBloomStrength !== null) onSettingChange('strength', debouncedBloomStrength);
+      if (debouncedBloomRadius !== null) onSettingChange('radius', debouncedBloomRadius);
+    }
+  }, [debouncedBloomStrength, debouncedBloomRadius, activeEffect, onSettingChange]);
+
+  // Debounce Oil Painting (Kuwahara) radius
+  const debouncedOilRadius = useDebounce(
+    activeEffect === 'oilPainting' && localSliderValues.radius !== undefined ? localSliderValues.radius : null,
+    200
+  );
+  
+  useEffect(() => {
+    if (activeEffect === 'oilPainting' && debouncedOilRadius !== null && onSettingChange) {
+      onSettingChange('radius', debouncedOilRadius);
+    }
+  }, [debouncedOilRadius, activeEffect, onSettingChange]);
+  
+  // List of effects to debounce sliders for
+  const debouncedEffects = ['blur', 'bloom', 'oilPainting'];
+  
   if (!hasImage) {
     return (
       <div className="p-6 h-full flex flex-col items-center justify-center text-center">
@@ -206,7 +238,14 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   max={setting.max}
                   step={setting.step}
                   value={typeof displayValue === 'number' ? displayValue : setting.default}
-                  onChange={e => handleSliderChange(setting.id, parseFloat(e.target.value))}
+                  // Only call onSettingChange directly if the effect is NOT debounced
+                  onChange={e => {
+                      const newValue = parseFloat(e.target.value);
+                      setLocalSliderValues(prev => ({...prev, [setting.id]: newValue}));
+                      if (!debouncedEffects.includes(activeEffect || '')) {
+                          onSettingChange?.(setting.id, newValue);
+                      }
+                  }}
                   className={`w-full appearance-none cursor-pointer h-1.5 rounded-full bg-dark-border 
                              focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-accent/50
                              [&::-webkit-slider-thumb]:appearance-none
