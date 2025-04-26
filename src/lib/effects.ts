@@ -2848,6 +2848,5 @@ const createVoronoiEffect = (settings: Record<string, number>) => {
   };
 };
 
-// Placeholders remain for: Voronoi, InkBleed
-const createVoronoiEffect = (settings: Record<string, number>) => { /* ... */ };
-const createInkBleedEffect = (settings: Record<string, number>) => { /* ... */ };
+// 13. Liquid Distortion / Ink Bleed
+const createInkBleedEffect = (settings: Record<string, number>) => { /* TODO: Implement Ink Bleed */ };
