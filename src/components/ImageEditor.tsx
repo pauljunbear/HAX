@@ -141,6 +141,33 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           // if (tempStage) tempStage.destroy(); 
         }
       }, 50); 
+    },
+    // Add function to get current canvas data URL
+    getCurrentDataURL: () => {
+      if (!isBrowser || !stageRef.current) {
+        console.error("Cannot get data URL: Not in browser or stage not ready.");
+        return null;
+      }
+      const imageNode = stageRef.current.findOne('Image');
+      if (!imageNode) {
+        console.error("Cannot get data URL: Image node not found.");
+        return null;
+      }
+
+      // Use toDataURL directly on the main stage's image node
+      // This assumes the node's cache is up-to-date with applied effects
+      try {
+          // Force cache update before getting data url
+          imageNode.cache(); 
+          const dataURL = imageNode.toDataURL({
+              pixelRatio: 1 // Use 1x for layer data to manage memory/performance 
+          });
+          console.log(`Generated layer dataURL length: ${dataURL?.length}`);
+          return dataURL;
+      } catch (err) {
+          console.error("Error generating data URL for layer:", err);
+          return null;
+      }
     }
   };
 

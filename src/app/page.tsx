@@ -156,12 +156,43 @@ export default function Home() {
   };
 
   // Add a new layer with the current image
-  const handleAddLayer = () => {
-    addLayer({
-      name: `Layer ${layers.length + 1}`,
-      type: 'image',
-      data: selectedImage
-    });
+  const handleAddLayer = async () => {
+    if (imageEditorRef && typeof imageEditorRef.getCurrentDataURL === 'function') {
+      console.log("Attempting to get current canvas data for new layer...");
+      const currentImageData = imageEditorRef.getCurrentDataURL();
+      
+      if (currentImageData) {
+        console.log("Adding layer with current canvas data.");
+        addLayer({
+          name: `Layer ${layers.length + 1}`,
+          type: 'image',
+          data: currentImageData // Use the snapshot from the canvas
+        });
+      } else {
+        console.error("Failed to get current canvas data for new layer.");
+        // Optionally fall back to original image or show an error
+        // Fallback to original image for now:
+        if (selectedImage) {
+            console.warn("Falling back to using original selected image for new layer.");
+            addLayer({
+                name: `Layer ${layers.length + 1}`,
+                type: 'image',
+                data: selectedImage
+            });
+        }
+      }
+    } else {
+      console.error("ImageEditor instance or getCurrentDataURL method not available for adding layer.");
+       // Fallback if ref not ready
+        if (selectedImage) {
+            console.warn("Ref not ready, falling back to using original selected image for new layer.");
+            addLayer({
+                name: `Layer ${layers.length + 1}`,
+                type: 'image',
+                data: selectedImage
+            });
+        }
+    }
   };
 
   // Callback to get the ref from ImageEditor
