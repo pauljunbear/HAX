@@ -2847,7 +2847,7 @@ const createVoronoiEffect = (settings: Record<string, number>) => {
   };
 };
 
-// 13. Liquid Distortion / Ink Bleed
+// 13. Ink Bleed Implementation (Simplified)
 const createInkBleedEffect = (settings: Record<string, number>) => {
     return function(imageData: KonvaImageData) {
         const { data, width, height } = imageData;
@@ -2856,6 +2856,7 @@ const createInkBleedEffect = (settings: Record<string, number>) => {
         
         const tempData = new Uint8ClampedArray(data.length);
         tempData.set(data);
+        const outputData = new Uint8ClampedArray(data.length); // Use output buffer
 
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
@@ -2873,7 +2874,7 @@ const createInkBleedEffect = (settings: Record<string, number>) => {
                     let count = 0;
                     const bleedRadius = Math.floor(amount * bleedFactor); // Bleed radius depends on darkness
 
-                    // Average neighbor pixels within bleed radius
+                    // Average neighbor pixels within bleed radius (Read from tempData)
                     for (let dy = -bleedRadius; dy <= bleedRadius; dy++) {
                         for (let dx = -bleedRadius; dx <= bleedRadius; dx++) {
                             const nx = x + dx;
@@ -2889,21 +2890,27 @@ const createInkBleedEffect = (settings: Record<string, number>) => {
                         }
                     }
                     if (count > 0) {
-                        // Set pixel to the averaged color of its bleeding neighbors
-                        data[index]   = sumR / count;
-                        data[index+1] = sumG / count;
-                        data[index+2] = sumB / count;
-                        data[index+3] = sumA / count;
+                        // Write averaged color to outputData
+                        outputData[index]   = sumR / count;
+                        outputData[index+1] = sumG / count;
+                        outputData[index+2] = sumB / count;
+                        outputData[index+3] = sumA / count;
                     }
                 } else {
-                    // If pixel doesn't bleed, keep original color (already in data)
+                    // If pixel doesn't bleed, copy original color to outputData
+                    outputData[index]   = tempData[index];
+                    outputData[index+1] = tempData[index + 1];
+                    outputData[index+2] = tempData[index + 2];
+                    outputData[index+3] = tempData[index + 3];
                 }
             }
         }
+        // Copy the result back to the original data array
+        data.set(outputData);
     };
 };
 
-// 18. Pixel Explosion Implementation (REWRITTEN using output buffer)
+// 18. Pixel Explosion Implementation (Revised output buffer handling)
 const createPixelExplosionEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
     const { data, width, height } = imageData;
@@ -2912,7 +2919,8 @@ const createPixelExplosionEffect = (settings: Record<string, number>) => {
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
-    const outputData = new Uint8ClampedArray(data.length); // Use output buffer
+    const outputData = new Uint8ClampedArray(data.length); 
+    outputData.set(tempData); // Initialize output with original image
     
     // Generate explosion centers
     const centers: {x: number, y: number}[] = [];
@@ -2951,7 +2959,7 @@ const createPixelExplosionEffect = (settings: Record<string, number>) => {
 
         const targetIndex = (targetY * width + targetX) * 4;
 
-        // Copy pixel data to the new location in output buffer
+        // Copy pixel data from original (tempData) to the new location in output buffer
         outputData[targetIndex]   = tempData[srcIndex];
         outputData[targetIndex+1] = tempData[srcIndex + 1];
         outputData[targetIndex+2] = tempData[srcIndex + 2];
@@ -2963,7 +2971,7 @@ const createPixelExplosionEffect = (settings: Record<string, number>) => {
   };
 };
 
-// 19. Fisheye Warp Implementation (REFINED out-of-bounds handling)
+// 19. Fisheye Warp Implementation (Ensuring tempData read)
 const createFisheyeWarpEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
     const { data, width, height } = imageData;
@@ -2982,26 +2990,25 @@ const createFisheyeWarpEffect = (settings: Record<string, number>) => {
         const dist = Math.sqrt(dx * dx + dy * dy);
         const index = (y * width + x) * 4;
 
-        let srcX = x; // Default to original if outside radius or calculation fails
+        let srcX = x; 
         let srcY = y;
 
-        if (dist < radius) {
+        if (dist < radius && strength !== 0) { // Check strength to avoid division by zero implicitly
           const normalizedDist = dist / radius;
           const factor = 1.0 + strength;
-          // Ensure factor isn't zero to avoid division issues
-          const adjustedFactor = factor === 0 ? 0.0001 : factor; 
+          const adjustedFactor = Math.abs(factor) < 0.0001 ? (factor > 0 ? 0.0001 : -0.0001) : factor; // Avoid zero
           const newDist = Math.atan(normalizedDist * adjustedFactor * 2) / (adjustedFactor * 2) * radius;
           
           const angle = Math.atan2(dy, dx);
           
           srcX = centerX + Math.cos(angle) * newDist;
           srcY = centerY + Math.sin(angle) * newDist;
-        } 
-
+        }
+        
         // Clamp source coordinates and handle potential floating point issues
-        srcX = Math.round(Math.min(width - 1, Math.max(0, srcX)));
-        srcY = Math.round(Math.min(height - 1, Math.max(0, srcY)));
-        const srcIndex = (srcY * width + srcX) * 4;
+        const clampedSrcX = Math.round(Math.min(width - 1, Math.max(0, srcX)));
+        const clampedSrcY = Math.round(Math.min(height - 1, Math.max(0, srcY)));
+        const srcIndex = (clampedSrcY * width + clampedSrcX) * 4;
 
         // Copy pixel from tempData to data
         data[index]   = tempData[srcIndex];

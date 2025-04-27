@@ -499,6 +499,13 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         // Get the Konva filter function and parameters
         const [filterFunc, filterParams] = await applyEffect(activeEffect, effectSettings || {});
         
+        // Clear cache for potentially problematic effects before applying
+        const effectsToClearCache = ['pixelExplosion', 'fisheyeWarp']; 
+        if (effectsToClearCache.includes(activeEffect)) {
+          console.log(`Clearing cache before applying ${activeEffect}`);
+          imageNode.clearCache(); 
+        }
+        
         if (!filterFunc) {
           console.warn("No filter function returned for effect:", activeEffect);
           imageNode.cache(); // Still cache and draw to clear previous filters
