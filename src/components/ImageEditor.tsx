@@ -7,6 +7,8 @@ import { applyEffect, getFilterConfig, ensureKonvaInitialized } from '@/lib/effe
 import { SelectionType, SelectionData } from './SelectionTool';
 import SelectionToolbar from './SelectionToolbar';
 import { EffectLayer } from './EffectLayers';
+import { supportsAnimation, getAnimationConfig } from '@/lib/animationConfig';
+import { renderAnimationFrames, exportAsGif, downloadBlob } from '@/lib/animationRenderer';
 
 interface ImageEditorProps {
   selectedImage?: string | null;
@@ -36,137 +38,105 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportQuality, setExportQuality] = useState<number>(0.9); // 0.0 to 1.0
-  const [exportFormat, setExportFormat] = useState<'png' | 'jpeg'>('png');
+  const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'gif'>('png');
   const [isBrowser, setIsBrowser] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [showExportOptions, setShowExportOptions] = useState(false);
+  const [animationDuration, setAnimationDuration] = useState(2000);
+  const [animationFrameRate, setAnimationFrameRate] = useState(30);
+  const [isExportingAnimation, setIsExportingAnimation] = useState(false);
+  const [animationProgress, setAnimationProgress] = useState(0);
   
   // Define the imperative handle methods object in the main component scope
   const imperativeHandleMethods = {
-    exportImage: () => {
-      console.log("Export function called via ref"); // Log: Function entry
-      if (!isBrowser) {
-        console.error("Export failed: Not in browser environment.");
-        return;
-      }
-      if (!stageRef.current) {
-        console.error("Export failed: Stage ref is not available.");
-        return;
-      }
-
-      const imageNode = stageRef.current.findOne('Image');
-      if (!imageNode) {
-        console.error("Export failed: Image node not found in the stage.");
+    exportImage: async () => {
+      console.log("Export method called on ImageEditor ref");
+      
+      if (!stageRef.current || !image) {
+        console.error("Cannot export: Stage or image not ready");
         return;
       }
       
-      console.log(`Attempting export with format: ${exportFormat}, quality: ${exportQuality}`);
-      setIsLoading(true);
-      
-      setTimeout(() => {
-        try {
-          // --- Create Temporary Stage for Export ---
-          console.log("Creating temporary stage for export...");
-          // Ensure Konva is available before creating Stage
-          const Konva = (window as any).Konva; // Access Konva globally if init worked
-          if (!Konva) {
-             console.error("Export failed: Konva is not initialized globally.");
-             setIsLoading(false);
-             return;
-          }
+      try {
+        if (exportFormat === 'gif' && hasAnimatedEffects && firstAnimatedEffect && animationConfig) {
+          // Animated GIF export
+          setIsExportingAnimation(true);
+          setAnimationProgress(0);
           
-          const tempStage = new Konva.Stage({
-            container: document.createElement('div'), // Hidden container
-            width: imageNode.width(),
-            height: imageNode.height(),
+          const options = {
+            duration: animationDuration,
+            frameRate: animationFrameRate,
+            quality: 10, // GIF quality 1-10
+            width: imageSize.width,
+            height: imageSize.height,
+            onProgress: (progress: number) => {
+              setAnimationProgress(progress * 0.5); // First 50% for frame rendering
+            }
+          };
+          
+          // Get current settings for the animated effect
+          const currentSettings = effectLayers?.find(
+            layer => layer.effectId === firstAnimatedEffect.effectId
+          )?.settings || {};
+          
+          // Render frames
+          const frames = await renderAnimationFrames(
+            image,
+            firstAnimatedEffect.effectId,
+            currentSettings,
+            animationConfig,
+            options
+          );
+          
+          // Export as GIF
+          const blob = await exportAsGif(frames, {
+            quality: 10,
+            onProgress: (progress: number) => {
+              setAnimationProgress(0.5 + progress * 0.5); // Last 50% for GIF encoding
+            },
+            onComplete: (blob: Blob) => {
+              downloadBlob(blob, `animated-${Date.now()}.gif`);
+              setIsExportingAnimation(false);
+              setAnimationProgress(0);
+            },
+            onError: (error: Error) => {
+              console.error('GIF export error:', error);
+              setIsExportingAnimation(false);
+              setAnimationProgress(0);
+              alert('Failed to export GIF: ' + error.message);
+            }
           });
-          const tempLayer = new Konva.Layer();
-          tempStage.add(tempLayer);
           
-          // Clone the image node - this should preserve its current state including filters
-          const imageClone = imageNode.clone(); 
-          imageClone.x(0); // Position at top-left in temp stage
-          imageClone.y(0);
-          tempLayer.add(imageClone);
-          
-          // Ensure filters are applied to the clone's cache before export
-          imageClone.cache(); 
-          
-          tempStage.draw(); // Draw the temporary stage
-          console.log("Temporary stage created and drawn.");
-          // --- End Temporary Stage --- 
-
-          console.log("Calling tempStage.toDataURL...");
-          const dataURL = tempStage.toDataURL({
+        } else {
+          // Static image export (existing code)
+          const uri = stageRef.current.toDataURL({
+            pixelRatio: window.devicePixelRatio || 1,
             mimeType: exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
-            quality: exportQuality,
-            pixelRatio: 2, // Keep high-res export
-            x: 0,
-            y: 0,
-            width: imageNode.width(), // Export only the image area
-            height: imageNode.height()
+            quality: exportFormat === 'jpeg' ? exportQuality : 1,
           });
-          
-          // Clean up temporary stage
-          tempStage.destroy();
-          console.log("Temporary stage destroyed.");
-
-          if (!dataURL) {
-            console.error("Export failed: toDataURL returned null or empty.");
-            setError('Failed to generate image data for export.');
-            setIsLoading(false);
-            return;
-          }
-          
-          console.log(`Exported image dataURL length: ${dataURL.length}`);
           
           const link = document.createElement('a');
-          link.download = `imager-export.${exportFormat}`;
-          link.href = dataURL;
-          
+          link.download = `edited-image-${Date.now()}.${exportFormat}`;
+          link.href = uri;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          
-          console.log("Export process completed successfully.");
-          setIsLoading(false);
-          
-        } catch (err) {
-          console.error("Export error caught:", err);
-          setError(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-          setIsLoading(false);
-          // Ensure cleanup even on error
-          // if (tempStage) tempStage.destroy(); 
         }
-      }, 50); 
+        
+        console.log("Export completed successfully");
+      } catch (error) {
+        console.error("Export error:", error);
+        setIsExportingAnimation(false);
+        setAnimationProgress(0);
+      }
     },
     // Add function to get current canvas data URL
-    getCurrentDataURL: () => {
-      if (!isBrowser || !stageRef.current) {
-        console.error("Cannot get data URL: Not in browser or stage not ready.");
-        return null;
-      }
-      const imageNode = stageRef.current.findOne('Image');
-      if (!imageNode) {
-        console.error("Cannot get data URL: Image node not found.");
-        return null;
-      }
-
-      // Use toDataURL directly on the main stage's image node
-      // This assumes the node's cache is up-to-date with applied effects
-      try {
-          // Force cache update before getting data url
-          imageNode.cache(); 
-          const dataURL = imageNode.toDataURL({
-              pixelRatio: 1 // Use 1x for layer data to manage memory/performance 
-          });
-          console.log(`Generated layer dataURL length: ${dataURL?.length}`);
-          return dataURL;
-      } catch (err) {
-          console.error("Error generating data URL for layer:", err);
-          return null;
-      }
+    getCanvasDataURL: () => {
+      if (!stageRef.current) return null;
+      return stageRef.current.toDataURL({
+        pixelRatio: window.devicePixelRatio || 1,
+      });
     }
   };
 
@@ -634,42 +604,16 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     applyFiltersAsync();
   }, [effectLayers, image, isBrowser]);
 
-  // Export the image (This is the original export function, now accessible via ref)
-  const handleExport = () => {
-    // This internal handler can now just call the exposed method if needed,
-    // but the primary export trigger is now external via the ref.
-    // We can keep the internal button logic if we still want an export button inside ImageEditor.
-    console.log("Internal export button clicked");
-    if (ref && typeof ref === 'object' && ref.current && typeof ref.current.exportImage === 'function') {
-      ref.current.exportImage();
-    } else {
-       console.error("Ref or exportImage method not available for internal export");
-    }
-  };
+  // Check if current effects support animation
+  const hasAnimatedEffects = effectLayers?.some(layer => 
+    layer.visible && supportsAnimation(layer.effectId)
+  ) || false;
 
-  // Export quality control
-  const handleExportQualityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setExportQuality(parseFloat(e.target.value));
-  };
-
-  // Export format control
-  const handleExportFormatChange = (format: 'png' | 'jpeg') => {
-    setExportFormat(format);
-  };
-
-  // Force reload the image if needed
-  const handleForceReload = () => {
-    if (!selectedImage) return;
-    
-    console.log("Force reloading image");
-    const tempImage = new Image();
-    tempImage.onload = () => {
-      console.log("Force reload successful");
-      // This will trigger the useImage hook to reload
-      onImageUpload?.(selectedImage);
-    };
-    tempImage.src = selectedImage;
-  };
+  // Get the first animated effect for settings
+  const firstAnimatedEffect = effectLayers?.find(layer => 
+    layer.visible && supportsAnimation(layer.effectId)
+  );
+  const animationConfig = firstAnimatedEffect ? getAnimationConfig(firstAnimatedEffect.effectId) : null;
 
   // Render different states
   if (!selectedImage) {
@@ -743,7 +687,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         <div className="animate-spin rounded-full h-10 w-10 border-2 border-t-emerald-500 border-gray-200 mb-4"></div>
         <span className="text-gray-600">Loading image...</span>
         <button 
-          onClick={handleForceReload}
+          onClick={handleUploadClick}
           className="mt-4 px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded-md hover:bg-gray-300"
         >
           Force Reload
@@ -847,7 +791,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
               
               <div className="flex gap-2">
                 <button
-                  onClick={handleExport}
+                  onClick={imperativeHandleMethods.exportImage}
                   className="btn-apple-secondary flex items-center"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -891,6 +835,18 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
                           >
                             JPEG
                           </button>
+                          {hasAnimatedEffects && (
+                            <button
+                              onClick={() => setExportFormat('gif')}
+                              className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-colors ${
+                                exportFormat === 'gif'
+                                  ? 'bg-white text-[rgb(var(--apple-gray-800))] shadow-sm'
+                                  : 'text-[rgb(var(--apple-gray-600))]'
+                              }`}
+                            >
+                              GIF
+                            </button>
+                          )}
                         </div>
                       </div>
                       
@@ -912,11 +868,58 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
                         </div>
                       )}
                       
+                      {exportFormat === 'gif' && hasAnimatedEffects && (
+                        <>
+                          <div className="mb-3">
+                            <div className="flex justify-between mb-1">
+                              <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">Duration</label>
+                              <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono">{animationDuration / 1000}s</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={500}
+                              max={5000}
+                              step={500}
+                              value={animationDuration}
+                              onChange={(e) => setAnimationDuration(parseInt(e.target.value))}
+                              className="w-full"
+                            />
+                          </div>
+                          
+                          <div className="mb-3">
+                            <div className="flex justify-between mb-1">
+                              <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">Frame Rate</label>
+                              <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono">{animationFrameRate} fps</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={12}
+                              max={30}
+                              step={6}
+                              value={animationFrameRate}
+                              onChange={(e) => setAnimationFrameRate(parseInt(e.target.value))}
+                              className="w-full"
+                            />
+                          </div>
+                        </>
+                      )}
+                      
                       <button
-                        onClick={handleExport}
+                        onClick={imperativeHandleMethods.exportImage}
+                        disabled={isExportingAnimation}
                         className="btn-apple-primary w-full"
                       >
-                        Export Image
+                        {isExportingAnimation ? (
+                          <span className="flex items-center justify-center">
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Creating GIF... {Math.round(animationProgress * 100)}%
+                          </span>
+                        ) : (
+                          `Export ${exportFormat.toUpperCase()}`
+                        )}
                       </button>
                     </div>
                   )}
