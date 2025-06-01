@@ -6,11 +6,11 @@ import useImage from '@/hooks/useImage';
 import { applyEffect, getFilterConfig, ensureKonvaInitialized } from '@/lib/effects';
 import { SelectionType, SelectionData } from './SelectionTool';
 import SelectionToolbar from './SelectionToolbar';
+import { EffectLayer } from './EffectLayers';
 
 interface ImageEditorProps {
   selectedImage?: string | null;
-  activeEffect?: string | null;
-  effectSettings?: Record<string, number>;
+  effectLayers?: EffectLayer[];  // Changed from activeEffect to effectLayers
   onImageUpload?: (imageDataUrl: string) => void;
   onReady?: (ref: any) => void;
 }
@@ -21,8 +21,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 const ImageEditor = forwardRef<any, ImageEditorProps>((
   {
     selectedImage,
-    activeEffect,
-    effectSettings,
+    effectLayers,
     onImageUpload,
     onReady,
   },
@@ -513,54 +512,73 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       imageNode.levels(1); // Posterize levels (1 effectively means no posterization)
       // We might need a more robust way to reset custom filter props if any exist
       
-      if (!activeEffect) {
-        console.log("No active effect, clearing filters and resetting properties.");
+      if (!effectLayers || effectLayers.length === 0) {
+        console.log("No active effects, clearing filters and resetting properties.");
         imageNode.cache();
         imageNode.getLayer().batchDraw();
         return;
       }
       
       try {
-        console.log("Applying effect:", activeEffect, "with settings:", effectSettings);
+        console.log("Applying effects:", effectLayers.map(layer => layer.effectId).join(', '));
         
-        // Get the Konva filter function and parameters
-        const [filterFunc, filterParams] = await applyEffect(activeEffect, effectSettings || {});
+        // Collect all filter functions and parameters
+        const allFilters: any[] = [];
+        const allParams: Record<string, any> = {};
         
-        // Clear cache for potentially problematic effects before applying
-        const effectsToClearCache = ['pixelExplosion', 'fisheyeWarp']; 
-        if (effectsToClearCache.includes(activeEffect)) {
-          console.log(`Clearing cache before applying ${activeEffect}`);
-          imageNode.clearCache(); 
+        for (const layer of effectLayers) {
+          if (!layer.visible) continue; // Skip invisible layers
+          
+          console.log(`Processing effect: ${layer.effectId} with opacity: ${layer.opacity}`);
+          const [filterFunc, filterParams] = await applyEffect(layer.effectId, layer.settings || {});
+          
+          if (filterFunc) {
+            allFilters.push(filterFunc);
+            
+            // Apply opacity to the effect if it's less than 1
+            if (layer.opacity < 1 && filterParams) {
+              // Some effects might need special handling for opacity
+              // For now, we'll handle it in a general way
+              Object.keys(filterParams).forEach(key => {
+                if (typeof filterParams[key] === 'number') {
+                  filterParams[key] *= layer.opacity;
+                }
+              });
+            }
+            
+            // Merge parameters (later ones override earlier ones for now)
+            if (filterParams) {
+              Object.assign(allParams, filterParams);
+            }
+          }
         }
         
-        if (!filterFunc) {
-          console.warn("No filter function returned for effect:", activeEffect);
-          imageNode.cache(); // Still cache and draw to clear previous filters
+        if (allFilters.length === 0) {
+          console.log("No valid filters to apply");
+          imageNode.cache();
           imageNode.getLayer().batchDraw();
           return;
         }
         
-        // Apply the filter function to the node
-        imageNode.filters([filterFunc]);
+        // Apply all filters at once
+        imageNode.filters(allFilters);
         
         // Set filter-specific parameters directly on the node
-        if (filterParams) {
-          console.log("Setting filter params on node:", filterParams);
-          for (const key in filterParams) {
-            if (typeof imageNode[key] === 'function') {
-              // Check if the key corresponds to a method (like brightness, contrast)
-              imageNode[key](filterParams[key]); 
-            } else {
-              // Otherwise, try setting as a property (less common for filters)
-              imageNode[key] = filterParams[key];
-            }
+        console.log("Setting filter params on node:", allParams);
+        for (const key in allParams) {
+          if (typeof imageNode[key] === 'function') {
+            // Check if the key corresponds to a method (like brightness, contrast)
+            imageNode[key](allParams[key]); 
+          } else {
+            // Otherwise, try setting as a property (less common for filters)
+            imageNode[key] = allParams[key];
           }
         }
         
         // Update the canvas
         imageNode.cache();
         imageNode.getLayer().batchDraw();
-        console.log(`Applied ${activeEffect} effect successfully`);
+        console.log(`Applied ${allFilters.length} effects successfully`);
         
       } catch (error) {
         console.error("Error applying filters:", error);
@@ -572,7 +590,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     };
     
     applyFiltersAsync();
-  }, [activeEffect, effectSettings, image, isBrowser]);
+  }, [effectLayers, image, isBrowser]);
 
   // Export the image (This is the original export function, now accessible via ref)
   const handleExport = () => {

@@ -90,9 +90,8 @@ const useEffectLayers = () => {
     const visibleLayers = layers.filter(layer => layer.visible);
     if (visibleLayers.length === 0) return null;
     
-    // For now, just return the first visible layer
-    // In a real implementation, you'd composite multiple effects
-    return visibleLayers[0];
+    // Return all visible layers to be applied in order
+    return visibleLayers;
   }, [layers]);
 
   // Clear all layers

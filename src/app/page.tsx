@@ -289,8 +289,7 @@ export default function Home() {
           ) : (
             <ImageEditor
               selectedImage={selectedImage}
-              activeEffect={activeEffect}
-              effectSettings={effectSettings}
+              effectLayers={effectLayers.filter(layer => layer.visible)}
               onImageUpload={handleImageUpload}
               onReady={handleEditorReady}
             />
