@@ -4,12 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 
-// Import ControlPanel normally since it doesn't use canvas
-import ControlPanel from '@/components/ControlPanel';
+// Import new components
+import ControlPanelV2 from '@/components/ControlPanelV2';
 import HistoryPanel from '@/components/HistoryPanel';
-import LayersPanel from '@/components/LayersPanel';
+import EffectLayers from '@/components/EffectLayers';
 import useHistory, { HistoryState } from '@/hooks/useHistory';
-import useLayers, { Layer } from '@/hooks/useLayers';
+import useEffectLayers from '@/hooks/useEffectLayers';
 
 // Dynamically import ImageEditor with SSR disabled
 const ImageEditor = dynamic(
@@ -21,8 +21,6 @@ export default function Home() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState<boolean>(false);
-  const [showLayers, setShowLayers] = useState<boolean>(false);
   const [imageEditorRef, setImageEditorRef] = useState<any>(null);
 
   // Initialize history with empty state
@@ -42,22 +40,24 @@ export default function Home() {
     effectSettings: {}
   });
 
-  // Initialize layers
+  // Initialize effect layers
   const {
-    layers,
-    activeLayerId,
-    addLayer,
-    removeLayer,
-    updateLayer,
-    moveLayer,
-    setActiveLayer,
-    toggleLayerVisibility,
-    toggleLayerLock,
-    duplicateLayer
-  } = useLayers();
+    layers: effectLayers,
+    activeLayerId: activeEffectLayerId,
+    activeLayer: activeEffectLayer,
+    addLayer: addEffectLayer,
+    removeLayer: removeEffectLayer,
+    updateLayer: updateEffectLayer,
+    reorderLayers: reorderEffectLayers,
+    setActiveLayer: setActiveEffectLayer,
+    updateLayerSettings,
+    getCombinedEffect,
+    clearLayers: clearEffectLayers,
+  } = useEffectLayers();
 
-  // Extract activeEffect and effectSettings from history state
-  const { activeEffect, effectSettings } = currentState;
+  // Extract activeEffect and effectSettings from the active effect layer
+  const activeEffect = activeEffectLayer?.effectId || null;
+  const effectSettings = activeEffectLayer?.settings || {};
 
   // Add debugging on component mount
   useEffect(() => {
@@ -75,6 +75,7 @@ export default function Home() {
 
     // Reset active effect and clear history when a new image is uploaded
     clearHistory({ activeEffect: null, effectSettings: {} });
+    clearEffectLayers();
 
     // Validate the image data
     if (!imageDataUrl.startsWith('data:image/')) {
@@ -106,33 +107,21 @@ export default function Home() {
   const handleEffectChange = (effectName: string | null) => {
     console.log("Effect changed to:", effectName);
     
-    // Create new state for history
-    const newState: HistoryState = {
-      activeEffect: effectName,
-      effectSettings: effectName ? { ...effectSettings } : {}
-    };
-    
-    // Add to history
-    addToHistory(newState);
+    if (effectName) {
+      // Add as a new effect layer
+      addEffectLayer(effectName);
+    } else if (activeEffectLayerId) {
+      // Remove the active layer
+      removeEffectLayer(activeEffectLayerId);
+    }
   };
 
   const handleSettingChange = (settingName: string, value: number) => {
     console.log(`Setting ${settingName} changed to:`, value);
     
-    // Create new settings object with the updated value
-    const newSettings = {
-      ...effectSettings,
-      [settingName]: value,
-    };
-    
-    // Create new state for history
-    const newState: HistoryState = {
-      activeEffect,
-      effectSettings: newSettings
-    };
-    
-    // Add to history
-    addToHistory(newState);
+    if (activeEffectLayerId) {
+      updateLayerSettings(activeEffectLayerId, settingName, value);
+    }
   };
 
   const handleUndo = () => {
@@ -145,54 +134,6 @@ export default function Home() {
 
   const handleJumpToState = (index: number) => {
     jumpToState(index);
-  };
-
-  const toggleHistoryPanel = () => {
-    setShowHistory(prev => !prev);
-  };
-
-  const toggleLayersPanel = () => {
-    setShowLayers(prev => !prev);
-  };
-
-  // Add a new layer with the current image
-  const handleAddLayer = async () => {
-    if (imageEditorRef && typeof imageEditorRef.getCurrentDataURL === 'function') {
-      console.log("Attempting to get current canvas data for new layer...");
-      const currentImageData = imageEditorRef.getCurrentDataURL();
-      
-      if (currentImageData) {
-        console.log("Adding layer with current canvas data.");
-        addLayer({
-          name: `Layer ${layers.length + 1}`,
-          type: 'image',
-          data: currentImageData // Use the snapshot from the canvas
-        });
-      } else {
-        console.error("Failed to get current canvas data for new layer.");
-        // Optionally fall back to original image or show an error
-        // Fallback to original image for now:
-        if (selectedImage) {
-            console.warn("Falling back to using original selected image for new layer.");
-            addLayer({
-                name: `Layer ${layers.length + 1}`,
-                type: 'image',
-                data: selectedImage
-            });
-        }
-      }
-    } else {
-      console.error("ImageEditor instance or getCurrentDataURL method not available for adding layer.");
-       // Fallback if ref not ready
-        if (selectedImage) {
-            console.warn("Ref not ready, falling back to using original selected image for new layer.");
-            addLayer({
-                name: `Layer ${layers.length + 1}`,
-                type: 'image',
-                data: selectedImage
-            });
-        }
-    }
   };
 
   // Callback to get the ref from ImageEditor
@@ -259,7 +200,9 @@ export default function Home() {
               Export Image
             </button>
           </div>
-          <ControlPanel 
+          
+          {/* New Control Panel */}
+          <ControlPanelV2
             activeEffect={activeEffect}
             effectSettings={effectSettings}
             onEffectChange={handleEffectChange}
@@ -267,7 +210,20 @@ export default function Home() {
             hasImage={!!selectedImage}
           />
           
-          {/* History panel - now directly in sidebar */}
+          {/* Effect Layers panel */}
+          {selectedImage && (
+            <EffectLayers
+              layers={effectLayers}
+              activeLayerId={activeEffectLayerId}
+              onAddLayer={addEffectLayer}
+              onRemoveLayer={removeEffectLayer}
+              onUpdateLayer={updateEffectLayer}
+              onReorderLayers={reorderEffectLayers}
+              onSetActiveLayer={setActiveEffectLayer}
+            />
+          )}
+          
+          {/* History panel */}
           {selectedImage && (
             <HistoryPanel
               canUndo={canUndo}
@@ -277,22 +233,6 @@ export default function Home() {
               history={history}
               currentIndex={currentIndex}
               onJumpToState={handleJumpToState}
-            />
-          )}
-          
-          {/* Layers panel - now directly in sidebar */}
-          {selectedImage && (
-            <LayersPanel
-              layers={layers}
-              activeLayerId={activeLayerId}
-              onSetActiveLayer={setActiveLayer}
-              onToggleVisibility={toggleLayerVisibility}
-              onRemoveLayer={removeLayer}
-              onAddLayer={handleAddLayer}
-              onDuplicateLayer={duplicateLayer}
-              onMoveLayer={moveLayer}
-              onUpdateLayer={updateLayer}
-              onToggleLock={toggleLayerLock}
             />
           )}
         </div>
