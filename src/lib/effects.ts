@@ -3686,3 +3686,52 @@ const createSelectiveColorEffect = (settings: Record<string, number>) => {
     }
   };
 };
+
+// Reorganized effects categories for better UX
+export const effectCategories = {
+  'Adjust': {
+    icon: '⚡',
+    description: 'Basic image adjustments',
+    effects: ['brightness', 'contrast', 'saturation', 'hue', 'colorTemperature']
+  },
+  'Blur & Focus': {
+    icon: '🔍',
+    description: 'Blur and sharpening effects',
+    effects: ['blur', 'sharpen', 'temporalEcho', 'bloom']
+  },
+  'Style': {
+    icon: '🎨',
+    description: 'Artistic transformations',
+    effects: ['pencilSketch', 'oilPainting', 'halftone', 'crosshatch', 'dotScreen', 'stippling', 'geometric', 'cellular', 'reaction-diffusion', 'flowField']
+  },
+  'Color': {
+    icon: '🌈',
+    description: 'Color grading and effects',
+    effects: ['grayscale', 'sepia', 'invert', 'duotone', 'holographicInterference', 'selectiveColor', 'colorQuantization', 'heatmap']
+  },
+  'Distort': {
+    icon: '🌀',
+    description: 'Warping and distortion',
+    effects: ['pixelate', 'swirl', 'kaleidoscope', 'kaleidoscopeFracture', 'fisheyeWarp', 'pixelExplosion', 'chromaticGlitch', 'databending']
+  },
+  'Simulate': {
+    icon: '✨',
+    description: 'Real-world simulations',
+    effects: ['liquidMetal', 'neuralDream', 'magneticField', 'inkBleed', 'vignette', 'chromaticAberration', 'scanLines', 'scratchedFilm', 'anaglyph']
+  },
+  'Overlay': {
+    icon: '📸',
+    description: 'Overlays and filters',
+    effects: ['noise', 'threshold', 'posterize', 'oldPhoto', 'lensFlare', 'edgeDetection', 'fractalNoise', 'circuitBoard']
+  }
+};
+
+// Helper function to get category for an effect
+export const getEffectCategory = (effectId: string): string | null => {
+  for (const [category, data] of Object.entries(effectCategories)) {
+    if (data.effects.includes(effectId)) {
+      return category;
+    }
+  }
+  return null;
+};
