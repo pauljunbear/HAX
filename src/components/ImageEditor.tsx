@@ -789,141 +789,133 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
             <>
               <div className="h-6 w-px bg-[rgb(var(--apple-gray-200))]"></div>
               
-              <div className="flex gap-2">
+              <div className="relative group">
                 <button
-                  onClick={imperativeHandleMethods.exportImage}
+                  onClick={() => setShowExportOptions(!showExportOptions)}
                   className="btn-apple-secondary flex items-center"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  Export (Internal)
+                  Export
+                  {hasAnimatedEffects && exportFormat === 'gif' && (
+                    <span className="ml-1 text-[10px] bg-primary-accent/20 text-primary-accent px-1.5 py-0.5 rounded">GIF</span>
+                  )}
                 </button>
                 
-                <div className="relative group">
-                  <button
-                    onClick={() => setShowExportOptions(!showExportOptions)}
-                    className="btn-apple-ghost p-2"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                    </svg>
-                  </button>
-                  
-                  {showExportOptions && (
-                    <div className="absolute bottom-full mb-2 right-0 bg-white rounded-lg shadow-sm border border-[rgb(var(--apple-gray-200))] p-3 min-w-[200px]">
-                      <div className="mb-3">
-                        <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium block mb-1">Format</label>
-                        <div className="flex bg-[rgb(var(--apple-gray-100))] rounded-lg p-1">
+                {showExportOptions && (
+                  <div className="absolute bottom-full mb-2 right-0 bg-white rounded-lg shadow-sm border border-[rgb(var(--apple-gray-200))] p-3 min-w-[200px]">
+                    <div className="mb-3">
+                      <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium block mb-1">Format</label>
+                      <div className="flex bg-[rgb(var(--apple-gray-100))] rounded-lg p-1">
+                        <button
+                          onClick={() => setExportFormat('png')}
+                          className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-colors ${
+                            exportFormat === 'png'
+                              ? 'bg-white text-[rgb(var(--apple-gray-800))] shadow-sm'
+                              : 'text-[rgb(var(--apple-gray-600))]'
+                          }`}
+                        >
+                          PNG
+                        </button>
+                        <button
+                          onClick={() => setExportFormat('jpeg')}
+                          className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-colors ${
+                            exportFormat === 'jpeg'
+                              ? 'bg-white text-[rgb(var(--apple-gray-800))] shadow-sm'
+                              : 'text-[rgb(var(--apple-gray-600))]'
+                          }`}
+                        >
+                          JPEG
+                        </button>
+                        {hasAnimatedEffects && (
                           <button
-                            onClick={() => setExportFormat('png')}
+                            onClick={() => setExportFormat('gif')}
                             className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-colors ${
-                              exportFormat === 'png'
+                              exportFormat === 'gif'
                                 ? 'bg-white text-[rgb(var(--apple-gray-800))] shadow-sm'
                                 : 'text-[rgb(var(--apple-gray-600))]'
                             }`}
                           >
-                            PNG
+                            GIF
                           </button>
-                          <button
-                            onClick={() => setExportFormat('jpeg')}
-                            className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-colors ${
-                              exportFormat === 'jpeg'
-                                ? 'bg-white text-[rgb(var(--apple-gray-800))] shadow-sm'
-                                : 'text-[rgb(var(--apple-gray-600))]'
-                            }`}
-                          >
-                            JPEG
-                          </button>
-                          {hasAnimatedEffects && (
-                            <button
-                              onClick={() => setExportFormat('gif')}
-                              className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-md transition-colors ${
-                                exportFormat === 'gif'
-                                  ? 'bg-white text-[rgb(var(--apple-gray-800))] shadow-sm'
-                                  : 'text-[rgb(var(--apple-gray-600))]'
-                              }`}
-                            >
-                              GIF
-                            </button>
-                          )}
-                        </div>
+                        )}
                       </div>
-                      
-                      {exportFormat === 'jpeg' && (
+                    </div>
+                    
+                    {exportFormat === 'jpeg' && (
+                      <div className="mb-3">
+                        <div className="flex justify-between mb-1">
+                          <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">Quality</label>
+                          <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono">{Math.round(exportQuality * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0.1}
+                          max={1}
+                          step={0.05}
+                          value={exportQuality}
+                          onChange={(e) => setExportQuality(parseFloat(e.target.value))}
+                          className="w-full"
+                        />
+                      </div>
+                    )}
+                    
+                    {exportFormat === 'gif' && hasAnimatedEffects && (
+                      <>
                         <div className="mb-3">
                           <div className="flex justify-between mb-1">
-                            <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">Quality</label>
-                            <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono">{Math.round(exportQuality * 100)}%</span>
+                            <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">Duration</label>
+                            <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono">{animationDuration / 1000}s</span>
                           </div>
                           <input
                             type="range"
-                            min={0.1}
-                            max={1}
-                            step={0.05}
-                            value={exportQuality}
-                            onChange={(e) => setExportQuality(parseFloat(e.target.value))}
+                            min={500}
+                            max={5000}
+                            step={500}
+                            value={animationDuration}
+                            onChange={(e) => setAnimationDuration(parseInt(e.target.value))}
                             className="w-full"
                           />
                         </div>
-                      )}
-                      
-                      {exportFormat === 'gif' && hasAnimatedEffects && (
-                        <>
-                          <div className="mb-3">
-                            <div className="flex justify-between mb-1">
-                              <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">Duration</label>
-                              <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono">{animationDuration / 1000}s</span>
-                            </div>
-                            <input
-                              type="range"
-                              min={500}
-                              max={5000}
-                              step={500}
-                              value={animationDuration}
-                              onChange={(e) => setAnimationDuration(parseInt(e.target.value))}
-                              className="w-full"
-                            />
+                        
+                        <div className="mb-3">
+                          <div className="flex justify-between mb-1">
+                            <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">Frame Rate</label>
+                            <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono">{animationFrameRate} fps</span>
                           </div>
-                          
-                          <div className="mb-3">
-                            <div className="flex justify-between mb-1">
-                              <label className="text-xs text-[rgb(var(--apple-gray-600))] font-medium">Frame Rate</label>
-                              <span className="text-xs text-[rgb(var(--apple-gray-500))] font-mono">{animationFrameRate} fps</span>
-                            </div>
-                            <input
-                              type="range"
-                              min={12}
-                              max={30}
-                              step={6}
-                              value={animationFrameRate}
-                              onChange={(e) => setAnimationFrameRate(parseInt(e.target.value))}
-                              className="w-full"
-                            />
-                          </div>
-                        </>
+                          <input
+                            type="range"
+                            min={12}
+                            max={30}
+                            step={6}
+                            value={animationFrameRate}
+                            onChange={(e) => setAnimationFrameRate(parseInt(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+                      </>
+                    )}
+                    
+                    <button
+                      onClick={imperativeHandleMethods.exportImage}
+                      disabled={isExportingAnimation}
+                      className="btn-apple-primary w-full"
+                    >
+                      {isExportingAnimation ? (
+                        <span className="flex items-center justify-center">
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Creating GIF... {Math.round(animationProgress * 100)}%
+                        </span>
+                      ) : (
+                        `Export ${exportFormat.toUpperCase()}`
                       )}
-                      
-                      <button
-                        onClick={imperativeHandleMethods.exportImage}
-                        disabled={isExportingAnimation}
-                        className="btn-apple-primary w-full"
-                      >
-                        {isExportingAnimation ? (
-                          <span className="flex items-center justify-center">
-                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Creating GIF... {Math.round(animationProgress * 100)}%
-                          </span>
-                        ) : (
-                          `Export ${exportFormat.toUpperCase()}`
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           )}

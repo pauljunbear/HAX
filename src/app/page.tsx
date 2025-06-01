@@ -186,21 +186,6 @@ export default function Home() {
       <main className="flex h-[calc(100vh-4rem)]">
         {/* Left sidebar - Use slightly lighter surface, remove backdrop blur/opacity */}
         <div className="w-80 border-r border-dark-border bg-dark-surface overflow-y-auto flex flex-col">
-          {/* Export button section - use surface bg, subtle border */}
-          <div className="p-5 border-b border-dark-border">
-            {/* Export button - Accent background */}
-            <button 
-              onClick={handleExportClick} 
-              disabled={!selectedImage || imageLoading}
-              className="w-full inline-flex items-center justify-center px-4 py-2 bg-primary-accent hover:bg-opacity-90 text-white text-sm font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              Export Image
-            </button>
-          </div>
-          
           {/* New Control Panel */}
           <ControlPanelV3
             activeEffect={activeEffect}

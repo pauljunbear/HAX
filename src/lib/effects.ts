@@ -359,8 +359,6 @@ export const applyEffect = async (
         return [createDatabendingEffect(settings), {}];
 
       // --- NEW 10 EFFECTS ---
-      case 'crystallize':
-        return [createCrystallizeEffect(settings), {}];
       case 'thermalVision':
         return [createThermalVisionEffect(settings), {}];
       case 'paperCutArt':
@@ -2667,13 +2665,6 @@ export const effectsConfig: Record<string, EffectConfig> = {
     },
   },
   // --- NEW 10 EFFECTS ---
-  crystallize: {
-    label: 'Crystallize',
-    category: 'Artistic',
-    settings: {
-      crystalSize: { label: 'Crystal Size', min: 1, max: 10, default: 5, step: 1 }
-    },
-  },
   thermalVision: {
     label: 'Thermal Vision',
     category: 'Artistic',
