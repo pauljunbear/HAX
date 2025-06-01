@@ -499,8 +499,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       imageNode.filters([]);
       
       // Clear any previously set filter properties
-      // (Need to know which properties were set, or reset all filter-related ones)
-      imageNode.brightness(0); // Reset example properties
+      imageNode.brightness(0);
       imageNode.contrast(0);
       imageNode.saturation(0);
       imageNode.hue(0);
@@ -509,8 +508,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       imageNode.pixelSize(1);
       imageNode.noise(0);
       imageNode.threshold(0.5);
-      imageNode.levels(1); // Posterize levels (1 effectively means no posterization)
-      // We might need a more robust way to reset custom filter props if any exist
+      imageNode.levels(1);
       
       if (!effectLayers || effectLayers.length === 0) {
         console.log("No active effects, clearing filters and resetting properties.");
@@ -522,67 +520,66 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       try {
         console.log("Applying effects:", effectLayers.map(layer => layer.effectId).join(', '));
         
-        // Collect all filter functions and parameters
-        const allFilters: any[] = [];
-        const allParams: Record<string, any> = {};
-        
+        // Pre-fetch all filter functions
+        const filterFunctions: Array<{ layer: EffectLayer, filterFunc: any }> = [];
         for (const layer of effectLayers) {
-          if (!layer.visible) continue; // Skip invisible layers
-          
-          console.log(`Processing effect: ${layer.effectId} with opacity: ${layer.opacity}`);
-          const [filterFunc, filterParams] = await applyEffect(layer.effectId, layer.settings || {});
-          
+          if (!layer.visible) continue;
+          const [filterFunc] = await applyEffect(layer.effectId, layer.settings || {});
           if (filterFunc) {
-            allFilters.push(filterFunc);
-            
-            // Apply opacity to the effect if it's less than 1
-            if (layer.opacity < 1 && filterParams) {
-              // Some effects might need special handling for opacity
-              // For now, we'll handle it in a general way
-              Object.keys(filterParams).forEach(key => {
-                if (typeof filterParams[key] === 'number') {
-                  filterParams[key] *= layer.opacity;
-                }
-              });
-            }
-            
-            // Merge parameters (later ones override earlier ones for now)
-            if (filterParams) {
-              Object.assign(allParams, filterParams);
-            }
+            filterFunctions.push({ layer, filterFunc });
           }
         }
         
-        if (allFilters.length === 0) {
+        if (filterFunctions.length === 0) {
           console.log("No valid filters to apply");
           imageNode.cache();
           imageNode.getLayer().batchDraw();
           return;
         }
         
-        // Apply all filters at once
-        imageNode.filters(allFilters);
-        
-        // Set filter-specific parameters directly on the node
-        console.log("Setting filter params on node:", allParams);
-        for (const key in allParams) {
-          if (typeof imageNode[key] === 'function') {
-            // Check if the key corresponds to a method (like brightness, contrast)
-            imageNode[key](allParams[key]); 
-          } else {
-            // Otherwise, try setting as a property (less common for filters)
-            imageNode[key] = allParams[key];
+        // Create a composite filter function that applies all effects with opacity
+        const compositeFilter = function(imageData: any) {
+          // Apply each visible effect layer
+          for (const { layer, filterFunc } of filterFunctions) {
+            console.log(`Applying ${layer.effectId} with opacity ${layer.opacity}`);
+            
+            // Create a copy of the current image data for this effect
+            const effectData = {
+              data: new Uint8ClampedArray(imageData.data),
+              width: imageData.width,
+              height: imageData.height
+            };
+            
+            // Apply the effect to the copy
+            filterFunc(effectData);
+            
+            // Blend the effect with the current image data based on opacity
+            if (layer.opacity < 1) {
+              for (let i = 0; i < imageData.data.length; i += 4) {
+                // Blend RGB channels
+                imageData.data[i] = imageData.data[i] * (1 - layer.opacity) + effectData.data[i] * layer.opacity;
+                imageData.data[i + 1] = imageData.data[i + 1] * (1 - layer.opacity) + effectData.data[i + 1] * layer.opacity;
+                imageData.data[i + 2] = imageData.data[i + 2] * (1 - layer.opacity) + effectData.data[i + 2] * layer.opacity;
+                // Keep alpha channel unchanged
+                imageData.data[i + 3] = imageData.data[i + 3];
+              }
+            } else {
+              // Full opacity - just copy the effect data
+              imageData.data.set(effectData.data);
+            }
           }
-        }
+        };
+        
+        // Apply the composite filter
+        imageNode.filters([compositeFilter]);
         
         // Update the canvas
         imageNode.cache();
         imageNode.getLayer().batchDraw();
-        console.log(`Applied ${allFilters.length} effects successfully`);
+        console.log(`Applied ${filterFunctions.length} effects successfully`);
         
       } catch (error) {
         console.error("Error applying filters:", error);
-        // Attempt to reset filters on error
         imageNode.filters([]);
         imageNode.cache();
         imageNode.getLayer()?.batchDraw();
