@@ -358,6 +358,28 @@ export const applyEffect = async (
       case 'databending':
         return [createDatabendingEffect(settings), {}];
 
+      // --- NEW 10 EFFECTS ---
+      case 'crystallize':
+        return [createCrystallizeEffect(settings), {}];
+      case 'thermalVision':
+        return [createThermalVisionEffect(settings), {}];
+      case 'paperCutArt':
+        return [createPaperCutArtEffect(settings), {}];
+      case 'tiltShiftMiniature':
+        return [createTiltShiftMiniatureEffect(settings), {}];
+      case 'neonGlowEdges':
+        return [createNeonGlowEdgesEffect(settings), {}];
+      case 'dispersionShatter':
+        return [createDispersionShatterEffect(settings), {}];
+      case 'retroDithering':
+        return [createRetroDitheringEffect(settings), {}];
+      case 'topographicContours':
+        return [createTopographicContoursEffect(settings), {}];
+      case 'weavePattern':
+        return [createWeavePatternEffect(settings), {}];
+      case 'bioluminescence':
+        return [createBioluminescenceEffect(settings), {}];
+
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
         return [null, null];
@@ -2644,6 +2666,81 @@ export const effectsConfig: Record<string, EffectConfig> = {
       distortion: { label: 'Distortion Level', min: 0.1, max: 1, default: 0.3, step: 0.05 },
     },
   },
+  // --- NEW 10 EFFECTS ---
+  crystallize: {
+    label: 'Crystallize',
+    category: 'Artistic',
+    settings: {
+      crystalSize: { label: 'Crystal Size', min: 1, max: 10, default: 5, step: 1 }
+    },
+  },
+  thermalVision: {
+    label: 'Thermal Vision',
+    category: 'Artistic',
+    settings: {
+      sensitivity: { label: 'Heat Sensitivity', min: 0.1, max: 1, default: 0.5, step: 0.05 }
+    },
+  },
+  paperCutArt: {
+    label: 'Paper Cut Art',
+    category: 'Artistic',
+    settings: {
+      layers: { label: 'Paper Layers', min: 3, max: 8, default: 5, step: 1 }
+    },
+  },
+  tiltShiftMiniature: {
+    label: 'Tilt-Shift Miniature',
+    category: 'Distortion',
+    settings: {
+      focalLength: { label: 'Focus Band Width', min: 10, max: 100, default: 50, step: 5 },
+      aperture: { label: 'Blur Strength', min: 1.4, max: 16, default: 5.6, step: 0.2 }
+    },
+  },
+  neonGlowEdges: {
+    label: 'Neon Glow Edges',
+    category: 'Artistic',
+    settings: {
+      glowWidth: { label: 'Glow Radius', min: 1, max: 10, default: 5, step: 1 },
+      glowIntensity: { label: 'Glow Brightness', min: 0.1, max: 1, default: 0.5, step: 0.05 }
+    },
+  },
+  dispersionShatter: {
+    label: 'Dispersion Shatter',
+    category: 'Distortion',
+    settings: {
+      dispersionAmount: { label: 'Dispersion Force', min: 0.05, max: 0.5, default: 0.2, step: 0.05 },
+      shatterIntensity: { label: 'Shatter Points', min: 0.1, max: 1, default: 0.5, step: 0.05 }
+    },
+  },
+  retroDithering: {
+    label: 'Retro Dithering',
+    category: 'Artistic',
+    settings: {
+      levels: { label: 'Color Levels', min: 2, max: 8, default: 4, step: 1 }
+    },
+  },
+  topographicContours: {
+    label: 'Topographic Contours',
+    category: 'Artistic',
+    settings: {
+      contourLevels: { label: 'Contour Lines', min: 5, max: 20, default: 10, step: 1 }
+    },
+  },
+  weavePattern: {
+    label: 'Weave Pattern',
+    category: 'Artistic',
+    settings: {
+      weaveSize: { label: 'Weave Size', min: 4, max: 16, default: 8, step: 2 }
+    },
+  },
+  bioluminescence: {
+    label: 'Bioluminescence',
+    category: 'Artistic',
+    settings: {
+      glowIntensity: { label: 'Glow Intensity', min: 0.1, max: 1, default: 0.5, step: 0.05 },
+      glowSpread: { label: 'Glow Spread', min: 0.1, max: 1, default: 0.5, step: 0.05 }
+    },
+  },
 }; 
 
 // 16. Scratched Film Implementation
@@ -3697,27 +3794,27 @@ export const effectCategories = {
   'Blur & Focus': {
     icon: '🔍',
     description: 'Blur and sharpening effects',
-    effects: ['blur', 'sharpen', 'temporalEcho', 'bloom']
+    effects: ['blur', 'sharpen', 'temporalEcho', 'bloom', 'tiltShiftMiniature']
   },
   'Style': {
     icon: '🎨',
     description: 'Artistic transformations',
-    effects: ['pencilSketch', 'oilPainting', 'halftone', 'crosshatch', 'dotScreen', 'stippling', 'geometric', 'cellular', 'reaction-diffusion', 'flowField']
+    effects: ['pencilSketch', 'oilPainting', 'halftone', 'crosshatch', 'dotScreen', 'stippling', 'geometric', 'cellular', 'reaction-diffusion', 'flowField', 'crystallize', 'paperCutArt', 'retroDithering', 'topographicContours', 'weavePattern', 'neonGlowEdges']
   },
   'Color': {
     icon: '🌈',
     description: 'Color grading and effects',
-    effects: ['grayscale', 'sepia', 'invert', 'duotone', 'holographicInterference', 'selectiveColor', 'colorQuantization', 'heatmap']
+    effects: ['grayscale', 'sepia', 'invert', 'duotone', 'holographicInterference', 'selectiveColor', 'colorQuantization', 'heatmap', 'thermalVision']
   },
   'Distort': {
     icon: '🌀',
     description: 'Warping and distortion',
-    effects: ['pixelate', 'swirl', 'kaleidoscope', 'kaleidoscopeFracture', 'fisheyeWarp', 'pixelExplosion', 'chromaticGlitch', 'databending']
+    effects: ['pixelate', 'swirl', 'kaleidoscope', 'kaleidoscopeFracture', 'fisheyeWarp', 'pixelExplosion', 'chromaticGlitch', 'databending', 'dispersionShatter']
   },
   'Simulate': {
     icon: '✨',
     description: 'Real-world simulations',
-    effects: ['liquidMetal', 'neuralDream', 'magneticField', 'inkBleed', 'vignette', 'chromaticAberration', 'scanLines', 'scratchedFilm', 'anaglyph']
+    effects: ['liquidMetal', 'neuralDream', 'magneticField', 'inkBleed', 'vignette', 'chromaticAberration', 'scanLines', 'scratchedFilm', 'anaglyph', 'bioluminescence']
   },
   'Overlay': {
     icon: '📸',
@@ -3727,6 +3824,534 @@ export const effectCategories = {
 };
 
 // Helper function to get category for an effect
+export const getEffectCategory = (effectId: string): string | null => {
+  for (const [category, data] of Object.entries(effectCategories)) {
+    if (data.effects.includes(effectId)) {
+      return category;
+    }
+  }
+  return null;
+};
+
+// --- NEW 10 EFFECTS IMPLEMENTATIONS ---
+
+// Crystallize Effect
+const createCrystallizeEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const crystalSize = Math.max(5, Math.floor((settings.crystalSize ?? 5) * 5));
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    // Create crystal centers
+    const crystals: { x: number, y: number, r: number, g: number, b: number }[] = [];
+    for (let y = 0; y < height; y += crystalSize) {
+      for (let x = 0; x < width; x += crystalSize) {
+        const cx = x + Math.floor(Math.random() * crystalSize);
+        const cy = y + Math.floor(Math.random() * crystalSize);
+        if (cx < width && cy < height) {
+          const idx = (cy * width + cx) * 4;
+          crystals.push({
+            x: cx,
+            y: cy,
+            r: tempData[idx],
+            g: tempData[idx + 1],
+            b: tempData[idx + 2]
+          });
+        }
+      }
+    }
+
+    // Apply Voronoi-like crystallization
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let minDist = Infinity;
+        let nearestCrystal = crystals[0];
+        
+        for (const crystal of crystals) {
+          const dist = Math.sqrt((x - crystal.x) ** 2 + (y - crystal.y) ** 2);
+          if (dist < minDist) {
+            minDist = dist;
+            nearestCrystal = crystal;
+          }
+        }
+        
+        const index = (y * width + x) * 4;
+        data[index] = nearestCrystal.r;
+        data[index + 1] = nearestCrystal.g;
+        data[index + 2] = nearestCrystal.b;
+      }
+    }
+  };
+};
+
+// Thermal Vision Effect
+const createThermalVisionEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const sensitivity = settings.sensitivity ?? 0.5;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      
+      // Calculate brightness as "temperature"
+      const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      const temp = brightness * sensitivity + (1 - sensitivity) * 0.5;
+      
+      // Map to thermal colors (cold=blue, warm=red, hot=white)
+      if (temp < 0.25) {
+        // Cold - Black to Blue
+        const t = temp * 4;
+        data[i] = 0;
+        data[i + 1] = 0;
+        data[i + 2] = Math.floor(255 * t);
+      } else if (temp < 0.5) {
+        // Cool - Blue to Cyan
+        const t = (temp - 0.25) * 4;
+        data[i] = 0;
+        data[i + 1] = Math.floor(255 * t);
+        data[i + 2] = 255;
+      } else if (temp < 0.75) {
+        // Warm - Cyan to Yellow
+        const t = (temp - 0.5) * 4;
+        data[i] = Math.floor(255 * t);
+        data[i + 1] = 255;
+        data[i + 2] = Math.floor(255 * (1 - t));
+      } else {
+        // Hot - Yellow to White
+        const t = (temp - 0.75) * 4;
+        data[i] = 255;
+        data[i + 1] = 255;
+        data[i + 2] = Math.floor(255 * t);
+      }
+    }
+  };
+};
+
+// Paper Cut Art Effect
+const createPaperCutArtEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const layers = Math.floor(settings.layers ?? 5);
+    const threshold = 1 / layers;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      
+      const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      const layer = Math.floor(brightness * layers) / layers;
+      
+      // Create paper-like layers with slight color variations
+      const paperColor = 255 - (layer * 200);
+      data[i] = paperColor;
+      data[i + 1] = paperColor - 10; // Slight warm tint
+      data[i + 2] = paperColor - 20;
+    }
+    
+    // Add paper texture
+    for (let i = 0; i < data.length; i += 4) {
+      const noise = (Math.random() - 0.5) * 10;
+      data[i] = Math.max(0, Math.min(255, data[i] + noise));
+      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+    }
+  };
+};
+
+// Tilt-Shift Miniature Effect
+const createTiltShiftMiniatureEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const focalPoint = height / 2;
+    const focalRange = (settings.focalLength ?? 50) * 2;
+    const blurStrength = 16 / (settings.aperture ?? 5.6);
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    for (let y = 0; y < height; y++) {
+      const distance = Math.abs(y - focalPoint);
+      const blurAmount = Math.max(0, (distance - focalRange) / height) * blurStrength;
+      
+      if (blurAmount > 0) {
+        const radius = Math.ceil(blurAmount);
+        
+        for (let x = 0; x < width; x++) {
+          let r = 0, g = 0, b = 0, count = 0;
+          
+          for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+              const ny = Math.max(0, Math.min(height - 1, y + dy));
+              const nx = Math.max(0, Math.min(width - 1, x + dx));
+              const idx = (ny * width + nx) * 4;
+              
+              r += tempData[idx];
+              g += tempData[idx + 1];
+              b += tempData[idx + 2];
+              count++;
+            }
+          }
+          
+          const index = (y * width + x) * 4;
+          data[index] = r / count;
+          data[index + 1] = g / count;
+          data[index + 2] = b / count;
+        }
+      }
+    }
+    
+    // Add slight saturation boost for toy-like appearance
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const avg = (r + g + b) / 3;
+      
+      data[i] = avg + (r - avg) * 1.3;
+      data[i + 1] = avg + (g - avg) * 1.3;
+      data[i + 2] = avg + (b - avg) * 1.3;
+    }
+  };
+};
+
+// Neon Glow Edges Effect
+const createNeonGlowEdgesEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const glowWidth = Math.max(1, settings.glowWidth ?? 5);
+    const glowIntensity = settings.glowIntensity ?? 0.5;
+    
+    // Edge detection
+    const edges = new Uint8ClampedArray(width * height);
+    const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+    const kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+    
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        let gx = 0, gy = 0;
+        
+        for (let ky = -1; ky <= 1; ky++) {
+          for (let kx = -1; kx <= 1; kx++) {
+            const idx = ((y + ky) * width + (x + kx)) * 4;
+            const val = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+            const kernelIdx = (ky + 1) * 3 + (kx + 1);
+            gx += val * kernelX[kernelIdx];
+            gy += val * kernelY[kernelIdx];
+          }
+        }
+        
+        edges[y * width + x] = Math.min(255, Math.sqrt(gx * gx + gy * gy));
+      }
+    }
+    
+    // Create neon glow
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 0;
+      data[i + 1] = 0;
+      data[i + 2] = 0;
+    }
+    
+    // Apply glow
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const edgeStrength = edges[y * width + x];
+        
+        if (edgeStrength > 30) {
+          // Choose neon color based on position
+          const hue = ((x + y) / (width + height)) * 360;
+          const { r, g, b } = hslToRgb(hue / 360, 1, 0.5);
+          
+          // Draw glow
+          for (let dy = -glowWidth; dy <= glowWidth; dy++) {
+            for (let dx = -glowWidth; dx <= glowWidth; dx++) {
+              const ny = Math.max(0, Math.min(height - 1, y + dy));
+              const nx = Math.max(0, Math.min(width - 1, x + dx));
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              
+              if (dist <= glowWidth) {
+                const falloff = 1 - (dist / glowWidth);
+                const intensity = falloff * glowIntensity * (edgeStrength / 255);
+                const idx = (ny * width + nx) * 4;
+                
+                data[idx] = Math.min(255, data[idx] + r * intensity * 255);
+                data[idx + 1] = Math.min(255, data[idx + 1] + g * intensity * 255);
+                data[idx + 2] = Math.min(255, data[idx + 2] + b * intensity * 255);
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+};
+
+// Dispersion Shatter Effect
+const createDispersionShatterEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const amount = settings.dispersionAmount ?? 0.3;
+    const intensity = settings.shatterIntensity ?? 0.5;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Create shatter points
+    const numPoints = Math.floor(20 * intensity);
+    const shatterPoints: { x: number, y: number, force: number }[] = [];
+    
+    for (let i = 0; i < numPoints; i++) {
+      shatterPoints.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        force: Math.random() * 100 * amount
+      });
+    }
+    
+    // Apply dispersion
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let totalForceX = 0;
+        let totalForceY = 0;
+        
+        for (const point of shatterPoints) {
+          const dx = x - point.x;
+          const dy = y - point.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) + 1;
+          
+          const force = point.force / (dist * dist);
+          totalForceX += (dx / dist) * force;
+          totalForceY += (dy / dist) * force;
+        }
+        
+        const sourceX = Math.max(0, Math.min(width - 1, Math.floor(x - totalForceX)));
+        const sourceY = Math.max(0, Math.min(height - 1, Math.floor(y - totalForceY)));
+        
+        const targetIdx = (y * width + x) * 4;
+        const sourceIdx = (sourceY * width + sourceX) * 4;
+        
+        data[targetIdx] = tempData[sourceIdx];
+        data[targetIdx + 1] = tempData[sourceIdx + 1];
+        data[targetIdx + 2] = tempData[sourceIdx + 2];
+        data[targetIdx + 3] = tempData[sourceIdx + 3];
+      }
+    }
+  };
+};
+
+// Retro Dithering Effect
+const createRetroDitheringEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const levels = Math.floor(settings.levels ?? 4); // Retro color depth
+    
+    // Floyd-Steinberg dithering
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        
+        for (let c = 0; c < 3; c++) {
+          const oldVal = data[idx + c];
+          const newVal = Math.round(oldVal / 255 * (levels - 1)) * (255 / (levels - 1));
+          data[idx + c] = newVal;
+          
+          const error = oldVal - newVal;
+          
+          // Distribute error to neighbors
+          if (x < width - 1) {
+            data[idx + 4 + c] += error * 7 / 16;
+          }
+          if (y < height - 1) {
+            if (x > 0) {
+              data[idx + (width - 1) * 4 + c] += error * 3 / 16;
+            }
+            data[idx + width * 4 + c] += error * 5 / 16;
+            if (x < width - 1) {
+              data[idx + (width + 1) * 4 + c] += error * 1 / 16;
+            }
+          }
+        }
+      }
+    }
+  };
+};
+
+// Topographic Contours Effect
+const createTopographicContoursEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const contourLevels = Math.floor(settings.contourLevels ?? 10);
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    
+    // Convert to elevation map based on brightness
+    for (let i = 0; i < data.length; i += 4) {
+      const brightness = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+      const level = Math.floor(brightness * contourLevels) / contourLevels;
+      
+      // Create contour lines
+      const nextPixelIdx = i + 4;
+      const belowPixelIdx = i + width * 4;
+      
+      let isContour = false;
+      
+      if (nextPixelIdx < data.length) {
+        const nextBrightness = (data[nextPixelIdx] * 0.299 + data[nextPixelIdx + 1] * 0.587 + data[nextPixelIdx + 2] * 0.114) / 255;
+        const nextLevel = Math.floor(nextBrightness * contourLevels) / contourLevels;
+        if (Math.abs(level - nextLevel) > 0.01) isContour = true;
+      }
+      
+      if (belowPixelIdx < data.length) {
+        const belowBrightness = (data[belowPixelIdx] * 0.299 + data[belowPixelIdx + 1] * 0.587 + data[belowPixelIdx + 2] * 0.114) / 255;
+        const belowLevel = Math.floor(belowBrightness * contourLevels) / contourLevels;
+        if (Math.abs(level - belowLevel) > 0.01) isContour = true;
+      }
+      
+      if (isContour) {
+        tempData[i] = 0;
+        tempData[i + 1] = 0;
+        tempData[i + 2] = 0;
+        tempData[i + 3] = 255;
+      } else {
+        const color = 255 - level * 200;
+        tempData[i] = color;
+        tempData[i + 1] = color - 20;
+        tempData[i + 2] = color - 40;
+        tempData[i + 3] = 255;
+      }
+    }
+    
+    data.set(tempData);
+  };
+};
+
+// Weave Pattern Effect
+const createWeavePatternEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const weaveSize = Math.floor(settings.weaveSize ?? 8);
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        
+        // Create weave pattern
+        const xPattern = Math.floor(x / weaveSize) % 2;
+        const yPattern = Math.floor(y / weaveSize) % 2;
+        const isWarp = (xPattern + yPattern) % 2 === 0;
+        
+        // Apply texture based on weave direction
+        const brightness = isWarp ? 1.1 : 0.9;
+        
+        data[idx] = Math.min(255, tempData[idx] * brightness);
+        data[idx + 1] = Math.min(255, tempData[idx + 1] * brightness);
+        data[idx + 2] = Math.min(255, tempData[idx + 2] * brightness);
+        
+        // Add fabric texture
+        const noise = (Math.random() - 0.5) * 5;
+        data[idx] = Math.max(0, Math.min(255, data[idx] + noise));
+        data[idx + 1] = Math.max(0, Math.min(255, data[idx + 1] + noise));
+        data[idx + 2] = Math.max(0, Math.min(255, data[idx + 2] + noise));
+      }
+    }
+  };
+};
+
+// Bioluminescence Effect
+const createBioluminescenceEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const glowIntensity = settings.glowIntensity ?? 0.5;
+    const glowSpread = settings.glowSpread ?? 0.5;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // First pass: identify bright regions
+    const glowMap = new Float32Array(width * height);
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const brightness = (tempData[idx] * 0.299 + tempData[idx + 1] * 0.587 + tempData[idx + 2] * 0.114) / 255;
+        
+        // Only bright areas glow
+        if (brightness > 0.6) {
+          glowMap[y * width + x] = (brightness - 0.6) * 2.5;
+        }
+      }
+    }
+    
+    // Create dark background
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = tempData[i] * 0.1;
+      data[i + 1] = tempData[i + 1] * 0.1;
+      data[i + 2] = tempData[i + 2] * 0.15; // Slight blue tint
+    }
+    
+    // Apply glow
+    const glowRadius = Math.ceil(glowSpread * 10);
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const glowValue = glowMap[y * width + x];
+        
+        if (glowValue > 0) {
+          for (let dy = -glowRadius; dy <= glowRadius; dy++) {
+            for (let dx = -glowRadius; dx <= glowRadius; dx++) {
+              const ny = Math.max(0, Math.min(height - 1, y + dy));
+              const nx = Math.max(0, Math.min(width - 1, x + dx));
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              
+              if (dist <= glowRadius) {
+                const falloff = Math.exp(-(dist * dist) / (glowRadius * glowRadius * 0.5));
+                const idx = (ny * width + nx) * 4;
+                
+                // Bioluminescent blue-green glow
+                data[idx] = Math.min(255, data[idx] + glowValue * falloff * glowIntensity * 100);
+                data[idx + 1] = Math.min(255, data[idx + 1] + glowValue * falloff * glowIntensity * 255);
+                data[idx + 2] = Math.min(255, data[idx + 2] + glowValue * falloff * glowIntensity * 200);
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+};
+
+// Helper function for HSL to RGB conversion
+function hslToRgb(h: number, s: number, l: number): { r: number, g: number, b: number } {
+  let r, g, b;
+  
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  
+  return { r, g, b };
+}
+
 export const getEffectCategory = (effectId: string): string | null => {
   for (const [category, data] of Object.entries(effectCategories)) {
     if (data.effects.includes(effectId)) {
