@@ -60,6 +60,11 @@ export async function renderAnimationFrames(
         animatedSettings[param] = curve(progress);
       }
       
+      // Add frame-based seed for effects that need randomness per frame
+      if (effectId === 'pixelExplosion') {
+        animatedSettings.seed = i + 1; // Different seed for each frame
+      }
+      
       // Clear the layer
       layer.destroyChildren();
       

@@ -3101,16 +3101,24 @@ const createPixelExplosionEffect = (settings: Record<string, number>) => {
     const { data, width, height } = imageData;
     const strength = settings.strength ?? 30;
     const numPoints = Math.max(1, Math.floor(settings.numPoints ?? 5));
+    const seed = settings.seed ?? 0; // Use seed for consistent previews
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
     const outputData = new Uint8ClampedArray(data.length); 
     outputData.set(tempData); // Initialize output with original image
     
-    // Generate explosion centers
+    // Simple pseudo-random number generator with seed
+    let rng = seed || 12345;
+    const random = () => {
+      rng = (rng * 1664525 + 1013904223) % 4294967296;
+      return rng / 4294967296;
+    };
+    
+    // Generate explosion centers with seeded random
     const centers: {x: number, y: number}[] = [];
     for (let i = 0; i < numPoints; i++) {
-      centers.push({ x: Math.random() * width, y: Math.random() * height });
+      centers.push({ x: random() * width, y: random() * height });
     }
 
     for (let y = 0; y < height; y++) {

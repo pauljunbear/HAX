@@ -137,9 +137,17 @@ export default function Home() {
   };
 
   const handleExportClick = () => {
+    console.log("Export button clicked");
+    console.log("imageEditorRef:", imageEditorRef);
+    console.log("imageEditorRef.current:", imageEditorRef.current);
+    
     if (imageEditorRef.current) {
       console.log("Calling export on ImageEditor");
-      imageEditorRef.current.exportImage(); // Call without format to show dialog
+      try {
+        imageEditorRef.current.exportImage(); // Call without format to show dialog
+      } catch (error) {
+        console.error("Error calling exportImage:", error);
+      }
     } else {
       console.log("ImageEditor ref not available");
     }
