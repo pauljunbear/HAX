@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { effectsConfig, effectCategories } from '@/lib/effects';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ControlPanelV3Props {
   activeEffect?: string | null;
@@ -203,30 +204,36 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
         </div>
 
         {/* Quick Access - Recent Effects */}
-        {!searchQuery && recentEffects.length > 0 && (
-          <div className="px-4 pb-3">
-            <div className="text-[10px] text-dark-textMuted uppercase tracking-wide mb-2">Recent</div>
+        {recentEffects.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mb-3 pb-3 border-b border-dark-border"
+          >
+            <h3 className="text-[10px] font-medium text-dark-textMuted uppercase tracking-wider mb-2">Recent</h3>
             <div className="flex flex-wrap gap-1.5">
-              {recentEffects.slice(0, 6).map(effectId => {
-                const effect = effectsConfig[effectId];
-                if (!effect) return null;
+              {recentEffects.slice(0, 4).map((effectId) => {
+                const config = effectsConfig[effectId];
+                if (!config) return null;
                 
                 return (
-                  <button
+                  <motion.button
                     key={effectId}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => handleEffectSelect(effectId)}
-                    className={`px-2.5 py-1 text-[11px] rounded-md transition-all ${
+                    className={`px-2.5 py-1 text-[10px] rounded-md transition-all ${
                       activeEffect === effectId
                         ? 'bg-primary-accent text-white'
-                        : 'bg-dark-bg text-dark-textMuted hover:text-dark-text border border-dark-border'
+                        : 'bg-dark-surface hover:bg-dark-border text-dark-textMuted hover:text-dark-text'
                     }`}
                   >
-                    {effect.label}
-                  </button>
+                    {config.label}
+                  </motion.button>
                 );
               })}
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
 
