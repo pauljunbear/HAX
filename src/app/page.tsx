@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 
 // Import new components
-import ControlPanelV2 from '@/components/ControlPanelV2';
+import ControlPanelV3 from '@/components/ControlPanelV3';
 import HistoryPanel from '@/components/HistoryPanel';
 import EffectLayers from '@/components/EffectLayers';
 import useHistory, { HistoryState } from '@/hooks/useHistory';
@@ -202,7 +202,7 @@ export default function Home() {
           </div>
           
           {/* New Control Panel */}
-          <ControlPanelV2
+          <ControlPanelV3
             activeEffect={activeEffect}
             effectSettings={effectSettings}
             onEffectChange={handleEffectChange}
