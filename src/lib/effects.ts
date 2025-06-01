@@ -4351,12 +4351,3 @@ function hslToRgb(h: number, s: number, l: number): { r: number, g: number, b: n
   
   return { r, g, b };
 }
-
-export const getEffectCategory = (effectId: string): string | null => {
-  for (const [category, data] of Object.entries(effectCategories)) {
-    if (data.effects.includes(effectId)) {
-      return category;
-    }
-  }
-  return null;
-};
