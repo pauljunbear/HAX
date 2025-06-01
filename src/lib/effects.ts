@@ -232,13 +232,13 @@ export const applyEffect = async (
         return [Konva.Filters.Blur, { blurRadius: settings.radius ?? 0 }];
 
       case 'sharpen':
-        return [Konva.Filters.Enhance, { enhance: (settings.amount ?? 0) * 0.5 }]; // Enhance seems closer to sharpen
+        return [Konva.Filters.Enhance, { enhance: (settings.value ?? 0) * 0.5 }]; // Enhance seems closer to sharpen
 
       case 'pixelate':
         return [Konva.Filters.Pixelate, { pixelSize: settings.pixelSize ?? 8 }];
 
       case 'noise':
-        return [Konva.Filters.Noise, { noise: settings.noise ?? 0.2 }];
+        return [Konva.Filters.Noise, { noise: settings.value ?? 0.2 }];
 
       case 'threshold':
         return [Konva.Filters.Threshold, { threshold: settings.threshold ?? 0.5 }];

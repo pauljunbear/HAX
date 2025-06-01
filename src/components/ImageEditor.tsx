@@ -520,63 +520,108 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       try {
         console.log("Applying effects:", effectLayers.map(layer => layer.effectId).join(', '));
         
-        // Pre-fetch all filter functions
-        const filterFunctions: Array<{ layer: EffectLayer, filterFunc: any }> = [];
+        // Separate effects into built-in Konva filters and custom filters
+        const builtInFilters: any[] = [];
+        const builtInParams: Record<string, any> = {};
+        const customEffects: Array<{ layer: EffectLayer, filterFunc: any }> = [];
+        
         for (const layer of effectLayers) {
           if (!layer.visible) continue;
-          const [filterFunc] = await applyEffect(layer.effectId, layer.settings || {});
-          if (filterFunc) {
-            filterFunctions.push({ layer, filterFunc });
+          
+          const [filterFunc, filterParams] = await applyEffect(layer.effectId, layer.settings || {});
+          if (!filterFunc) continue;
+          
+          // Check if this is a built-in Konva filter (has parameters)
+          if (filterParams && Object.keys(filterParams).length > 0) {
+            // Built-in Konva filter
+            builtInFilters.push(filterFunc);
+            
+            // Apply opacity to numeric parameters
+            if (layer.opacity < 1) {
+              const adjustedParams: Record<string, any> = {};
+              for (const [key, value] of Object.entries(filterParams)) {
+                if (typeof value === 'number') {
+                  // Special handling for specific parameters
+                  if (key === 'brightness' || key === 'contrast' || key === 'enhance') {
+                    adjustedParams[key] = value * layer.opacity;
+                  } else {
+                    adjustedParams[key] = value;
+                  }
+                } else {
+                  adjustedParams[key] = value;
+                }
+              }
+              Object.assign(builtInParams, adjustedParams);
+            } else {
+              Object.assign(builtInParams, filterParams);
+            }
+          } else {
+            // Custom effect that modifies imageData
+            customEffects.push({ layer, filterFunc });
           }
         }
         
-        if (filterFunctions.length === 0) {
-          console.log("No valid filters to apply");
-          imageNode.cache();
-          imageNode.getLayer().batchDraw();
-          return;
+        // If we have custom effects, create a composite filter
+        if (customEffects.length > 0) {
+          const compositeFilter = function(imageData: any) {
+            // Store original for blending
+            const originalData = new Uint8ClampedArray(imageData.data);
+            
+            // Apply each custom effect
+            for (const { layer, filterFunc } of customEffects) {
+              console.log(`Applying custom effect: ${layer.effectId} with opacity ${layer.opacity}`);
+              
+              if (layer.opacity < 1) {
+                // Create a copy for this effect
+                const effectData = {
+                  data: new Uint8ClampedArray(originalData),
+                  width: imageData.width,
+                  height: imageData.height
+                };
+                
+                // Apply the effect
+                filterFunc(effectData);
+                
+                // Blend with original based on opacity
+                for (let i = 0; i < imageData.data.length; i += 4) {
+                  imageData.data[i] = originalData[i] * (1 - layer.opacity) + effectData.data[i] * layer.opacity;
+                  imageData.data[i + 1] = originalData[i + 1] * (1 - layer.opacity) + effectData.data[i + 1] * layer.opacity;
+                  imageData.data[i + 2] = originalData[i + 2] * (1 - layer.opacity) + effectData.data[i + 2] * layer.opacity;
+                  imageData.data[i + 3] = originalData[i + 3];
+                }
+              } else {
+                // Apply directly
+                filterFunc(imageData);
+              }
+              
+              // Update original for next effect
+              originalData.set(imageData.data);
+            }
+          };
+          
+          // Add composite filter to the beginning
+          builtInFilters.unshift(compositeFilter);
         }
         
-        // Create a composite filter function that applies all effects with opacity
-        const compositeFilter = function(imageData: any) {
-          // Apply each visible effect layer
-          for (const { layer, filterFunc } of filterFunctions) {
-            console.log(`Applying ${layer.effectId} with opacity ${layer.opacity}`);
-            
-            // Create a copy of the current image data for this effect
-            const effectData = {
-              data: new Uint8ClampedArray(imageData.data),
-              width: imageData.width,
-              height: imageData.height
-            };
-            
-            // Apply the effect to the copy
-            filterFunc(effectData);
-            
-            // Blend the effect with the current image data based on opacity
-            if (layer.opacity < 1) {
-              for (let i = 0; i < imageData.data.length; i += 4) {
-                // Blend RGB channels
-                imageData.data[i] = imageData.data[i] * (1 - layer.opacity) + effectData.data[i] * layer.opacity;
-                imageData.data[i + 1] = imageData.data[i + 1] * (1 - layer.opacity) + effectData.data[i + 1] * layer.opacity;
-                imageData.data[i + 2] = imageData.data[i + 2] * (1 - layer.opacity) + effectData.data[i + 2] * layer.opacity;
-                // Keep alpha channel unchanged
-                imageData.data[i + 3] = imageData.data[i + 3];
-              }
-            } else {
-              // Full opacity - just copy the effect data
-              imageData.data.set(effectData.data);
+        // Apply all filters
+        if (builtInFilters.length > 0) {
+          imageNode.filters(builtInFilters);
+          
+          // Set built-in filter parameters
+          console.log("Setting built-in filter params:", builtInParams);
+          for (const [key, value] of Object.entries(builtInParams)) {
+            if (typeof imageNode[key] === 'function') {
+              imageNode[key](value);
             }
           }
-        };
-        
-        // Apply the composite filter
-        imageNode.filters([compositeFilter]);
+        } else {
+          imageNode.filters([]);
+        }
         
         // Update the canvas
         imageNode.cache();
         imageNode.getLayer().batchDraw();
-        console.log(`Applied ${filterFunctions.length} effects successfully`);
+        console.log(`Applied effects successfully`);
         
       } catch (error) {
         console.error("Error applying filters:", error);
