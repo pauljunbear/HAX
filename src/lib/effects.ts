@@ -340,6 +340,24 @@ export const applyEffect = async (
 
       // --- MORE UNIQUE EFFECTS END HERE ---
 
+      // --- NEW UNIQUE EFFECTS ---
+      case 'chromaticGlitch':
+        return [createChromaticGlitchEffect(settings), {}];
+      case 'liquidMetal':
+        return [createLiquidMetalEffect(settings), {}];
+      case 'temporalEcho':
+        return [createTemporalEchoEffect(settings), {}];
+      case 'kaleidoscopeFracture':
+        return [createKaleidoscopeFractureEffect(settings), {}];
+      case 'neuralDream':
+        return [createNeuralDreamEffect(settings), {}];
+      case 'holographicInterference':
+        return [createHolographicInterferenceEffect(settings), {}];
+      case 'magneticField':
+        return [createMagneticFieldEffect(settings), {}];
+      case 'databending':
+        return [createDatabendingEffect(settings), {}];
+
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
         return [null, null];
@@ -2035,8 +2053,20 @@ export const effectsConfig: Record<string, EffectConfig> = {
     label: 'Duotone',
     category: 'Color Effects',
     settings: {
-      color1: { label: 'Color 1 (Hex#)', default: 0x0000ff },
-      color2: { label: 'Color 2 (Hex#)', default: 0xffff00 },
+      color1: { 
+        label: 'Color 1 (Hex#)', 
+        min: 0x000000,
+        max: 0xffffff,
+        default: 0x0000ff,
+        step: 1
+      },
+      color2: { 
+        label: 'Color 2 (Hex#)', 
+        min: 0x000000,
+        max: 0xffffff,
+        default: 0xffff00,
+        step: 1
+      },
     },
   },
   
@@ -2547,6 +2577,73 @@ export const effectsConfig: Record<string, EffectConfig> = {
     },
   },
   // --- MORE UNIQUE EFFECTS END HERE ---
+
+  // --- NEW UNIQUE EFFECTS ---
+  chromaticGlitch: {
+    label: 'Chromatic Glitch',
+    category: 'Distortion',
+    settings: {
+      amount: { label: 'Glitch Intensity', min: 0, max: 20, default: 5, step: 1 },
+      frequency: { label: 'Band Frequency', min: 2, max: 50, default: 10, step: 1 },
+    },
+  },
+  liquidMetal: {
+    label: 'Liquid Metal',
+    category: 'Artistic Simulation',
+    settings: {
+      intensity: { label: 'Intensity', min: 0, max: 1, default: 0.5, step: 0.05 },
+      flicker: { label: 'Shimmer', min: 0, max: 0.1, default: 0.03, step: 0.01 },
+    },
+  },
+  temporalEcho: {
+    label: 'Temporal Echo',
+    category: 'Blur & Sharpen',
+    settings: {
+      delay: { label: 'Echo Spacing', min: 0.1, max: 0.5, default: 0.2, step: 0.05 },
+      decay: { label: 'Decay Rate', min: 0.5, max: 0.95, default: 0.8, step: 0.05 },
+    },
+  },
+  kaleidoscopeFracture: {
+    label: 'Kaleidoscope Fracture',
+    category: 'Distortion',
+    settings: {
+      segments: { label: 'Segments', min: 3, max: 24, default: 8, step: 1 },
+      centerX: { label: 'Center X (0-1)', min: 0, max: 1, default: 0.5, step: 0.01 },
+      centerY: { label: 'Center Y (0-1)', min: 0, max: 1, default: 0.5, step: 0.01 },
+    },
+  },
+  neuralDream: {
+    label: 'Neural Dream',
+    category: 'Artistic Simulation',
+    settings: {
+      style: { label: 'Style Intensity', min: 0, max: 1, default: 0.5, step: 0.05 },
+      noise: { label: 'Dream Noise', min: 0, max: 0.5, default: 0.2, step: 0.02 },
+    },
+  },
+  holographicInterference: {
+    label: 'Holographic Interference',
+    category: 'Color Effects',
+    settings: {
+      frequency: { label: 'Pattern Frequency', min: 1, max: 20, default: 5, step: 1 },
+      phaseShift: { label: 'Phase Shift', min: 0, max: 1, default: 0.5, step: 0.05 },
+    },
+  },
+  magneticField: {
+    label: 'Magnetic Field',
+    category: 'Artistic Simulation',
+    settings: {
+      strength: { label: 'Field Strength', min: 0.1, max: 1, default: 0.5, step: 0.05 },
+      direction: { label: 'Field Direction', min: 0, max: 1, default: 0.5, step: 0.05 },
+    },
+  },
+  databending: {
+    label: 'Databending',
+    category: 'Distortion',
+    settings: {
+      amount: { label: 'Corruption Amount', min: 0.1, max: 1, default: 0.5, step: 0.05 },
+      distortion: { label: 'Distortion Level', min: 0.1, max: 1, default: 0.3, step: 0.05 },
+    },
+  },
 }; 
 
 // 16. Scratched Film Implementation
@@ -3015,6 +3112,576 @@ const createFisheyeWarpEffect = (settings: Record<string, number>) => {
         data[index+1] = tempData[srcIndex + 1];
         data[index+2] = tempData[srcIndex + 2];
         data[index+3] = tempData[srcIndex + 3];
+      }
+    }
+  };
+};
+
+// --- NEW UNIQUE EFFECTS IMPLEMENTATIONS ---
+
+// Chromatic Aberration Glitch - Different from regular chromatic aberration with glitch aesthetics
+const createChromaticGlitchEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const amount = Math.max(0, settings.amount ?? 5);
+    const frequency = Math.max(1, settings.frequency ?? 5);
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Create glitch bands
+    const bandHeight = Math.max(1, Math.floor(height / frequency));
+    
+    for (let y = 0; y < height; y++) {
+      // Determine if this row is in a glitch band
+      const bandIndex = Math.floor(y / bandHeight);
+      const isGlitchBand = bandIndex % 2 === 0;
+      
+      if (isGlitchBand) {
+        // Apply different offsets for each color channel
+        const rOffset = Math.floor((Math.random() - 0.5) * amount * 2);
+        const gOffset = Math.floor((Math.random() - 0.5) * amount);
+        const bOffset = Math.floor((Math.random() - 0.5) * amount * 2);
+        
+        for (let x = 0; x < width; x++) {
+          const index = (y * width + x) * 4;
+          
+          // Red channel with horizontal offset
+          const rX = Math.min(width - 1, Math.max(0, x + rOffset));
+          const rIndex = (y * width + rX) * 4;
+          data[index] = tempData[rIndex];
+          
+          // Green channel with different offset
+          const gX = Math.min(width - 1, Math.max(0, x + gOffset));
+          const gIndex = (y * width + gX) * 4;
+          data[index + 1] = tempData[gIndex + 1];
+          
+          // Blue channel with opposite offset
+          const bX = Math.min(width - 1, Math.max(0, x + bOffset));
+          const bIndex = (y * width + bX) * 4;
+          data[index + 2] = tempData[bIndex + 2];
+          
+          // Add random noise to glitch bands
+          if (Math.random() < 0.1) {
+            data[index] = Math.random() * 255;
+            data[index + 1] = Math.random() * 255;
+            data[index + 2] = Math.random() * 255;
+          }
+        }
+      }
+    }
+  };
+};
+
+// Liquid Metal Morph Effect
+const createLiquidMetalEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const intensity = settings.intensity ?? 0.5;
+    const flicker = settings.flicker ?? 0.03;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Create metallic reflection map based on brightness
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        
+        // Calculate brightness
+        const brightness = (tempData[index] + tempData[index + 1] + tempData[index + 2]) / 3;
+        
+        // Create wave-like distortion for liquid effect
+        const waveX = Math.sin(y * 0.05 + x * 0.02) * intensity * 10;
+        const waveY = Math.cos(x * 0.05 + y * 0.02) * intensity * 10;
+        
+        // Sample from distorted position
+        const srcX = Math.min(width - 1, Math.max(0, Math.floor(x + waveX)));
+        const srcY = Math.min(height - 1, Math.max(0, Math.floor(y + waveY)));
+        const srcIndex = (srcY * width + srcX) * 4;
+        
+        // Apply metallic coloring based on brightness
+        const metalFactor = 1 + Math.sin(brightness * 0.05) * intensity;
+        
+        // Silver/mercury colors
+        data[index] = Math.min(255, tempData[srcIndex] * metalFactor * 0.9);
+        data[index + 1] = Math.min(255, tempData[srcIndex + 1] * metalFactor * 0.95);
+        data[index + 2] = Math.min(255, tempData[srcIndex + 2] * metalFactor);
+        
+        // Add shimmer
+        const shimmer = Math.random() * flicker * 255;
+        data[index] = Math.min(255, data[index] + shimmer);
+        data[index + 1] = Math.min(255, data[index + 1] + shimmer);
+        data[index + 2] = Math.min(255, data[index + 2] + shimmer);
+      }
+    }
+  };
+};
+
+// Temporal Echo Trails Effect
+const createTemporalEchoEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const delay = settings.delay ?? 0.2;
+    const decay = settings.decay ?? 0.8;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Simulate multiple time-shifted versions
+    const numEchoes = 5;
+    
+    for (let echo = 0; echo < numEchoes; echo++) {
+      const offset = Math.floor(delay * (echo + 1) * Math.min(width, height) * 0.1);
+      const opacity = Math.pow(decay, echo + 1);
+      
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const index = (y * width + x) * 4;
+          
+          // Create directional echo based on brightness gradient
+          const srcX = Math.min(width - 1, Math.max(0, x - offset));
+          const srcY = Math.min(height - 1, Math.max(0, y - offset / 2));
+          const srcIndex = (srcY * width + srcX) * 4;
+          
+          // Blend echo with current pixel
+          data[index] = data[index] * (1 - opacity) + tempData[srcIndex] * opacity;
+          data[index + 1] = data[index + 1] * (1 - opacity) + tempData[srcIndex + 1] * opacity;
+          data[index + 2] = data[index + 2] * (1 - opacity) + tempData[srcIndex + 2] * opacity;
+        }
+      }
+    }
+  };
+};
+
+// Kaleidoscope Fracture Effect - Different from regular kaleidoscope
+const createKaleidoscopeFractureEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const segments = Math.max(2, Math.floor(settings.segments ?? 6));
+    const centerX = (settings.centerX ?? 0.5) * width;
+    const centerY = (settings.centerY ?? 0.5) * height;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    const angleStep = (Math.PI * 2) / segments;
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const dx = x - centerX;
+        const dy = y - centerY;
+        let angle = Math.atan2(dy, dx);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Create fracture effect by quantizing angles
+        angle = Math.floor(angle / angleStep) * angleStep;
+        
+        // Add fractal-like distortion
+        const fractalOffset = Math.sin(distance * 0.05) * 10;
+        angle += fractalOffset * 0.01;
+        
+        // Mirror and rotate for kaleidoscope effect
+        if (Math.floor((angle + Math.PI) / angleStep) % 2 === 1) {
+          angle = -angle;
+        }
+        
+        // Calculate source position
+        const srcX = Math.floor(centerX + Math.cos(angle) * distance);
+        const srcY = Math.floor(centerY + Math.sin(angle) * distance);
+        
+        if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+          const srcIndex = (srcY * width + srcX) * 4;
+          const dstIndex = (y * width + x) * 4;
+          
+          data[dstIndex] = tempData[srcIndex];
+          data[dstIndex + 1] = tempData[srcIndex + 1];
+          data[dstIndex + 2] = tempData[srcIndex + 2];
+          data[dstIndex + 3] = tempData[srcIndex + 3];
+        }
+      }
+    }
+  };
+};
+
+// Neural Style Dream Effect
+const createNeuralDreamEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const style = settings.style ?? 0.5;
+    const noise = settings.noise ?? 0.2;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Simulate neural style transfer with perlin-like noise
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        
+        // Create dream-like distortion
+        const noiseScale = 0.01;
+        const noiseX = x * noiseScale;
+        const noiseY = y * noiseScale;
+        
+        // Multi-octave noise for organic patterns
+        const noise1 = Math.sin(noiseX * 10) * Math.cos(noiseY * 10);
+        const noise2 = Math.sin(noiseX * 20) * Math.cos(noiseY * 20) * 0.5;
+        const noise3 = Math.sin(noiseX * 40) * Math.cos(noiseY * 40) * 0.25;
+        
+        const totalNoise = (noise1 + noise2 + noise3) * noise;
+        
+        // Style transfer simulation - blend between photo and artistic interpretation
+        const r = tempData[index];
+        const g = tempData[index + 1];
+        const b = tempData[index + 2];
+        
+        // Create impressionistic color shifts
+        const hue = Math.atan2(Math.sqrt(3) * (g - b), 2 * r - g - b);
+        const shifted_hue = hue + totalNoise * Math.PI;
+        
+        // Convert back to RGB with style influence
+        const intensity = (r + g + b) / 3;
+        const saturation = Math.sqrt((r - intensity) ** 2 + (g - intensity) ** 2 + (b - intensity) ** 2) / intensity;
+        
+        const stylizedIntensity = intensity * (1 + totalNoise);
+        const stylizedSaturation = saturation * (1 + style);
+        
+        // Apply stylized colors
+        data[index] = Math.min(255, Math.max(0, stylizedIntensity + stylizedSaturation * Math.cos(shifted_hue) * intensity));
+        data[index + 1] = Math.min(255, Math.max(0, stylizedIntensity + stylizedSaturation * Math.cos(shifted_hue - 2.094) * intensity));
+        data[index + 2] = Math.min(255, Math.max(0, stylizedIntensity + stylizedSaturation * Math.cos(shifted_hue + 2.094) * intensity));
+      }
+    }
+  };
+};
+
+// Holographic Interference Effect
+const createHolographicInterferenceEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const frequency = settings.frequency ?? 5;
+    const phaseShift = settings.phaseShift ?? 0.5;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        
+        // Get original brightness
+        const brightness = (tempData[index] + tempData[index + 1] + tempData[index + 2]) / 3 / 255;
+        
+        // Create interference pattern
+        const pattern1 = Math.sin(x * frequency * 0.05 + phaseShift * Math.PI);
+        const pattern2 = Math.sin(y * frequency * 0.05 + phaseShift * Math.PI * 1.5);
+        const interference = (pattern1 + pattern2) * 0.5;
+        
+        // Create rainbow effect based on interference and brightness
+        const hue = (interference + brightness) * Math.PI * 2;
+        
+        // HSL to RGB conversion for rainbow colors
+        const c = brightness * 0.8; // Chroma
+        const hp = hue / (Math.PI / 3);
+        const x2 = c * (1 - Math.abs((hp % 2) - 1));
+        
+        let r = 0, g = 0, b = 0;
+        if (hp >= 0 && hp < 1) { r = c; g = x2; b = 0; }
+        else if (hp >= 1 && hp < 2) { r = x2; g = c; b = 0; }
+        else if (hp >= 2 && hp < 3) { r = 0; g = c; b = x2; }
+        else if (hp >= 3 && hp < 4) { r = 0; g = x2; b = c; }
+        else if (hp >= 4 && hp < 5) { r = x2; g = 0; b = c; }
+        else if (hp >= 5 && hp < 6) { r = c; g = 0; b = x2; }
+        
+        const m = brightness - c * 0.5;
+        
+        // Blend holographic colors with original
+        const blend = 0.6;
+        data[index] = Math.min(255, tempData[index] * (1 - blend) + (r + m) * 255 * blend);
+        data[index + 1] = Math.min(255, tempData[index + 1] * (1 - blend) + (g + m) * 255 * blend);
+        data[index + 2] = Math.min(255, tempData[index + 2] * (1 - blend) + (b + m) * 255 * blend);
+      }
+    }
+  };
+};
+
+// Magnetic Field Visualization Effect
+const createMagneticFieldEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const strength = settings.strength ?? 0.5;
+    const direction = settings.direction ?? 0.5;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Convert to grayscale first for edge detection
+    const edges = new Float32Array(width * height);
+    
+    // Sobel edge detection
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        let gx = 0, gy = 0;
+        
+        // Sobel X kernel
+        const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+        const kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+        
+        let k = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const idx = ((y + dy) * width + (x + dx)) * 4;
+            const gray = (tempData[idx] + tempData[idx + 1] + tempData[idx + 2]) / 3;
+            gx += gray * kernelX[k];
+            gy += gray * kernelY[k];
+            k++;
+          }
+        }
+        
+        edges[y * width + x] = Math.sqrt(gx * gx + gy * gy);
+      }
+    }
+    
+    // Create field lines based on edges
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        const edgeStrength = edges[y * width + x] / 255;
+        
+        if (edgeStrength > 0.1) {
+          // Create flowing field lines
+          const angle = Math.atan2(y - height / 2, x - width / 2) + direction * Math.PI;
+          const flow = Math.sin(angle * 10 + edgeStrength * 20) * strength;
+          
+          // Field line colors (blue to red gradient)
+          const fieldIntensity = (flow + 1) * 0.5;
+          
+          data[index] = Math.min(255, tempData[index] * 0.3 + fieldIntensity * 255);
+          data[index + 1] = Math.min(255, tempData[index + 1] * 0.3 + (1 - fieldIntensity) * 100);
+          data[index + 2] = Math.min(255, tempData[index + 2] * 0.3 + (1 - fieldIntensity) * 255);
+        } else {
+          // Darken non-field areas
+          data[index] = tempData[index] * 0.3;
+          data[index + 1] = tempData[index + 1] * 0.3;
+          data[index + 2] = tempData[index + 2] * 0.3;
+        }
+      }
+    }
+  };
+};
+
+// Databending Corruption Effect
+const createDatabendingEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const amount = settings.amount ?? 0.5;
+    const distortion = settings.distortion ?? 0.3;
+    
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+    
+    // Simulate data corruption patterns
+    const corruptionTypes = ['byteshift', 'channelswap', 'compression', 'interlace'];
+    const blockSize = Math.floor(32 + (1 - amount) * 96); // Smaller blocks = more corruption
+    
+    for (let y = 0; y < height; y += blockSize) {
+      for (let x = 0; x < width; x += blockSize) {
+        if (Math.random() < amount) {
+          const corruption = corruptionTypes[Math.floor(Math.random() * corruptionTypes.length)];
+          
+          for (let by = 0; by < blockSize && y + by < height; by++) {
+            for (let bx = 0; bx < blockSize && x + bx < width; bx++) {
+              const px = x + bx;
+              const py = y + by;
+              const index = (py * width + px) * 4;
+              
+              switch (corruption) {
+                case 'byteshift':
+                  // Shift bytes creating color artifacts
+                  const shift = Math.floor(distortion * 8);
+                  data[index] = tempData[index + shift] || tempData[index];
+                  data[index + 1] = tempData[index + 1 + shift] || tempData[index + 1];
+                  data[index + 2] = tempData[index + 2 + shift] || tempData[index + 2];
+                  break;
+                  
+                case 'channelswap':
+                  // Swap color channels
+                  data[index] = tempData[index + 2]; // R = B
+                  data[index + 1] = tempData[index]; // G = R
+                  data[index + 2] = tempData[index + 1]; // B = G
+                  break;
+                  
+                case 'compression':
+                  // Simulate JPEG compression artifacts
+                  const quality = 1 - distortion;
+                  const quantized = Math.floor(tempData[index] / (quality * 32)) * (quality * 32);
+                  data[index] = quantized;
+                  data[index + 1] = quantized;
+                  data[index + 2] = quantized;
+                  break;
+                  
+                case 'interlace':
+                  // Create interlacing effect
+                  if (py % 2 === 0) {
+                    const offset = Math.floor(distortion * 10);
+                    const srcX = Math.min(width - 1, Math.max(0, px + offset));
+                    const srcIndex = (py * width + srcX) * 4;
+                    data[index] = tempData[srcIndex];
+                    data[index + 1] = tempData[srcIndex + 1];
+                    data[index + 2] = tempData[srcIndex + 2];
+                  }
+                  break;
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+};
+
+// Lens Flare Effect Implementation
+const createLensFlareEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const flareX = (settings.x ?? 0.2) * width;
+    const flareY = (settings.y ?? 0.2) * height;
+    const strength = settings.strength ?? 0.8;
+    
+    // Create lens flare components
+    const numFlares = 5;
+    const flareColors = [
+      { r: 1.0, g: 0.9, b: 0.7 }, // Main bright flare
+      { r: 0.9, g: 0.7, b: 0.9 }, // Purple tint
+      { r: 0.7, g: 0.9, b: 0.7 }, // Green tint
+      { r: 0.9, g: 0.8, b: 0.5 }, // Orange
+      { r: 0.6, g: 0.7, b: 0.9 }  // Blue
+    ];
+    
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        
+        let flareIntensity = 0;
+        let flareR = 0, flareG = 0, flareB = 0;
+        
+        // Calculate contribution from each flare component
+        for (let i = 0; i < numFlares; i++) {
+          const flareFactor = 1 - (i * 0.15);
+          const flareRadius = (50 + i * 20) * strength;
+          
+          // Position flares along the line from light source to center
+          const centerX = width / 2;
+          const centerY = height / 2;
+          const t = 0.5 + (i - numFlares/2) * 0.2;
+          const currentFlareX = flareX + (centerX - flareX) * t;
+          const currentFlareY = flareY + (centerY - flareY) * t;
+          
+          const dx = x - currentFlareX;
+          const dy = y - currentFlareY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < flareRadius) {
+            const intensity = Math.pow(1 - (dist / flareRadius), 2) * flareFactor;
+            flareIntensity += intensity;
+            flareR += flareColors[i].r * intensity;
+            flareG += flareColors[i].g * intensity;
+            flareB += flareColors[i].b * intensity;
+          }
+        }
+        
+        // Add rays from main flare
+        const mainDx = x - flareX;
+        const mainDy = y - flareY;
+        const mainDist = Math.sqrt(mainDx * mainDx + mainDy * mainDy);
+        const angle = Math.atan2(mainDy, mainDx);
+        
+        // Star pattern rays
+        const rayIntensity = Math.pow(Math.max(0, 
+          Math.cos(angle * 4) * 0.5 + 
+          Math.cos(angle * 8) * 0.3 +
+          0.2
+        ), 2) * Math.exp(-mainDist / (width * 0.5)) * strength;
+        
+        flareIntensity += rayIntensity;
+        flareR += rayIntensity;
+        flareG += rayIntensity * 0.9;
+        flareB += rayIntensity * 0.7;
+        
+        // Blend with original image
+        data[index] = Math.min(255, data[index] + flareR * 255 * strength);
+        data[index + 1] = Math.min(255, data[index + 1] + flareG * 255 * strength);
+        data[index + 2] = Math.min(255, data[index + 2] + flareB * 255 * strength);
+      }
+    }
+  };
+};
+
+// Selective Color Effect Implementation
+const createSelectiveColorEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const targetHue = settings.hue ?? 0; // Target hue in degrees
+    const range = settings.range ?? 30; // Hue range in degrees
+    const saturationBoost = settings.saturation ?? 1.5;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i] / 255;
+      const g = data[i + 1] / 255;
+      const b = data[i + 2] / 255;
+      
+      // Convert RGB to HSL
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const l = (max + min) / 2;
+      let h = 0;
+      let s = 0;
+      
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        
+        switch (max) {
+          case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+          case g: h = ((b - r) / d + 2) / 6; break;
+          case b: h = ((r - g) / d + 4) / 6; break;
+        }
+      }
+      
+      h *= 360; // Convert to degrees
+      
+      // Check if color is within target range
+      let hueDiff = Math.abs(h - targetHue);
+      if (hueDiff > 180) hueDiff = 360 - hueDiff;
+      
+      if (hueDiff <= range) {
+        // Color is within range - keep it and boost saturation
+        s = Math.min(1, s * saturationBoost);
+        
+        // Convert back to RGB
+        const hue2rgb = (p: number, q: number, t: number) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        const hNorm = h / 360;
+        
+        data[i] = Math.round(hue2rgb(p, q, hNorm + 1/3) * 255);
+        data[i + 1] = Math.round(hue2rgb(p, q, hNorm) * 255);
+        data[i + 2] = Math.round(hue2rgb(p, q, hNorm - 1/3) * 255);
+      } else {
+        // Color is outside range - desaturate it
+        const gray = Math.round(l * 255);
+        data[i] = gray;
+        data[i + 1] = gray;
+        data[i + 2] = gray;
       }
     }
   };
