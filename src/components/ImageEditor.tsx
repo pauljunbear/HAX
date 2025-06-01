@@ -10,12 +10,13 @@ import { EffectLayer } from './EffectLayers';
 import { supportsAnimation, getAnimationConfig } from '@/lib/animationConfig';
 import { renderAnimationFrames, exportAsGif, downloadBlob } from '@/lib/animationRenderer';
 import { motion, AnimatePresence } from 'framer-motion';
+import Konva from 'konva';
+import { applyCompositeEffects, createCompositeFilter, FilterFunction } from '@/lib/effects';
 
 interface ImageEditorProps {
   selectedImage?: string | null;
   effectLayers?: EffectLayer[];  // Changed from activeEffect to effectLayers
   onImageUpload?: (imageDataUrl: string) => void;
-  onReady?: (ref: any) => void;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -26,7 +27,6 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     selectedImage,
     effectLayers,
     onImageUpload,
-    onReady,
   },
   ref
 ) => {
@@ -49,89 +49,82 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   const [isExportingAnimation, setIsExportingAnimation] = useState(false);
   const [animationProgress, setAnimationProgress] = useState(0);
   
-  // Define the imperative handle methods object in the main component scope
-  const imperativeHandleMethods = {
-    exportImage: async () => {
+  // Expose the export method via ref
+  useImperativeHandle(ref, () => ({
+    exportImage: async (format?: 'png' | 'jpeg' | 'gif') => {
       console.log("Export method called on ImageEditor ref");
+      console.log("Current effect layers:", effectLayers);
       
       if (!stageRef.current || !image) {
         console.error("Cannot export: Stage or image not ready");
         return;
       }
       
-      try {
-        if (exportFormat === 'gif' && hasAnimatedEffects && firstAnimatedEffect && animationConfig) {
-          // Animated GIF export
-          setIsExportingAnimation(true);
-          setAnimationProgress(0);
+      // Check if we have animated effects
+      const animatedLayers = effectLayers?.filter(layer => 
+        layer.visible && supportsAnimation(layer.effectId)
+      ) || [];
+      
+      console.log("Animated layers found:", animatedLayers);
+      console.log("Effect layer IDs:", effectLayers?.map(l => l.effectId));
+      console.log("Which ones support animation:", effectLayers?.map(l => ({
+        id: l.effectId,
+        supportsAnimation: supportsAnimation(l.effectId)
+      })));
+      
+      // If format is not specified, show export dialog
+      if (!format) {
+        // Create and show export dialog
+        const showExportDialog = () => {
+          const dialog = document.createElement('div');
+          dialog.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+          dialog.innerHTML = `
+            <div class="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+              <h3 class="text-sm font-semibold mb-4">Export Options</h3>
+              <div class="space-y-3">
+                <button class="export-option w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-format="png">
+                  Export as PNG
+                </button>
+                <button class="export-option w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-format="jpeg">
+                  Export as JPEG
+                </button>
+                ${animatedLayers.length > 0 ? `
+                  <button class="export-option w-full py-3 px-4 bg-primary-accent hover:bg-primary-accent/90 text-white rounded-lg text-sm font-medium transition-colors" data-format="gif">
+                    Export as GIF (Animated)
+                  </button>
+                ` : ''}
+              </div>
+              <button class="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700" id="cancel-export">
+                Cancel
+              </button>
+            </div>
+          `;
           
-          const options = {
-            duration: animationDuration,
-            frameRate: animationFrameRate,
-            quality: 10, // GIF quality 1-10
-            width: imageSize.width,
-            height: imageSize.height,
-            onProgress: (progress: number) => {
-              setAnimationProgress(progress * 0.5); // First 50% for frame rendering
+          document.body.appendChild(dialog);
+          
+          // Handle clicks
+          const handleClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.classList.contains('export-option')) {
+              const selectedFormat = target.getAttribute('data-format') as 'png' | 'jpeg' | 'gif';
+              document.body.removeChild(dialog);
+              exportWithFormat(selectedFormat);
+            } else if (target.id === 'cancel-export' || target === dialog) {
+              document.body.removeChild(dialog);
             }
           };
           
-          // Get current settings for the animated effect
-          const currentSettings = effectLayers?.find(
-            layer => layer.effectId === firstAnimatedEffect.effectId
-          )?.settings || {};
-          
-          // Render frames
-          const frames = await renderAnimationFrames(
-            image,
-            firstAnimatedEffect.effectId,
-            currentSettings,
-            animationConfig,
-            options
-          );
-          
-          // Export as GIF
-          const blob = await exportAsGif(frames, {
-            quality: 10,
-            onProgress: (progress: number) => {
-              setAnimationProgress(0.5 + progress * 0.5); // Last 50% for GIF encoding
-            },
-            onComplete: (blob: Blob) => {
-              downloadBlob(blob, `animated-${Date.now()}.gif`);
-              setIsExportingAnimation(false);
-              setAnimationProgress(0);
-            },
-            onError: (error: Error) => {
-              console.error('GIF export error:', error);
-              setIsExportingAnimation(false);
-              setAnimationProgress(0);
-              alert('Failed to export GIF: ' + error.message);
-            }
-          });
-          
-        } else {
-          // Static image export (existing code)
-          const uri = stageRef.current.toDataURL({
-            pixelRatio: window.devicePixelRatio || 1,
-            mimeType: exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png',
-            quality: exportFormat === 'jpeg' ? exportQuality : 1,
-          });
-          
-          const link = document.createElement('a');
-          link.download = `edited-image-${Date.now()}.${exportFormat}`;
-          link.href = uri;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
+          dialog.addEventListener('click', handleClick);
+        };
         
-        console.log("Export completed successfully");
-      } catch (error) {
-        console.error("Export error:", error);
-        setIsExportingAnimation(false);
-        setAnimationProgress(0);
+        showExportDialog();
+        return;
       }
+      
+      // Export with specified format
+      exportWithFormat(format);
     },
+    
     // Add function to get current canvas data URL
     getCanvasDataURL: () => {
       if (!stageRef.current) return null;
@@ -139,20 +132,101 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         pixelRatio: window.devicePixelRatio || 1,
       });
     }
-  };
+  }), [image, stageRef, imageSize, effectLayers]);
 
-  // Use imperative handle to expose methods
-  useImperativeHandle(ref, () => (imperativeHandleMethods));
-
-  // Call onReady when the component is ready
-  useEffect(() => {
-    if (stageRef.current && typeof onReady === 'function') {
-      console.log("ImageEditor is ready, calling onReady callback");
-      // Pass the object with the methods directly
-      onReady(imperativeHandleMethods);
+  const exportWithFormat = async (format: 'png' | 'jpeg' | 'gif') => {
+    if (!stageRef.current || !image) return;
+    
+    const animatedLayers = effectLayers?.filter(layer => 
+      layer.visible && supportsAnimation(layer.effectId)
+    ) || [];
+    
+    const firstAnimatedEffect = animatedLayers[0];
+    const animationConfig = firstAnimatedEffect ? getAnimationConfig(firstAnimatedEffect.effectId) : null;
+    
+    try {
+      if (format === 'gif' && animatedLayers.length > 0 && firstAnimatedEffect && animationConfig) {
+        // Show progress dialog
+        const progressDialog = document.createElement('div');
+        progressDialog.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        progressDialog.innerHTML = `
+          <div class="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+            <h3 class="text-sm font-semibold mb-4">Creating Animated GIF</h3>
+            <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+              <div id="progress-bar" class="bg-primary-accent h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="progress-text" class="text-xs text-gray-600">Preparing...</p>
+          </div>
+        `;
+        document.body.appendChild(progressDialog);
+        
+        const progressBar = progressDialog.querySelector('#progress-bar') as HTMLElement;
+        const progressText = progressDialog.querySelector('#progress-text') as HTMLElement;
+        
+        const options = {
+          duration: 2000, // 2 seconds default
+          frameRate: 24,
+          quality: 10,
+          width: imageSize.width,
+          height: imageSize.height,
+          onProgress: (progress: number) => {
+            progressBar.style.width = `${progress * 50}%`;
+            progressText.textContent = `Rendering frames... ${Math.round(progress * 100)}%`;
+          }
+        };
+        
+        // Get current settings for the animated effect
+        const currentSettings = effectLayers?.find(
+          layer => layer.effectId === firstAnimatedEffect.effectId
+        )?.settings || {};
+        
+        // Render frames
+        const frames = await renderAnimationFrames(
+          image,
+          firstAnimatedEffect.effectId,
+          currentSettings,
+          animationConfig,
+          options
+        );
+        
+        // Export as GIF
+        await exportAsGif(frames, {
+          quality: 10,
+          onProgress: (progress: number) => {
+            progressBar.style.width = `${50 + progress * 50}%`;
+            progressText.textContent = `Creating GIF... ${Math.round(progress * 100)}%`;
+          },
+          onComplete: (blob: Blob) => {
+            downloadBlob(blob, `animated-${Date.now()}.gif`);
+            document.body.removeChild(progressDialog);
+          },
+          onError: (error: Error) => {
+            console.error('GIF export error:', error);
+            document.body.removeChild(progressDialog);
+            alert('Failed to export GIF: ' + error.message);
+          }
+        });
+        
+      } else {
+        // Static image export
+        const uri = stageRef.current.toDataURL({
+          pixelRatio: window.devicePixelRatio || 1,
+          mimeType: format === 'jpeg' ? 'image/jpeg' : 'image/png',
+          quality: format === 'jpeg' ? 0.9 : 1,
+        });
+        
+        const link = document.createElement('a');
+        link.download = `edited-image-${Date.now()}.${format}`;
+        link.href = uri;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      alert('Failed to export image: ' + (error as Error).message);
     }
-    // Dependency array should include the object that onReady depends on
-  }, [stageRef, onReady]); // Remove imperativeHandleMethods from deps here, it's stable
+  };
 
   // Detect browser environment to avoid SSR issues
   useEffect(() => {
@@ -772,195 +846,6 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           )}
         </Layer>
       </Stage>
-      
-      {/* Floating control bar with better positioning */}
-      <AnimatePresence>
-        {image && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50"
-          >
-            <motion.div 
-              whileHover={{ scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 300 }}
-              className="bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-gray-200/50 p-4 flex items-center space-x-3"
-            >
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleUploadClick}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-xl transition-all duration-200 flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                New Image
-              </motion.button>
-              
-              <div className="h-8 w-px bg-gray-200"></div>
-              
-              <div className="relative">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowExportOptions(!showExportOptions)}
-                  className="px-4 py-2 bg-primary-accent hover:bg-primary-accent/90 text-white text-xs font-medium rounded-xl transition-all duration-200 flex items-center shadow-sm"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Export
-                  {hasAnimatedEffects && exportFormat === 'gif' && (
-                    <motion.span 
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="ml-1.5 text-[9px] bg-white/20 text-white px-1.5 py-0.5 rounded-full font-bold"
-                    >
-                      GIF
-                    </motion.span>
-                  )}
-                </motion.button>
-                
-                <AnimatePresence>
-                  {showExportOptions && (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
-                      className="absolute bottom-full mb-2 right-0 bg-white rounded-xl shadow-xl border border-gray-200/50 p-4 min-w-[220px]"
-                    >
-                      <div className="mb-3">
-                        <label className="text-[10px] text-gray-600 font-medium block mb-1.5 uppercase tracking-wide">Format</label>
-                        <div className="flex bg-gray-100 rounded-lg p-1">
-                          <button
-                            onClick={() => setExportFormat('png')}
-                            className={`flex-1 py-1.5 px-3 text-[11px] font-medium rounded-md transition-all duration-200 ${
-                              exportFormat === 'png'
-                                ? 'bg-white text-gray-800 shadow-sm'
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
-                          >
-                            PNG
-                          </button>
-                          <button
-                            onClick={() => setExportFormat('jpeg')}
-                            className={`flex-1 py-1.5 px-3 text-[11px] font-medium rounded-md transition-all duration-200 ${
-                              exportFormat === 'jpeg'
-                                ? 'bg-white text-gray-800 shadow-sm'
-                                : 'text-gray-600 hover:text-gray-800'
-                            }`}
-                          >
-                            JPEG
-                          </button>
-                          {hasAnimatedEffects && (
-                            <button
-                              onClick={() => setExportFormat('gif')}
-                              className={`flex-1 py-1.5 px-3 text-[11px] font-medium rounded-md transition-all duration-200 ${
-                                exportFormat === 'gif'
-                                  ? 'bg-white text-gray-800 shadow-sm'
-                                  : 'text-gray-600 hover:text-gray-800'
-                              }`}
-                            >
-                              GIF
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {exportFormat === 'jpeg' && (
-                        <motion.div 
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mb-3"
-                        >
-                          <div className="flex justify-between mb-1">
-                            <label className="text-[10px] text-gray-600 font-medium">Quality</label>
-                            <span className="text-[10px] text-gray-500 font-mono">{Math.round(exportQuality * 100)}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min={0.1}
-                            max={1}
-                            step={0.05}
-                            value={exportQuality}
-                            onChange={(e) => setExportQuality(parseFloat(e.target.value))}
-                            className="w-full h-1.5"
-                          />
-                        </motion.div>
-                      )}
-                      
-                      {exportFormat === 'gif' && hasAnimatedEffects && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                        >
-                          <div className="mb-3">
-                            <div className="flex justify-between mb-1">
-                              <label className="text-[10px] text-gray-600 font-medium">Duration</label>
-                              <span className="text-[10px] text-gray-500 font-mono">{animationDuration / 1000}s</span>
-                            </div>
-                            <input
-                              type="range"
-                              min={500}
-                              max={5000}
-                              step={500}
-                              value={animationDuration}
-                              onChange={(e) => setAnimationDuration(parseInt(e.target.value))}
-                              className="w-full h-1.5"
-                            />
-                          </div>
-                          
-                          <div className="mb-3">
-                            <div className="flex justify-between mb-1">
-                              <label className="text-[10px] text-gray-600 font-medium">Frame Rate</label>
-                              <span className="text-[10px] text-gray-500 font-mono">{animationFrameRate} fps</span>
-                            </div>
-                            <input
-                              type="range"
-                              min={12}
-                              max={30}
-                              step={6}
-                              value={animationFrameRate}
-                              onChange={(e) => setAnimationFrameRate(parseInt(e.target.value))}
-                              className="w-full h-1.5"
-                            />
-                          </div>
-                        </motion.div>
-                      )}
-                      
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={imperativeHandleMethods.exportImage}
-                        disabled={isExportingAnimation}
-                        className="w-full py-2.5 bg-primary-accent hover:bg-primary-accent/90 text-white text-[11px] font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isExportingAnimation ? (
-                          <span className="flex items-center justify-center">
-                            <svg className="animate-spin -ml-1 mr-1.5 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Creating GIF... {Math.round(animationProgress * 100)}%
-                          </span>
-                        ) : (
-                          `Export ${exportFormat.toUpperCase()}`
-                        )}
-                      </motion.button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       
       {/* Hidden file input */}
       <input

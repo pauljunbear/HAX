@@ -21,7 +21,7 @@ export default function Home() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
-  const [imageEditorRef, setImageEditorRef] = useState<any>(null);
+  const imageEditorRef = useRef<any>(null);
 
   // Initialize history with empty state
   const { 
@@ -136,23 +136,12 @@ export default function Home() {
     jumpToState(index);
   };
 
-  // Callback to get the ref from ImageEditor
-  const handleEditorReady = (editorInstance: any) => {
-    console.log("ImageEditor instance received in Home component:", editorInstance);
-    // Store the instance (which has the exportImage method)
-    setImageEditorRef(editorInstance);
-  };
-
   const handleExportClick = () => {
-    // Now imageEditorRef directly holds the object with the method
-    if (imageEditorRef && typeof imageEditorRef.exportImage === 'function') {
-      console.log("Triggering export via stored editor instance");
-      imageEditorRef.exportImage();
+    if (imageEditorRef.current) {
+      console.log("Calling export on ImageEditor");
+      imageEditorRef.current.exportImage(); // Call without format to show dialog
     } else {
-      console.error("ImageEditor instance or exportImage method not available.", {
-        refExists: !!imageEditorRef, // Should now be true if handleEditorReady was called
-        isFunction: typeof imageEditorRef?.exportImage
-      });
+      console.log("ImageEditor ref not available");
     }
   };
 
@@ -167,6 +156,40 @@ export default function Home() {
           </h1>
           <div className="ml-3 text-[10px] font-medium bg-dark-border text-dark-textMuted px-2 py-0.5 rounded-full">Real-time Effects</div>
         </div>
+        
+        {/* Center controls */}
+        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-2">
+          {selectedImage && (
+            <>
+              <button
+                onClick={() => {
+                  if (confirm('Are you sure you want to load a new image? Current edits will be lost.')) {
+                    setSelectedImage(null);
+                    clearHistory({ activeEffect: null, effectSettings: {} });
+                    clearEffectLayers();
+                  }
+                }}
+                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-all duration-200 flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                New Image
+              </button>
+              
+              <button
+                onClick={handleExportClick}
+                className="px-3 py-1.5 bg-primary-accent hover:bg-primary-accent/90 text-white text-xs font-medium rounded-lg transition-all duration-200 flex items-center shadow-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export
+              </button>
+            </>
+          )}
+        </div>
+        
         <div className="flex gap-4">
           {/* Ensure link uses dark theme text colors */}
           <a 
@@ -273,10 +296,10 @@ export default function Home() {
             </div>
           ) : (
             <ImageEditor
+              ref={imageEditorRef}
               selectedImage={selectedImage}
               effectLayers={effectLayers.filter(layer => layer.visible)}
               onImageUpload={handleImageUpload}
-              onReady={handleEditorReady}
             />
           )}
         </div>

@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { effectsConfig, effectCategories } from '@/lib/effects';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronRight } from 'lucide-react';
 
 interface ControlPanelV3Props {
   activeEffect?: string | null;
@@ -208,7 +209,7 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mb-3 pb-3 border-b border-dark-border"
+            className="px-4 mb-3 pb-3 border-b border-dark-border"
           >
             <h3 className="text-[10px] font-medium text-dark-textMuted uppercase tracking-wider mb-2">Recent</h3>
             <div className="flex flex-wrap gap-1.5">
@@ -222,13 +223,13 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handleEffectSelect(effectId)}
-                    className={`px-2.5 py-1 text-[10px] rounded-md transition-all ${
+                    className={`px-2.5 py-1 text-[10px] rounded-md transition-all max-w-[45%] ${
                       activeEffect === effectId
                         ? 'bg-primary-accent text-white'
                         : 'bg-dark-surface hover:bg-dark-border text-dark-textMuted hover:text-dark-text'
                     }`}
                   >
-                    {config.label}
+                    <span className="truncate block">{config.label}</span>
                   </motion.button>
                 );
               })}
@@ -290,14 +291,14 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                   className="w-full flex items-center px-3 py-2 text-xs rounded-md transition-all hover:bg-dark-bg"
                 >
                   <svg 
-                    className={`w-3 h-3 mr-2 transition-transform ${expandedCategories.has(category) ? 'rotate-90' : ''}`} 
+                    className={`w-3 h-3 mr-2 transition-transform flex-shrink-0 ${expandedCategories.has(category) ? 'rotate-90' : ''}`} 
                     fill="none" viewBox="0 0 24 24" stroke="currentColor"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  <span className="mr-2">{data.icon}</span>
-                  <span className="font-medium text-dark-text">{category}</span>
-                  <span className="ml-auto text-[10px] text-dark-textMuted">
+                  <span className="mr-2 flex-shrink-0">{data.icon}</span>
+                  <span className="font-medium text-dark-text flex-1 text-left truncate">{category}</span>
+                  <span className="ml-2 text-[10px] text-dark-textMuted flex-shrink-0">
                     {data.effects.length}
                   </span>
                 </button>
