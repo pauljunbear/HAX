@@ -1,0 +1,15 @@
+{
+  "restartable": "rs",
+  "ignore": [
+    ".git",
+    "node_modules/**/node_modules",
+    ".next",
+    "public"
+  ],
+  "verbose": true,
+  "watch": [
+    "src/"
+  ],
+  "ext": "ts,tsx,js,jsx,css,json",
+  "delay": "2500"
+} 
