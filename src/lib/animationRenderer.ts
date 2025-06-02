@@ -141,41 +141,57 @@ export async function exportAsGif(
   }
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const gif = new GIF({
-      quality: options.quality,
-      workers: 2,
-      workerScript: '/gif.worker.js' // We'll need to copy this to public
-    });
-    
-    // Add frames
-    frames.forEach(frame => {
-      gif.addFrame(frame.canvas, { delay: frame.delay });
-    });
-    
-    // Set up event handlers
-    gif.on('progress', (progress: number) => {
-      if (options.onProgress) {
-        options.onProgress(progress);
-      }
-    });
-    
-    gif.on('finished', (blob: Blob) => {
-      if (options.onComplete) {
-        options.onComplete(blob);
-      }
-      resolve(blob);
-    });
-    
-    gif.on('error', (error: any) => {
-      const err = new Error(error.message || 'GIF generation failed');
+    try {
+      // @ts-ignore - gif.js types are not perfect
+      const gif = new GIF({
+        quality: options.quality,
+        workers: 2,
+        workerScript: '/gif.worker.js',
+        width: frames[0]?.canvas.width || 800,
+        height: frames[0]?.canvas.height || 600,
+        debug: true
+      });
+      
+      // Add frames
+      frames.forEach(frame => {
+        gif.addFrame(frame.canvas, { delay: frame.delay });
+      });
+      
+      // Set up event handlers
+      gif.on('progress', (progress: number) => {
+        console.log('GIF progress:', progress);
+        if (options.onProgress) {
+          options.onProgress(progress);
+        }
+      });
+      
+      gif.on('finished', (blob: Blob) => {
+        console.log('GIF finished, blob size:', blob.size);
+        if (options.onComplete) {
+          options.onComplete(blob);
+        }
+        resolve(blob);
+      });
+      
+      gif.on('error', (error: any) => {
+        console.error('GIF error:', error);
+        const err = new Error(error.message || 'GIF generation failed');
+        if (options.onError) {
+          options.onError(err);
+        }
+        reject(err);
+      });
+      
+      // Start rendering
+      gif.render();
+    } catch (error) {
+      console.error('GIF creation error:', error);
+      const err = error instanceof Error ? error : new Error('Failed to create GIF');
       if (options.onError) {
         options.onError(err);
       }
       reject(err);
-    });
-    
-    // Start rendering
-    gif.render();
+    }
   });
 }
 

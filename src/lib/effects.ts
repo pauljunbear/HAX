@@ -3121,6 +3121,9 @@ const createPixelExplosionEffect = (settings: Record<string, number>) => {
       centers.push({ x: random() * width, y: random() * height });
     }
 
+    // For preview, use a small strength value if strength is 0
+    const effectiveStrength = strength || 15;
+
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const srcIndex = (y * width + x) * 4;
@@ -3144,7 +3147,7 @@ const createPixelExplosionEffect = (settings: Record<string, number>) => {
         const dy = y - nearestCenter.y;
         // Normalize distance for consistent displacement feel across image sizes
         const normalizedDist = dist / Math.max(width, height);
-        const displacement = normalizedDist * strength;
+        const displacement = normalizedDist * effectiveStrength;
         
         // Calculate target coords, clamping to bounds
         const targetX = Math.round(Math.min(width - 1, Math.max(0, x + (dx / dist) * displacement)));
@@ -3222,6 +3225,9 @@ const createChromaticGlitchEffect = (settings: Record<string, number>) => {
     const amount = Math.max(0, settings.amount ?? 5);
     const frequency = Math.max(1, settings.frequency ?? 5);
     
+    // For preview, ensure we have visible effect
+    const effectiveAmount = amount || 8;
+    
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
     
@@ -3235,9 +3241,9 @@ const createChromaticGlitchEffect = (settings: Record<string, number>) => {
       
       if (isGlitchBand) {
         // Apply different offsets for each color channel
-        const rOffset = Math.floor((Math.random() - 0.5) * amount * 2);
-        const gOffset = Math.floor((Math.random() - 0.5) * amount);
-        const bOffset = Math.floor((Math.random() - 0.5) * amount * 2);
+        const rOffset = Math.floor((Math.random() - 0.5) * effectiveAmount * 2);
+        const gOffset = Math.floor((Math.random() - 0.5) * effectiveAmount);
+        const bOffset = Math.floor((Math.random() - 0.5) * effectiveAmount * 2);
         
         for (let x = 0; x < width; x++) {
           const index = (y * width + x) * 4;
@@ -3276,6 +3282,9 @@ const createLiquidMetalEffect = (settings: Record<string, number>) => {
     const intensity = settings.intensity ?? 0.5;
     const flicker = settings.flicker ?? 0.03;
     
+    // For preview, ensure we have visible effect
+    const effectiveIntensity = intensity || 0.3;
+    
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
     
@@ -3288,8 +3297,8 @@ const createLiquidMetalEffect = (settings: Record<string, number>) => {
         const brightness = (tempData[index] + tempData[index + 1] + tempData[index + 2]) / 3;
         
         // Create wave-like distortion for liquid effect
-        const waveX = Math.sin(y * 0.05 + x * 0.02) * intensity * 10;
-        const waveY = Math.cos(x * 0.05 + y * 0.02) * intensity * 10;
+        const waveX = Math.sin(y * 0.05 + x * 0.02) * effectiveIntensity * 10;
+        const waveY = Math.cos(x * 0.05 + y * 0.02) * effectiveIntensity * 10;
         
         // Sample from distorted position
         const srcX = Math.min(width - 1, Math.max(0, Math.floor(x + waveX)));
@@ -3297,7 +3306,7 @@ const createLiquidMetalEffect = (settings: Record<string, number>) => {
         const srcIndex = (srcY * width + srcX) * 4;
         
         // Apply metallic coloring based on brightness
-        const metalFactor = 1 + Math.sin(brightness * 0.05) * intensity;
+        const metalFactor = 1 + Math.sin(brightness * 0.05) * effectiveIntensity;
         
         // Silver/mercury colors
         data[index] = Math.min(255, tempData[srcIndex] * metalFactor * 0.9);
