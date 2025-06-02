@@ -92,8 +92,8 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           duration: 2000, // 2 seconds default
           frameRate: 24,
           quality: 10,
-          width: imageSize.width,
-          height: imageSize.height,
+          width: image.width,
+          height: image.height,
           onProgress: (progress: number) => {
             progressBar.style.width = `${progress * 50}%`;
             progressText.textContent = `Rendering frames... ${Math.round(progress * 100)}%`;
@@ -134,11 +134,51 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         
       } else {
         // Static image export
-        const uri = stageRef.current.toDataURL({
-          pixelRatio: window.devicePixelRatio || 1,
+        // Create a temporary stage with the exact image dimensions
+        const tempStage = new Konva.Stage({
+          container: document.createElement('div'),
+          width: image.width,
+          height: image.height
+        });
+        
+        const tempLayer = new Konva.Layer();
+        tempStage.add(tempLayer);
+        
+        // Create image node
+        const tempImage = new Konva.Image({
+          image: image,
+          x: 0,
+          y: 0,
+          width: image.width,
+          height: image.height
+        });
+        
+        // Copy filters from the original image node
+        const originalImageNode = stageRef.current.findOne('Image');
+        if (originalImageNode) {
+          tempImage.filters(originalImageNode.filters());
+          // Copy all filter parameters
+          const filterParams = ['brightness', 'contrast', 'saturation', 'hue', 'blurRadius', 'enhance', 'pixelSize', 'noise', 'threshold', 'levels'];
+          filterParams.forEach(param => {
+            if (typeof originalImageNode[param] === 'function' && typeof tempImage[param] === 'function') {
+              tempImage[param](originalImageNode[param]());
+            }
+          });
+        }
+        
+        tempLayer.add(tempImage);
+        tempImage.cache();
+        tempLayer.batchDraw();
+        
+        // Export the temp stage
+        const uri = tempStage.toDataURL({
+          pixelRatio: 1, // Export at original resolution
           mimeType: format === 'jpeg' ? 'image/jpeg' : 'image/png',
           quality: format === 'jpeg' ? 0.9 : 1,
         });
+        
+        // Clean up
+        tempStage.destroy();
         
         const link = document.createElement('a');
         link.download = `edited-image-${Date.now()}.${format}`;
