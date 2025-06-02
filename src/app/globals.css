@@ -43,6 +43,36 @@
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-start-rgb));
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Prevent pull-to-refresh on mobile */
+html {
+  overscroll-behavior-y: contain;
+}
+
+/* Mobile-specific touch handling */
+@media (max-width: 768px) {
+  /* Larger touch targets */
+  button, a, input[type="range"]::-webkit-slider-thumb {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Better spacing for touch */
+  .touch-target {
+    padding: 12px;
+  }
+  
+  /* Disable hover effects on touch devices */
+  @media (hover: none) {
+    button:hover,
+    a:hover {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
 }
 
 .canvas-container {
@@ -50,6 +80,67 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  touch-action: pan-x pan-y;
+}
+
+/* Better slider thumb for mobile */
+input[type="range"] {
+  @apply appearance-none bg-[rgb(var(--apple-gray-200))] h-1.5 rounded-full;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  @apply appearance-none w-5 h-5 rounded-full bg-white border-2 border-[rgb(var(--primary))] cursor-pointer;
+  -webkit-appearance: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+  @apply appearance-none w-5 h-5 rounded-full bg-white border-2 border-[rgb(var(--primary))] cursor-pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Larger thumb on mobile */
+@media (max-width: 768px) {
+  input[type="range"]::-webkit-slider-thumb {
+    width: 28px;
+    height: 28px;
+  }
+  
+  input[type="range"]::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* Mobile-friendly scrollbar */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(var(--apple-gray-400), 0.5);
+    border-radius: 10px;
+  }
+}
+
+/* Bottom sheet animation */
+.mobile-menu {
+  will-change: transform;
+}
+
+/* Prevent scroll when mobile menu is open */
+body.mobile-menu-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
 }
 
 @layer components {
@@ -95,15 +186,6 @@ body {
     @apply backdrop-blur-md bg-white/90 dark:bg-black/70 border border-[rgb(var(--apple-gray-200))] dark:border-[rgb(var(--apple-gray-800))];
   }
   
-  /* Input range slider styling */
-  input[type="range"] {
-    @apply appearance-none bg-[rgb(var(--apple-gray-200))] h-1.5 rounded-full;
-  }
-  
-  input[type="range"]::-webkit-slider-thumb {
-    @apply appearance-none w-5 h-5 rounded-full bg-white border-2 border-[rgb(var(--primary))] cursor-pointer;
-  }
-  
   /* Tab styling */
   .tab-apple {
     @apply px-4 py-2 text-sm font-medium rounded-md transition-colors;
@@ -131,6 +213,13 @@ body {
 /* Canvas background */
 .canvas-bg {
   background-color: rgb(var(--canvas-bg));
+  background-image: 
+    linear-gradient(45deg, rgba(0,0,0,0.05) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0,0,0,0.05) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.05) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.05) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
 }
 
 /* Frosted glass effect */

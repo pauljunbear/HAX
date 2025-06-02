@@ -486,50 +486,38 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     fileInputRef.current?.click();
   };
 
-  // Update stage size based on container size
+  // Resize the canvas when the container size changes
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
-        const { clientWidth, clientHeight } = containerRef.current;
-        console.log("Container size update:", clientWidth, "x", clientHeight);
+        const containerWidth = containerRef.current.offsetWidth;
+        const containerHeight = containerRef.current.offsetHeight;
+        
+        // Add padding for mobile
+        const padding = window.innerWidth < 768 ? 20 : 40;
+        const maxWidth = containerWidth - padding;
+        const maxHeight = containerHeight - padding;
+        
         setStageSize({
-          width: clientWidth || 800, // Fallback size if clientWidth is 0
-          height: clientHeight || 600, // Fallback size if clientHeight is 0
+          width: maxWidth,
+          height: maxHeight
         });
+        
+        console.log("Container resized to:", maxWidth, maxHeight);
       }
     };
 
-    // Initial update with a slight delay to ensure DOM is ready
-    setTimeout(updateSize, 10);
+    updateSize();
+    window.addEventListener('resize', updateSize);
     
-    // Add resize event with throttling
-    let resizeTimeout: NodeJS.Timeout;
-    const handleResize = () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
-        updateSize();
-      }, 100); // Throttle to avoid excessive updates
-    };
-    
-    window.addEventListener('resize', handleResize);
-    
-    // Force multiple redraws after mounting to ensure images show properly
-    const redrawTimeouts = [100, 300, 800, 1500].map(delay => 
-      setTimeout(() => {
-        updateSize();
-        if (stageRef.current) {
-          const layer = stageRef.current.findOne('Layer');
-          if (layer) {
-            layer.batchDraw();
-          }
-        }
-      }, delay)
-    );
-    
+    // Also update on orientation change for mobile
+    window.addEventListener('orientationchange', () => {
+      setTimeout(updateSize, 100);
+    });
+
     return () => {
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(resizeTimeout);
-      redrawTimeouts.forEach(timeout => clearTimeout(timeout));
+      window.removeEventListener('resize', updateSize);
+      window.removeEventListener('orientationchange', updateSize);
     };
   }, []);
 
@@ -910,52 +898,106 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
 
   return (
     <div 
-      ref={containerRef} 
-      className="h-full relative w-full flex items-center justify-center"
-      style={{ 
-        minHeight: '400px',
-        visibility: 'visible',
-        display: 'block'
-      }}
+      ref={containerRef}
+      className="relative w-full h-full flex items-center justify-center canvas-bg overflow-hidden"
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
     >
-      {isLoading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 backdrop-blur-sm">
-          <div className="flex flex-col items-center">
-            <div className="h-10 w-10 rounded-full border-4 border-[rgb(var(--apple-gray-200))] border-t-[rgb(var(--primary))] animate-spin mb-3"></div>
-            <p className="text-[rgb(var(--apple-gray-600))] font-medium">Processing...</p>
-          </div>
-        </div>
+      {isBrowser && stageSize.width > 0 && stageSize.height > 0 && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="relative"
+        >
+          <Stage
+            ref={stageRef}
+            width={stageSize.width}
+            height={stageSize.height}
+            className="canvas-bg shadow-xl rounded-lg touch-none"
+            style={{ touchAction: 'none' }}
+          >
+            {/* Main image layer */}
+            <Layer>
+              <AnimatePresence>
+                {image && imageStatus === 'loaded' && (
+                  <KonvaImage
+                    image={image}
+                    x={(stageSize.width - imageSize.width) / 2}
+                    y={(stageSize.height - imageSize.height) / 2}
+                    width={imageSize.width}
+                    height={imageSize.height}
+                    filters={combinedFilters}
+                    ref={(node) => {
+                      if (node) {
+                        // Apply all filter parameters
+                        combinedFilterParams.forEach(params => {
+                          if (params) {
+                            Object.entries(params).forEach(([key, value]) => {
+                              if (typeof node[key] === 'function') {
+                                node[key](value);
+                              }
+                            });
+                          }
+                        });
+                        
+                        // Always cache after applying filters
+                        node.cache();
+                      }
+                    }}
+                  />
+                )}
+              </AnimatePresence>
+            </Layer>
+          </Stage>
+        </motion.div>
       )}
-      
-      <Stage
-        ref={stageRef}
-        width={stageSize.width}
-        height={stageSize.height}
-        className="canvas-bg"
-        style={{
-          display: 'block',
-          width: `${stageSize.width}px`,
-          height: `${stageSize.height}px`,
-          position: 'relative',
-          zIndex: 1,
-          visibility: 'visible',
-        }}
-      >
-        {/* Main image layer */}
-        <Layer>
-          {image && (
-            <KonvaImage
-              image={image}
-              x={(stageSize.width - (imageSize.width * Math.min(stageSize.width / imageSize.width, stageSize.height / imageSize.height, 1))) / 2}
-              y={(stageSize.height - (imageSize.height * Math.min(stageSize.width / imageSize.width, stageSize.height / imageSize.height, 1))) / 2}
-              width={imageSize.width * Math.min(stageSize.width / imageSize.width, stageSize.height / imageSize.height, 1)}
-              height={imageSize.height * Math.min(stageSize.width / imageSize.width, stageSize.height / imageSize.height, 1)}
-              listening={false}
-            />
-          )}
-        </Layer>
-      </Stage>
-      
+
+      {/* Responsive Drop zone overlay */}
+      {!selectedImage && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-5 rounded-lg border-2 border-dashed border-gray-300 p-4 md:p-8"
+        >
+          <div className="text-center">
+            <svg className="mx-auto h-10 w-10 md:h-12 md:w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <p className="mt-2 text-xs md:text-sm text-gray-600">Drop your image here or click to browse</p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Responsive Loading indicator */}
+      {isLoading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80"
+        >
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-6 w-6 md:h-8 md:w-8 border-b-2 border-primary-accent"></div>
+            <p className="mt-2 text-xs md:text-sm text-gray-600">Processing...</p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Responsive Error message */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-xs bg-red-50 border border-red-200 text-red-800 px-3 py-2 md:px-4 md:py-3 rounded-lg shadow-lg text-xs md:text-sm"
+        >
+          <p className="font-medium">Error</p>
+          <p>{error}</p>
+        </motion.div>
+      )}
+
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
