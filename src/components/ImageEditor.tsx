@@ -49,91 +49,12 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   const [isExportingAnimation, setIsExportingAnimation] = useState(false);
   const [animationProgress, setAnimationProgress] = useState(0);
   
-  // Expose the export method via ref
-  useImperativeHandle(ref, () => ({
-    exportImage: async (format?: 'png' | 'jpeg' | 'gif') => {
-      console.log("Export method called on ImageEditor ref");
-      console.log("Current effect layers:", effectLayers);
-      
-      if (!stageRef.current || !image) {
-        console.error("Cannot export: Stage or image not ready");
-        return;
-      }
-      
-      // Check if we have animated effects
-      const animatedLayers = effectLayers?.filter(layer => 
-        layer.visible && supportsAnimation(layer.effectId)
-      ) || [];
-      
-      console.log("Animated layers found:", animatedLayers);
-      console.log("Effect layer IDs:", effectLayers?.map(l => l.effectId));
-      console.log("Which ones support animation:", effectLayers?.map(l => ({
-        id: l.effectId,
-        supportsAnimation: supportsAnimation(l.effectId)
-      })));
-      
-      // If format is not specified, show export dialog
-      if (!format) {
-        // Create and show export dialog
-        const showExportDialog = () => {
-          const dialog = document.createElement('div');
-          dialog.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
-          dialog.innerHTML = `
-            <div class="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
-              <h3 class="text-sm font-semibold mb-4">Export Options</h3>
-              <div class="space-y-3">
-                <button class="export-option w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-format="png">
-                  Export as PNG
-                </button>
-                <button class="export-option w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-format="jpeg">
-                  Export as JPEG
-                </button>
-                ${animatedLayers.length > 0 ? `
-                  <button class="export-option w-full py-3 px-4 bg-primary-accent hover:bg-primary-accent/90 text-white rounded-lg text-sm font-medium transition-colors" data-format="gif">
-                    Export as GIF (Animated)
-                  </button>
-                ` : ''}
-              </div>
-              <button class="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700" id="cancel-export">
-                Cancel
-              </button>
-            </div>
-          `;
-          
-          document.body.appendChild(dialog);
-          
-          // Handle clicks
-          const handleClick = (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            if (target.classList.contains('export-option')) {
-              const selectedFormat = target.getAttribute('data-format') as 'png' | 'jpeg' | 'gif';
-              document.body.removeChild(dialog);
-              exportWithFormat(selectedFormat);
-            } else if (target.id === 'cancel-export' || target === dialog) {
-              document.body.removeChild(dialog);
-            }
-          };
-          
-          dialog.addEventListener('click', handleClick);
-        };
-        
-        showExportDialog();
-        return;
-      }
-      
-      // Export with specified format
-      exportWithFormat(format);
-    },
-    
-    // Add function to get current canvas data URL
-    getCanvasDataURL: () => {
-      if (!stageRef.current) return null;
-      return stageRef.current.toDataURL({
-        pixelRatio: window.devicePixelRatio || 1,
-      });
-    }
-  }), [image, stageRef, imageSize, effectLayers]);
-
+  // Debug ref attachment
+  useEffect(() => {
+    console.log("ImageEditor component mounted, ref:", ref);
+  }, [ref]);
+  
+  // Define exportWithFormat before useImperativeHandle
   const exportWithFormat = async (format: 'png' | 'jpeg' | 'gif') => {
     if (!stageRef.current || !image) return;
     
@@ -227,6 +148,94 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       alert('Failed to export image: ' + (error as Error).message);
     }
   };
+  
+  // Expose the export method via ref
+  useImperativeHandle(ref, () => {
+    console.log("useImperativeHandle called, creating ref object");
+    return {
+      exportImage: async (format?: 'png' | 'jpeg' | 'gif') => {
+        console.log("Export method called on ImageEditor ref");
+        console.log("Current effect layers:", effectLayers);
+        
+        if (!stageRef.current || !image) {
+          console.error("Cannot export: Stage or image not ready");
+          return;
+        }
+        
+        // Check if we have animated effects
+        const animatedLayers = effectLayers?.filter(layer => 
+          layer.visible && supportsAnimation(layer.effectId)
+        ) || [];
+        
+        console.log("Animated layers found:", animatedLayers);
+        console.log("Effect layer IDs:", effectLayers?.map(l => l.effectId));
+        console.log("Which ones support animation:", effectLayers?.map(l => ({
+          id: l.effectId,
+          supportsAnimation: supportsAnimation(l.effectId)
+        })));
+        
+        // If format is not specified, show export dialog
+        if (!format) {
+          // Create and show export dialog
+          const showExportDialog = () => {
+            const dialog = document.createElement('div');
+            dialog.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+            dialog.innerHTML = `
+              <div class="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+                <h3 class="text-sm font-semibold mb-4">Export Options</h3>
+                <div class="space-y-3">
+                  <button class="export-option w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-format="png">
+                    Export as PNG
+                  </button>
+                  <button class="export-option w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-format="jpeg">
+                    Export as JPEG
+                  </button>
+                  ${animatedLayers.length > 0 ? `
+                    <button class="export-option w-full py-3 px-4 bg-primary-accent hover:bg-primary-accent/90 text-white rounded-lg text-sm font-medium transition-colors" data-format="gif">
+                      Export as GIF (Animated)
+                    </button>
+                  ` : ''}
+                </div>
+                <button class="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700" id="cancel-export">
+                  Cancel
+                </button>
+              </div>
+            `;
+            
+            document.body.appendChild(dialog);
+            
+            // Handle clicks
+            const handleClick = (e: MouseEvent) => {
+              const target = e.target as HTMLElement;
+              if (target.classList.contains('export-option')) {
+                const selectedFormat = target.getAttribute('data-format') as 'png' | 'jpeg' | 'gif';
+                document.body.removeChild(dialog);
+                exportWithFormat(selectedFormat);
+              } else if (target.id === 'cancel-export' || target === dialog) {
+                document.body.removeChild(dialog);
+              }
+            };
+            
+            dialog.addEventListener('click', handleClick);
+          };
+          
+          showExportDialog();
+          return;
+        }
+        
+        // Export with specified format
+        exportWithFormat(format);
+      },
+      
+      // Add function to get current canvas data URL
+      getCanvasDataURL: () => {
+        if (!stageRef.current) return null;
+        return stageRef.current.toDataURL({
+          pixelRatio: window.devicePixelRatio || 1,
+        });
+      }
+    };
+  }, [image, stageRef, imageSize, effectLayers, exportWithFormat]);
 
   // Detect browser environment to avoid SSR issues
   useEffect(() => {
