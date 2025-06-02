@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 
@@ -11,10 +11,22 @@ import EffectLayers from '@/components/EffectLayers';
 import useHistory, { HistoryState } from '@/hooks/useHistory';
 import useEffectLayers from '@/hooks/useEffectLayers';
 
-// Dynamically import ImageEditor with SSR disabled
+// Dynamically import ImageEditor with SSR disabled and proper ref forwarding
 const ImageEditor = dynamic(
-  () => import('@/components/ImageEditor'),
-  { ssr: false }
+  () => import('@/components/ImageEditor').then(mod => {
+    // Explicitly handle the forwardRef component
+    return mod.default || mod;
+  }),
+  { 
+    ssr: false,
+    // Add loading component
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-emerald-500 border-gray-200"></div>
+        <span className="ml-3 text-gray-600">Loading editor...</span>
+      </div>
+    )
+  }
 );
 
 export default function Home() {
@@ -22,6 +34,7 @@ export default function Home() {
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const imageEditorRef = useRef<any>(null);
+  const [exportTrigger, setExportTrigger] = useState(0);
 
   // Initialize history with empty state
   const { 
@@ -149,7 +162,9 @@ export default function Home() {
         console.error("Error calling exportImage:", error);
       }
     } else {
-      console.log("ImageEditor ref not available");
+      console.log("ImageEditor ref not available, using trigger");
+      // Fallback: trigger export using state change
+      setExportTrigger(prev => prev + 1);
     }
   };
 
@@ -308,6 +323,7 @@ export default function Home() {
               selectedImage={selectedImage}
               effectLayers={effectLayers.filter(layer => layer.visible)}
               onImageUpload={handleImageUpload}
+              exportTrigger={exportTrigger}
             />
           )}
         </div>
