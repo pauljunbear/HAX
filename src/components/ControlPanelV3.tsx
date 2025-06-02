@@ -222,14 +222,18 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                     key={effectId}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => handleEffectSelect(effectId)}
-                    className={`px-2.5 py-1 text-[10px] rounded-md transition-all max-w-[45%] ${
+                    onClick={() => {
+                      onEffectChange(effectId);
+                      // Store in recent
+                      addToRecentEffects(effectId);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium transition-all ${
                       activeEffect === effectId
-                        ? 'bg-primary-accent text-white'
-                        : 'bg-dark-surface hover:bg-dark-border text-dark-textMuted hover:text-dark-text'
+                        ? 'bg-primary-accent text-white shadow-sm'
+                        : 'bg-dark-bg text-dark-textMuted hover:bg-dark-surface'
                     }`}
                   >
-                    <span className="truncate block">{config.label}</span>
+                    {config.label}
                   </motion.button>
                 );
               })}
