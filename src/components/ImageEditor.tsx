@@ -18,6 +18,7 @@ interface ImageEditorProps {
   effectLayers?: EffectLayer[];  // Changed from activeEffect to effectLayers
   onImageUpload?: (imageDataUrl: string) => void;
   exportTrigger?: number;
+  onExportComplete?: () => void;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -29,6 +30,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     effectLayers,
     onImageUpload,
     exportTrigger,
+    onExportComplete,
   },
   ref
 ) => {
@@ -156,6 +158,9 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     if (exportTrigger && exportTrigger > 0 && stageRef.current && image) {
       console.log("Export triggered via prop");
       
+      // Reset the trigger immediately to prevent re-showing on effect changes
+      onExportComplete?.();
+      
       // Check if we have animated effects
       const animatedLayers = effectLayers?.filter(layer => 
         layer.visible && supportsAnimation(layer.effectId)
@@ -202,7 +207,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       
       dialog.addEventListener('click', handleClick);
     }
-  }, [exportTrigger, effectLayers, image, exportWithFormat]);
+  }, [exportTrigger, effectLayers, image, exportWithFormat, onExportComplete]);
   
   // Expose the export method via ref
   useImperativeHandle(ref, () => {

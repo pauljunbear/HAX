@@ -324,6 +324,7 @@ export default function Home() {
               effectLayers={effectLayers.filter(layer => layer.visible)}
               onImageUpload={handleImageUpload}
               exportTrigger={exportTrigger}
+              onExportComplete={() => setExportTrigger(0)}
             />
           )}
         </div>
