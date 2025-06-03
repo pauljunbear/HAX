@@ -134,25 +134,40 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         
       } else {
         // Static image export
-        // Create a temporary stage with the exact image dimensions
-          const tempStage = new Konva.Stage({
-          container: document.createElement('div'),
-          width: image.width,
-          height: image.height
-          });
+        // Create a clean container div with no styling
+        const tempContainer = document.createElement('div');
+        tempContainer.style.position = 'absolute';
+        tempContainer.style.top = '-9999px';
+        tempContainer.style.left = '-9999px';
+        tempContainer.style.background = 'transparent';
+        tempContainer.style.border = 'none';
+        tempContainer.style.padding = '0';
+        tempContainer.style.margin = '0';
+        document.body.appendChild(tempContainer);
         
-          const tempLayer = new Konva.Layer();
-          tempStage.add(tempLayer);
-          
+        // Create a temporary stage with the exact image dimensions
+        const tempStage = new Konva.Stage({
+          container: tempContainer,
+          width: image.width,
+          height: image.height,
+          listening: false
+        });
+        
+        // Ensure stage has transparent background
+        tempStage.container().style.backgroundColor = 'transparent';
+        
+        const tempLayer = new Konva.Layer();
+        tempStage.add(tempLayer);
+        
         // Create image node
         const tempImage = new Konva.Image({
           image: image,
-            x: 0,
-            y: 0,
+          x: 0,
+          y: 0,
           width: image.width,
           height: image.height
-          });
-          
+        });
+        
         // Copy filters from the original image node
         const originalImageNode = stageRef.current.findOne('Image');
         if (originalImageNode) {
@@ -179,13 +194,14 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         
         // Clean up
         tempStage.destroy();
-          
-          const link = document.createElement('a');
+        document.body.removeChild(tempContainer);
+        
+        const link = document.createElement('a');
         link.download = `edited-image-${Date.now()}.${format}`;
         link.href = uri;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
     } catch (error) {
       console.error("Export error:", error);
