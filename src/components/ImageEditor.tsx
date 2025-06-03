@@ -135,24 +135,24 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       } else {
         // Static image export
         // Create a temporary stage with the exact image dimensions
-        const tempStage = new Konva.Stage({
+          const tempStage = new Konva.Stage({
           container: document.createElement('div'),
           width: image.width,
           height: image.height
-        });
+          });
         
-        const tempLayer = new Konva.Layer();
-        tempStage.add(tempLayer);
-        
+          const tempLayer = new Konva.Layer();
+          tempStage.add(tempLayer);
+          
         // Create image node
         const tempImage = new Konva.Image({
           image: image,
-          x: 0,
-          y: 0,
+            x: 0,
+            y: 0,
           width: image.width,
           height: image.height
-        });
-        
+          });
+          
         // Copy filters from the original image node
         const originalImageNode = stageRef.current.findOne('Image');
         if (originalImageNode) {
@@ -179,13 +179,13 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         
         // Clean up
         tempStage.destroy();
-        
-        const link = document.createElement('a');
+          
+          const link = document.createElement('a');
         link.download = `edited-image-${Date.now()}.${format}`;
         link.href = uri;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
       }
     } catch (error) {
       console.error("Export error:", error);
@@ -246,7 +246,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       };
       
       dialog.addEventListener('click', handleClick);
-    }
+      }
   }, [exportTrigger, effectLayers, image, exportWithFormat, onExportComplete]);
   
   // Expose the export method via ref
@@ -260,8 +260,8 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         if (!stageRef.current || !image) {
           console.error("Cannot export: Stage or image not ready");
           return;
-        }
-        
+      }
+
         // Check if we have animated effects
         const animatedLayers = effectLayers?.filter(layer => 
           layer.visible && supportsAnimation(layer.effectId)
@@ -303,7 +303,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
             `;
             
             document.body.appendChild(dialog);
-            
+
             // Handle clicks
             const handleClick = (e: MouseEvent) => {
               const target = e.target as HTMLElement;
@@ -507,14 +507,14 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       }
     };
 
-    updateSize();
+        updateSize();
     window.addEventListener('resize', updateSize);
     
     // Also update on orientation change for mobile
     window.addEventListener('orientationchange', () => {
       setTimeout(updateSize, 100);
     });
-
+    
     return () => {
       window.removeEventListener('resize', updateSize);
       window.removeEventListener('orientationchange', updateSize);
@@ -730,7 +730,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
                   imageData.data[i + 1] = originalData[i + 1] * (1 - layer.opacity) + effectData.data[i + 1] * layer.opacity;
                   imageData.data[i + 2] = originalData[i + 2] * (1 - layer.opacity) + effectData.data[i + 2] * layer.opacity;
                   imageData.data[i + 3] = originalData[i + 3];
-                }
+        }
               } else {
                 // Apply directly
                 filterFunc(imageData);
@@ -898,7 +898,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
 
   return (
     <div 
-      ref={containerRef}
+      ref={containerRef} 
       className="relative w-full h-full flex items-center justify-center canvas-bg overflow-hidden"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
@@ -910,49 +910,37 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           transition={{ duration: 0.3 }}
           className="relative"
         >
-          <Stage
-            ref={stageRef}
-            width={stageSize.width}
-            height={stageSize.height}
+      <Stage
+        ref={stageRef}
+        width={stageSize.width}
+        height={stageSize.height}
             className="canvas-bg shadow-xl rounded-lg touch-none"
             style={{ touchAction: 'none' }}
-          >
-            {/* Main image layer */}
-            <Layer>
+      >
+        {/* Main image layer */}
+        <Layer>
               <AnimatePresence>
-                {image && imageStatus === 'loaded' && (
-                  <KonvaImage
-                    image={image}
+                {image && imageStatus.status === 'loaded' && (
+            <KonvaImage
+              image={image}
                     x={(stageSize.width - imageSize.width) / 2}
                     y={(stageSize.height - imageSize.height) / 2}
                     width={imageSize.width}
                     height={imageSize.height}
-                    filters={combinedFilters}
                     ref={(node) => {
                       if (node) {
-                        // Apply all filter parameters
-                        combinedFilterParams.forEach(params => {
-                          if (params) {
-                            Object.entries(params).forEach(([key, value]) => {
-                              if (typeof node[key] === 'function') {
-                                node[key](value);
-                              }
-                            });
-                          }
-                        });
-                        
-                        // Always cache after applying filters
+                        // Ensure image is cached for Konva performance
                         node.cache();
                       }
                     }}
-                  />
-                )}
+            />
+          )}
               </AnimatePresence>
-            </Layer>
-          </Stage>
+        </Layer>
+      </Stage>
         </motion.div>
       )}
-
+      
       {/* Responsive Drop zone overlay */}
       {!selectedImage && (
         <motion.div
@@ -981,7 +969,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-6 w-6 md:h-8 md:w-8 border-b-2 border-primary-accent"></div>
             <p className="mt-2 text-xs md:text-sm text-gray-600">Processing...</p>
-          </div>
+                        </div>
         </motion.div>
       )}
 
@@ -996,8 +984,8 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           <p className="font-medium">Error</p>
           <p>{error}</p>
         </motion.div>
-      )}
-
+          )}
+      
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
