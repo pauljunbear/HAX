@@ -18,14 +18,14 @@
 
 ## Tasks
 
-- [ ] 1.0 Add Generative Artistic Overlays
+- [x] 1.0 Add Generative Artistic Overlays
   - [x] 1.1 Evaluate and select a library for overlays (p5.js vs. tsParticles) with performance benchmark
   - [x] 1.2 Create `GenerativeOverlay.tsx` that renders an overlay layer on top of the existing Konva canvas
   - [x] 1.3 Extend `effectsConfig` and `effectCategories` to include "Generative Overlay" effects with default settings
   - [x] 1.4 Add parameter controls (e.g., particle count, color, speed) to `ControlPanelV3`
   - [x] 1.5 Support overlay visibility, ordering, and opacity in `EffectLayers`
   - [x] 1.6 Ensure overlays are rasterised during static export and frame capture for GIF/video export
-  - [ ] 1.7 Write unit tests for overlay rendering and settings persistence
+  - [x] 1.7 Write unit tests for overlay rendering and settings persistence
 
 - [ ] 2.0 Integrate 3D Effects with Three.js/R3F
   - [ ] 2.1 Scaffold `ThreeDEffectsCanvas.tsx` using React Three Fiber
