@@ -12,6 +12,7 @@ import { renderAnimationFrames, exportAsGif, downloadBlob } from '@/lib/animatio
 import { motion, AnimatePresence } from 'framer-motion';
 import Konva from 'konva';
 import { applyCompositeEffects, createCompositeFilter, FilterFunction } from '@/lib/effects';
+import GenerativeOverlay from './GenerativeOverlay';
 
 interface ImageEditorProps {
   selectedImage?: string | null;
@@ -19,6 +20,14 @@ interface ImageEditorProps {
   onImageUpload?: (imageDataUrl: string) => void;
   exportTrigger?: number;
   onExportComplete?: () => void;
+  // Generative overlay props
+  showOverlay?: boolean;
+  overlayEffect?: 'stars' | 'bubbles' | 'network' | 'snow' | 'confetti' | 'fireflies';
+  overlayOpacity?: number;
+  overlayParticleCount?: number;
+  overlayColor?: string;
+  overlaySpeed?: number;
+  overlayInteractive?: boolean;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -31,6 +40,13 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     onImageUpload,
     exportTrigger,
     onExportComplete,
+    showOverlay,
+    overlayEffect,
+    overlayOpacity,
+    overlayParticleCount,
+    overlayColor,
+    overlaySpeed,
+    overlayInteractive,
   },
   ref
 ) => {
@@ -1016,6 +1032,22 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         <div className="absolute top-2 left-2 text-xs bg-black/80 text-white p-2 rounded-md font-mono opacity-70 hover:opacity-100 transition-opacity">
           <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
         </div>
+      )}
+
+      {/* Generative Overlay positioned over the canvas */}
+      {selectedImage && image && imageStatus.status === 'loaded' && (
+        <GenerativeOverlay
+          id="canvas-overlay"
+          effectType={overlayEffect || 'stars'}
+          visible={showOverlay || false}
+          opacity={overlayOpacity || 0.6}
+          particleCount={overlayParticleCount || 50}
+          color={overlayColor || '#ffffff'}
+          speed={overlaySpeed || 1}
+          interactive={overlayInteractive !== false}
+          zIndex={20}
+          className="rounded-lg"
+        />
       )}
     </div>
   );
