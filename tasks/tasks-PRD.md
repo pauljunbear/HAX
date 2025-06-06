@@ -27,15 +27,17 @@
   - [x] 1.6 Ensure overlays are rasterised during static export and frame capture for GIF/video export
   - [x] 1.7 Write unit tests for overlay rendering and settings persistence
 
-- [ ] 2.0 Integrate 3D Effects with Three.js/R3F
-  - [ ] 2.1 Scaffold `ThreeDEffectsCanvas.tsx` using React Three Fiber
-  - [ ] 2.2 Map uploaded image as texture onto a 3D plane and cube with basic orbit controls
-  - [ ] 2.3 Implement a tilt/parallax 3D effect controlled by mouse/touch
-  - [ ] 2.4 Add effect definition and settings (depth, rotation speed) to `effectsConfig`
-  - [ ] 2.5 Provide UI controls in `ControlPanelV3` for 3D effect parameters
-  - [ ] 2.6 Add fallback to 2D canvas on devices without WebGL support
-  - [ ] 2.7 Include 3D scene rendering in export pipeline (using `three-canvas-screenshot` or WebGL render target)
-  - [ ] 2.8 Unit tests for 3D effect component mounting and fallback logic
+- [x] 2.0 Integrate 3D Effects with Three.js/R3F
+  - [x] 2.1 Scaffold `ThreeDEffectsCanvas.tsx` using React Three Fiber
+  - [x] 2.2 Map uploaded image as texture onto a 3D plane and cube with basic orbit controls
+  - [x] 2.3 Implement a tilt/parallax 3D effect controlled by mouse/touch
+  - [x] 2.4 Add effect definition and settings (depth, rotation speed) to `effectsConfig`
+  - [x] 2.5 Provide UI controls in `ControlPanelV3` for 3D effect parameters
+  - [x] 2.6 Add fallback to 2D canvas on devices without WebGL support
+  - [x] 2.7 Include 3D scene rendering in export pipeline (using `three-canvas-screenshot` or WebGL render target)
+  - [x] 2.8 Unit tests for 3D effect component mounting and fallback logic
+
+- [x] 2.0 Integrate 3D Effects with Three.js/R3F
 
 - [ ] 3.0 Enhance Export Pipeline (Video & High-quality Animation)
   - [ ] 3.1 Add ffmpeg-wasm and create `videoExporter.ts` utility

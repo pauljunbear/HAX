@@ -388,6 +388,14 @@ export const applyEffect = async (
         // Return a special marker indicating this is an overlay effect
         return ['GENERATIVE_OVERLAY' as any, { effectType: effectName.replace('generative', '').toLowerCase(), settings }];
 
+      // 3D Effects - Return special marker for 3D handling
+      case 'threeDPlane':
+      case 'threeDCube':
+      case 'threeDTilt':
+      case 'threeDParallax':
+        // Return a special marker indicating this is a 3D effect
+        return ['THREE_D_EFFECT' as any, { effectType: effectName.replace('threeD', '3d').toLowerCase(), settings }];
+
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
         return [null, null];
@@ -2810,6 +2818,43 @@ export const effectsConfig: Record<string, EffectConfig> = {
       interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
     },
   },
+
+  // 3D Effects
+  threeDPlane: {
+    label: '3D Plane',
+    category: '3D Effects',
+    settings: {
+      depth: { label: 'Depth', min: 0.1, max: 3, default: 1, step: 0.1 },
+      controlsEnabled: { label: 'Controls (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+    },
+  },
+  threeDCube: {
+    label: '3D Cube',
+    category: '3D Effects',
+    settings: {
+      depth: { label: 'Depth', min: 0.1, max: 3, default: 1, step: 0.1 },
+      rotationSpeed: { label: 'Rotation Speed', min: 0.1, max: 3, default: 1, step: 0.1 },
+      controlsEnabled: { label: 'Controls (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+    },
+  },
+  threeDTilt: {
+    label: '3D Tilt Effect',
+    category: '3D Effects',
+    settings: {
+      depth: { label: 'Depth', min: 0.1, max: 3, default: 1, step: 0.1 },
+      tiltIntensity: { label: 'Tilt Intensity', min: 0.1, max: 1, default: 0.2, step: 0.05 },
+      controlsEnabled: { label: 'Controls (0=No, 1=Yes)', min: 0, max: 1, default: 0, step: 1 },
+    },
+  },
+  threeDParallax: {
+    label: '3D Parallax',
+    category: '3D Effects',
+    settings: {
+      depth: { label: 'Depth', min: 0.1, max: 3, default: 1, step: 0.1 },
+      tiltIntensity: { label: 'Parallax Intensity', min: 0.1, max: 1, default: 0.2, step: 0.05 },
+      controlsEnabled: { label: 'Controls (0=No, 1=Yes)', min: 0, max: 1, default: 0, step: 1 },
+    },
+  },
 }; 
 
 // 16. Scratched Film Implementation
@@ -3911,6 +3956,11 @@ export const effectCategories = {
     icon: '✨',
     description: 'Animated particle overlays',
     effects: ['generativeStars', 'generativeBubbles', 'generativeNetwork', 'generativeSnow', 'generativeConfetti', 'generativeFireflies']
+  },
+  '3D Effects': {
+    icon: '🎲',
+    description: '3D transformations and depth effects',
+    effects: ['threeDPlane', 'threeDCube', 'threeDTilt', 'threeDParallax']
   }
 };
 
