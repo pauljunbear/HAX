@@ -353,13 +353,6 @@ export default function Home() {
               onImageUpload={handleImageUpload}
               exportTrigger={exportTrigger}
               onExportComplete={() => setExportTrigger(0)}
-              showOverlay={true}
-              overlayEffect="stars"
-              overlayOpacity={0.3}
-              overlayParticleCount={30}
-              overlayColor="#ffffff"
-              overlaySpeed={0.5}
-              overlayInteractive={true}
             />
           )}
         </div>

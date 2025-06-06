@@ -121,6 +121,9 @@ export async function renderAnimationFrames(
       const ctx = frameCanvas.getContext('2d');
       
       if (ctx) {
+        // Clear canvas to transparent (remove black background)
+        ctx.clearRect(0, 0, options.width, options.height);
+        
         // Draw the Konva layer to our canvas
         const layerCanvas = layer.getCanvas()._canvas;
         ctx.drawImage(layerCanvas, 0, 0);
@@ -391,6 +394,9 @@ async function renderOverlayAnimationFrames(
     const ctx = frameCanvas.getContext('2d');
     
     if (ctx) {
+      // Clear canvas to transparent (remove black background)
+      ctx.clearRect(0, 0, options.width, options.height);
+      
       // Draw the base image
       ctx.drawImage(baseImage, 0, 0, options.width, options.height);
       
