@@ -305,17 +305,19 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
     }
   }, [effectType, opacity, particleCount, color, speed, interactive]);
 
-  if (!visible) {
-    return null;
-  }
-
   return (
     <div
-      className={`absolute inset-0 pointer-events-none ${className}`}
+      data-testid={`generative-overlay-${id}`}
+      className={`absolute inset-0 transition-opacity duration-300 ${
+        visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      } ${className}`}
       style={{
         zIndex,
-        opacity,
-      }}
+        '--overlay-opacity': opacity.toString(),
+      } as React.CSSProperties}
+      role="img"
+      aria-label={`Decorative ${effectType} overlay effect`}
+      aria-hidden={!interactive}
     >
       <Particles
         id={id}
@@ -329,6 +331,7 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
           width: '100%',
           height: '100%',
           pointerEvents: interactive ? 'auto' : 'none',
+          opacity: visible ? opacity : 0,
         }}
       />
     </div>
