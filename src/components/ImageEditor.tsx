@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Konva from 'konva';
 import { applyCompositeEffects, createCompositeFilter, FilterFunction } from '@/lib/effects';
 import GenerativeOverlay from './GenerativeOverlay';
+import ThreeDEffectsCanvas from './ThreeDEffectsCanvas';
 
 interface ImageEditorProps {
   selectedImage?: string | null;
@@ -920,8 +921,16 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     layer.visible && layer.effectId.startsWith('generative')
   ) || [];
 
+  // Extract 3D effect layers
+  const threeDLayers = effectLayers?.filter(layer => 
+    layer.visible && layer.effectId.startsWith('threeD')
+  ) || [];
+
   // Convert layer settings to overlay props for the first visible overlay
   const primaryOverlay = overlayLayers[0];
+  
+  // Convert layer settings to 3D props for the first visible 3D effect
+  const primary3DEffect = threeDLayers[0];
   const derivedOverlayProps = primaryOverlay ? {
     showOverlay: true,
     overlayEffect: primaryOverlay.effectId.replace('generative', '').toLowerCase() as 'stars' | 'bubbles' | 'network' | 'snow' | 'confetti' | 'fireflies',
@@ -940,6 +949,23 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     overlayInteractive: true,
   };
 
+  // Create derived 3D props from effect layers
+  const derived3DProps = primary3DEffect ? {
+    show3D: true,
+    threeDEffect: primary3DEffect.effectId.replace('threeD', '3d').toLowerCase() as '3dPlane' | '3dCube' | '3dTilt' | '3dParallax',
+    threeDDepth: primary3DEffect.settings?.depth ?? 1,
+    threeDRotationSpeed: primary3DEffect.settings?.rotationSpeed ?? 1,
+    threeDTiltIntensity: primary3DEffect.settings?.tiltIntensity ?? 0.2,
+    threeDControlsEnabled: (primary3DEffect.settings?.controlsEnabled ?? 1) > 0.5,
+  } : {
+    show3D: false,
+    threeDEffect: '3dPlane' as const,
+    threeDDepth: 1,
+    threeDRotationSpeed: 1,
+    threeDTiltIntensity: 0.2,
+    threeDControlsEnabled: true,
+  };
+
   // Use derived props if no explicit overlay props are provided
   const effectiveOverlayProps = {
     showOverlay: showOverlay ?? derivedOverlayProps.showOverlay,
@@ -950,6 +976,9 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     overlaySpeed: overlaySpeed ?? derivedOverlayProps.overlaySpeed,
     overlayInteractive: overlayInteractive ?? derivedOverlayProps.overlayInteractive,
   };
+
+  // Effective 3D props from derived values
+  const effective3DProps = derived3DProps;
 
   // Render different states
   if (!selectedImage) {
@@ -1179,6 +1208,23 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           interactive={effectiveOverlayProps.overlayInteractive}
           zIndex={20}
           className="rounded-lg"
+        />
+      )}
+
+      {/* 3D Effects Canvas positioned over the Konva canvas */}
+      {selectedImage && image && imageStatus.status === 'loaded' && effective3DProps.show3D && (
+        <ThreeDEffectsCanvas
+          imageUrl={selectedImage}
+          effectType={effective3DProps.threeDEffect}
+          visible={effective3DProps.show3D}
+          depth={effective3DProps.threeDDepth}
+          rotationSpeed={effective3DProps.threeDRotationSpeed}
+          tiltIntensity={effective3DProps.threeDTiltIntensity}
+          controlsEnabled={effective3DProps.threeDControlsEnabled}
+          width={stageSize.width}
+          height={stageSize.height}
+          zIndex={15}
+          className="absolute inset-0 rounded-lg"
         />
       )}
     </div>
