@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "clean": "rm -rf .next && rm -rf node_modules/.cache",
     "fix-dirs": "mkdir -p app app/api && cp -n src/app/layout.tsx app/layout.js 2>/dev/null || true && cp -n src/app/page.tsx app/page.js 2>/dev/null || true",
     "fix": "node scripts/fix-common-issues.js"
@@ -46,12 +49,18 @@
     "typescript": "^5"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/gif.js": "^0.2.5",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.19.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
     "eslint-config-next": "14.0.4",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.0.0-beta.3",
     "tsparticles-engine": "^2.12.0"
   }
 }
