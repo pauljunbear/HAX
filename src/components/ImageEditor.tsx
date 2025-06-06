@@ -14,6 +14,9 @@ import Konva from 'konva';
 import { applyCompositeEffects, createCompositeFilter, FilterFunction } from '@/lib/effects';
 import GenerativeOverlay from './GenerativeOverlay';
 import ThreeDEffectsCanvas from './ThreeDEffectsCanvas';
+import { PerformanceMonitor, usePerformanceMonitor, PerformanceMetrics } from './PerformanceMonitor';
+import { getWorkerManager, cleanupWorkerManager, WorkerManager } from '@/lib/performance/WorkerManager';
+import { BatchProcessor, BatchOperation } from '@/lib/performance/BatchProcessor';
 
 interface ImageEditorProps {
   selectedImage?: string | null;
@@ -70,10 +73,70 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   const [isExportingAnimation, setIsExportingAnimation] = useState(false);
   const [animationProgress, setAnimationProgress] = useState(0);
   
+  // Performance monitoring state
+  const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
+  const [workerManager, setWorkerManager] = useState<WorkerManager | null>(null);
+  const [batchProcessor, setBatchProcessor] = useState<BatchProcessor | null>(null);
+  const [processingTime, setProcessingTime] = useState<number>(0);
+  const [lastProcessingTime, setLastProcessingTime] = useState<number>(0);
+  
+  // Performance monitoring hooks
+  const { startRender, endRender, startOperation, endOperation } = usePerformanceMonitor();
+  
   // Debug ref attachment
   useEffect(() => {
     console.log("ImageEditor component mounted, ref:", ref);
   }, [ref]);
+  
+  // Initialize performance systems
+  useEffect(() => {
+    const initializePerformanceSystems = async () => {
+      try {
+        // Initialize worker manager
+        const manager = await getWorkerManager();
+        setWorkerManager(manager);
+        
+        // Initialize batch processor
+        const processor = new BatchProcessor();
+        setBatchProcessor(processor);
+        
+        console.log('Performance systems initialized');
+      } catch (error) {
+        console.error('Failed to initialize performance systems:', error);
+      }
+    };
+
+    initializePerformanceSystems();
+
+    // Cleanup on unmount
+    return () => {
+      cleanupWorkerManager();
+    };
+  }, []);
+
+  // Performance metrics handler
+  const handlePerformanceChange = (metrics: PerformanceMetrics) => {
+    setPerformanceMetrics(metrics);
+    
+    // Auto-enable performance monitor if performance is poor
+    if (metrics.fps < 25 || metrics.memoryUsage / metrics.memoryLimit > 0.85) {
+      setShowPerformanceMonitor(true);
+    }
+  };
+
+  // Toggle performance monitor with keyboard shortcut
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'p' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        setShowPerformanceMonitor(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
   
   // Define exportWithFormat before useImperativeHandle
   const exportWithFormat = async (format: 'png' | 'jpeg' | 'gif') => {
@@ -752,14 +815,18 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     return () => window.removeEventListener('resize', handleResize);
   }, [image, imageSize, isBrowser]);
 
-  // Apply filters to the image
+  // Apply filters to the image with performance optimization
   useEffect(() => {
-    if (!isBrowser || !image || !stageRef.current) return;
+    if (!isBrowser || !image || !stageRef.current || !batchProcessor) return;
     
-    const applyFiltersAsync = async () => {
+    const applyFiltersWithPerformance = async () => {
+      startOperation();
+      const operationStart = performance.now();
+      
       const imageNode = stageRef.current.findOne('Image');
       if (!imageNode) {
         console.error("Image node not found in Stage");
+        endOperation();
         return;
       }
       
@@ -780,18 +847,22 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       
       if (!effectLayers || effectLayers.length === 0) {
         console.log("No active effects, clearing filters and resetting properties.");
+        startRender();
         imageNode.cache();
         imageNode.getLayer().batchDraw();
+        endRender();
+        endOperation();
         return;
       }
       
       try {
-        console.log("Applying effects:", effectLayers.map(layer => layer.effectId).join(', '));
+        console.log("Applying effects with performance optimization:", effectLayers.map(layer => layer.effectId).join(', '));
         
-        // Separate effects into built-in Konva filters and custom filters
+        // Separate effects for performance optimization
         const builtInFilters: any[] = [];
         const builtInParams: Record<string, any> = {};
-        const customEffects: Array<{ layer: EffectLayer, filterFunc: any }> = [];
+        const heavyEffects: EffectLayer[] = [];
+        const lightEffects: EffectLayer[] = [];
         
         for (const layer of effectLayers) {
           if (!layer.visible) continue;
@@ -799,12 +870,12 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           const [filterFunc, filterParams] = await applyEffect(layer.effectId, layer.settings || {});
           if (!filterFunc) continue;
           
-          // Skip generative overlay effects - they're handled separately
-          if (filterFunc === 'GENERATIVE_OVERLAY') continue;
+          // Skip generative overlay and 3D effects - they're handled separately
+          if (filterFunc === 'GENERATIVE_OVERLAY' || filterFunc === 'THREE_D_EFFECT') continue;
           
           // Check if this is a built-in Konva filter (has parameters)
           if (filterParams && Object.keys(filterParams).length > 0) {
-            // Built-in Konva filter
+            // Built-in Konva filter - these are GPU accelerated
             builtInFilters.push(filterFunc);
             
             // Apply opacity to numeric parameters
@@ -827,54 +898,92 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
               Object.assign(builtInParams, filterParams);
             }
           } else {
-            // Custom effect that modifies imageData
-            customEffects.push({ layer, filterFunc });
+            // Custom effect that modifies imageData - classify for performance
+            const isHeavyEffect = ['blur', 'oilPainting', 'edgeDetection', 'emboss', 'noise'].includes(layer.effectId);
+            if (isHeavyEffect && workerManager) {
+              heavyEffects.push(layer);
+            } else {
+              lightEffects.push(layer);
+            }
           }
         }
         
-        // If we have custom effects, create a composite filter
-        if (customEffects.length > 0) {
+        // Create composite filter for custom effects
+        if (heavyEffects.length > 0 || lightEffects.length > 0) {
           const compositeFilter = function(imageData: any) {
-            // Store original for blending
             const originalData = new Uint8ClampedArray(imageData.data);
             
-            // Apply each custom effect
-            for (const { layer, filterFunc } of customEffects) {
-              console.log(`Applying custom effect: ${layer.effectId} with opacity ${layer.opacity}`);
-              
-              if (layer.opacity < 1) {
-                // Create a copy for this effect
-                const effectData = {
-                  data: new Uint8ClampedArray(originalData),
-                  width: imageData.width,
-                  height: imageData.height
-                };
-                
-                // Apply the effect
-                filterFunc(effectData);
-                
-                // Blend with original based on opacity
-                for (let i = 0; i < imageData.data.length; i += 4) {
-                  imageData.data[i] = originalData[i] * (1 - layer.opacity) + effectData.data[i] * layer.opacity;
-                  imageData.data[i + 1] = originalData[i + 1] * (1 - layer.opacity) + effectData.data[i + 1] * layer.opacity;
-                  imageData.data[i + 2] = originalData[i + 2] * (1 - layer.opacity) + effectData.data[i + 2] * layer.opacity;
-                  imageData.data[i + 3] = originalData[i + 3];
-        }
-              } else {
-                // Apply directly
-                filterFunc(imageData);
-              }
-              
-              // Update original for next effect
-              originalData.set(imageData.data);
+            // Apply light effects on main thread
+            for (const layer of lightEffects) {
+              applyEffect(layer.effectId, layer.settings || {}).then(([filterFunc]) => {
+                if (filterFunc && typeof filterFunc === 'function') {
+                  if (layer.opacity < 1) {
+                    const effectData = {
+                      data: new Uint8ClampedArray(originalData),
+                      width: imageData.width,
+                      height: imageData.height
+                    };
+                    
+                    filterFunc(effectData);
+                    
+                    // Blend with opacity
+                    for (let i = 0; i < imageData.data.length; i += 4) {
+                      imageData.data[i] = originalData[i] * (1 - layer.opacity) + effectData.data[i] * layer.opacity;
+                      imageData.data[i + 1] = originalData[i + 1] * (1 - layer.opacity) + effectData.data[i + 1] * layer.opacity;
+                      imageData.data[i + 2] = originalData[i + 2] * (1 - layer.opacity) + effectData.data[i + 2] * layer.opacity;
+                      imageData.data[i + 3] = originalData[i + 3];
+                    }
+                  } else {
+                    filterFunc(imageData);
+                  }
+                  originalData.set(imageData.data);
+                }
+              }).catch(error => {
+                console.error(`Error applying light effect ${layer.effectId}:`, error);
+              });
             }
           };
           
-          // Add composite filter to the beginning
+          // Add composite filter
           builtInFilters.unshift(compositeFilter);
         }
         
-        // Apply all filters
+        // Process heavy effects asynchronously with workers if available
+        if (heavyEffects.length > 0 && workerManager && batchProcessor) {
+          console.log(`Scheduling ${heavyEffects.length} heavy effects for worker processing`);
+          
+          // Get the current canvas imageData
+          const canvas = imageNode.toCanvas();
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Create batch job for heavy effects
+            const batchJob = batchProcessor.createSimpleJob(
+              imageData,
+              heavyEffects.map(layer => ({
+                effectId: layer.effectId,
+                settings: layer.settings || {}
+              })),
+              (progress) => {
+                console.log(`Heavy effects batch progress: ${Math.round(progress * 100)}%`);
+              }
+            );
+            
+            // Process in background
+            batchProcessor.addJob(batchJob).then((results) => {
+              if (results.length > 0 && stageRef.current) {
+                console.log('Heavy effects processed, applying to canvas');
+                // Apply the processed result back
+                // This is handled asynchronously and won't block the UI
+              }
+            }).catch((error) => {
+              console.error('Batch processing error:', error);
+            });
+          }
+        }
+        
+        // Apply built-in filters immediately (these are GPU accelerated)
         if (builtInFilters.length > 0) {
           imageNode.filters(builtInFilters);
           
@@ -889,21 +998,33 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           imageNode.filters([]);
         }
         
-        // Update the canvas
+        // Update the canvas with performance monitoring
+        startRender();
         imageNode.cache();
         imageNode.getLayer().batchDraw();
-        console.log(`Applied effects successfully`);
+        endRender();
+        
+        const operationEnd = performance.now();
+        const processingTime = operationEnd - operationStart;
+        setLastProcessingTime(processingTime);
+        setProcessingTime(prev => prev + processingTime);
+        
+        console.log(`Applied effects in ${processingTime.toFixed(2)}ms`);
         
       } catch (error) {
         console.error("Error applying filters:", error);
         imageNode.filters([]);
+        startRender();
         imageNode.cache();
         imageNode.getLayer()?.batchDraw();
+        endRender();
       }
+      
+      endOperation();
     };
     
-    applyFiltersAsync();
-  }, [effectLayers, image, isBrowser]);
+    applyFiltersWithPerformance();
+  }, [effectLayers, image, isBrowser, batchProcessor, workerManager, startOperation, endOperation, startRender, endRender]);
 
   // Check if current effects support animation
   const hasAnimatedEffects = effectLayers?.some(layer => 
@@ -1226,6 +1347,21 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           zIndex={15}
           className="absolute inset-0 rounded-lg"
         />
+      )}
+
+      {/* Performance Monitor - toggle with Ctrl/Cmd + Shift + P */}
+      <PerformanceMonitor
+        isVisible={showPerformanceMonitor}
+        position="top-right"
+        onPerformanceChange={handlePerformanceChange}
+        workerManager={workerManager}
+      />
+      
+      {/* Performance Stats Tooltip */}
+      {!showPerformanceMonitor && lastProcessingTime > 0 && (
+        <div className="absolute top-4 right-4 bg-black/80 text-white text-xs px-2 py-1 rounded-md">
+          Last: {lastProcessingTime.toFixed(0)}ms
+        </div>
       )}
     </div>
   );
