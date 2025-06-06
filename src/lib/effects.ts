@@ -378,6 +378,16 @@ export const applyEffect = async (
       case 'bioluminescence':
         return [createBioluminescenceEffect(settings), {}];
 
+      // Generative Overlay Effects - Return special marker for overlay handling
+      case 'generativeStars':
+      case 'generativeBubbles':
+      case 'generativeNetwork':
+      case 'generativeSnow':
+      case 'generativeConfetti':
+      case 'generativeFireflies':
+        // Return a special marker indicating this is an overlay effect
+        return ['GENERATIVE_OVERLAY' as any, { effectType: effectName.replace('generative', '').toLowerCase(), settings }];
+
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
         return [null, null];
@@ -2732,6 +2742,74 @@ export const effectsConfig: Record<string, EffectConfig> = {
       glowSpread: { label: 'Glow Spread', min: 0.1, max: 1, default: 0.5, step: 0.05 }
     },
   },
+
+  // Generative Overlay Effects
+  generativeStars: {
+    label: 'Stars Overlay',
+    category: 'Generative Overlay',
+    settings: {
+      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
+      particleCount: { label: 'Star Count', min: 10, max: 200, default: 50, step: 5 },
+      speed: { label: 'Twinkle Speed', min: 0.1, max: 3, default: 1, step: 0.1 },
+      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0xffffff, step: 1 },
+      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+    },
+  },
+  generativeBubbles: {
+    label: 'Bubbles Overlay',
+    category: 'Generative Overlay',
+    settings: {
+      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
+      particleCount: { label: 'Bubble Count', min: 10, max: 150, default: 40, step: 5 },
+      speed: { label: 'Float Speed', min: 0.5, max: 4, default: 1.5, step: 0.1 },
+      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0x87ceeb, step: 1 },
+      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+    },
+  },
+  generativeNetwork: {
+    label: 'Network Overlay',
+    category: 'Generative Overlay',
+    settings: {
+      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
+      particleCount: { label: 'Node Count', min: 10, max: 100, default: 30, step: 5 },
+      speed: { label: 'Movement Speed', min: 0.2, max: 2, default: 1, step: 0.1 },
+      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0x00ff88, step: 1 },
+      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+    },
+  },
+  generativeSnow: {
+    label: 'Snow Overlay',
+    category: 'Generative Overlay',
+    settings: {
+      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
+      particleCount: { label: 'Snowflake Count', min: 20, max: 300, default: 80, step: 10 },
+      speed: { label: 'Fall Speed', min: 0.5, max: 5, default: 2, step: 0.1 },
+      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0xffffff, step: 1 },
+      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+    },
+  },
+  generativeConfetti: {
+    label: 'Confetti Overlay',
+    category: 'Generative Overlay',
+    settings: {
+      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
+      particleCount: { label: 'Piece Count', min: 20, max: 200, default: 60, step: 5 },
+      speed: { label: 'Fall Speed', min: 1, max: 6, default: 3, step: 0.2 },
+      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0xff6b6b, step: 1 },
+      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+    },
+  },
+  generativeFireflies: {
+    label: 'Fireflies Overlay',
+    category: 'Generative Overlay',
+    settings: {
+      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
+      particleCount: { label: 'Firefly Count', min: 5, max: 50, default: 20, step: 2 },
+      speed: { label: 'Flight Speed', min: 0.2, max: 2, default: 0.8, step: 0.1 },
+      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0xffff00, step: 1 },
+      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+    },
+  },
 }; 
 
 // 16. Scratched Film Implementation
@@ -3828,6 +3906,11 @@ export const effectCategories = {
     icon: '📸',
     description: 'Overlays and filters',
     effects: ['noise', 'threshold', 'posterize', 'oldPhoto', 'lensFlare', 'edgeDetection', 'fractalNoise', 'circuitBoard']
+  },
+  'Generative Overlay': {
+    icon: '✨',
+    description: 'Animated particle overlays',
+    effects: ['generativeStars', 'generativeBubbles', 'generativeNetwork', 'generativeSnow', 'generativeConfetti', 'generativeFireflies']
   }
 };
 

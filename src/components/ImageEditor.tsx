@@ -113,7 +113,16 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           onProgress: (progress: number) => {
             progressBar.style.width = `${progress * 50}%`;
             progressText.textContent = `Rendering frames... ${Math.round(progress * 100)}%`;
-          }
+          },
+          // Include overlay props if overlay is active
+          overlayProps: effectiveOverlayProps.showOverlay ? {
+            effectType: effectiveOverlayProps.overlayEffect,
+            opacity: effectiveOverlayProps.overlayOpacity,
+            particleCount: effectiveOverlayProps.overlayParticleCount,
+            color: effectiveOverlayProps.overlayColor,
+            speed: effectiveOverlayProps.overlaySpeed,
+            interactive: effectiveOverlayProps.overlayInteractive,
+          } : undefined
         };
         
         // Get current settings for the animated effect
@@ -149,68 +158,101 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         });
         
       } else {
-        // Static image export
-        // Create a clean container div with no styling
-        const tempContainer = document.createElement('div');
-        tempContainer.style.position = 'absolute';
-        tempContainer.style.top = '-9999px';
-        tempContainer.style.left = '-9999px';
-        tempContainer.style.background = 'transparent';
-        tempContainer.style.border = 'none';
-        tempContainer.style.padding = '0';
-        tempContainer.style.margin = '0';
-        document.body.appendChild(tempContainer);
-        
-        // Create a temporary stage with the exact image dimensions
-        const tempStage = new Konva.Stage({
-          container: tempContainer,
-          width: image.width,
-          height: image.height,
-          listening: false
+        // Static image export with overlay compositing
+        await exportStaticImageWithOverlay(format);
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      alert('Failed to export image: ' + (error as Error).message);
+    }
+  };
+
+  // Helper function to export static image with overlay compositing
+  const exportStaticImageWithOverlay = async (format: 'png' | 'jpeg') => {
+    // Create a clean container div with no styling
+    const tempContainer = document.createElement('div');
+    tempContainer.style.position = 'absolute';
+    tempContainer.style.top = '-9999px';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.background = 'transparent';
+    tempContainer.style.border = 'none';
+    tempContainer.style.padding = '0';
+    tempContainer.style.margin = '0';
+    document.body.appendChild(tempContainer);
+    
+    try {
+      // Create a temporary stage with the exact image dimensions
+      const tempStage = new Konva.Stage({
+        container: tempContainer,
+        width: image.width,
+        height: image.height,
+        listening: false
+      });
+      
+      // Ensure stage has transparent background
+      tempStage.container().style.backgroundColor = 'transparent';
+      
+      const tempLayer = new Konva.Layer();
+      tempStage.add(tempLayer);
+      
+      // Create image node
+      const tempImage = new Konva.Image({
+        image: image,
+        x: 0,
+        y: 0,
+        width: image.width,
+        height: image.height
+      });
+      
+      // Copy filters from the original image node
+      const originalImageNode = stageRef.current.findOne('Image');
+      if (originalImageNode) {
+        tempImage.filters(originalImageNode.filters());
+        // Copy all filter parameters
+        const filterParams = ['brightness', 'contrast', 'saturation', 'hue', 'blurRadius', 'enhance', 'pixelSize', 'noise', 'threshold', 'levels'];
+        filterParams.forEach(param => {
+          if (typeof originalImageNode[param] === 'function' && typeof tempImage[param] === 'function') {
+            tempImage[param](originalImageNode[param]());
+          }
         });
+      }
+      
+      tempLayer.add(tempImage);
+      tempImage.cache();
+      tempLayer.batchDraw();
+      
+      // Create final composite canvas
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = image.width;
+      finalCanvas.height = image.height;
+      const finalCtx = finalCanvas.getContext('2d');
+      
+      if (!finalCtx) {
+        throw new Error('Failed to get canvas context');
+      }
+      
+      // Draw the processed image to final canvas
+      const imageDataURL = tempStage.toDataURL({
+        pixelRatio: 1,
+        mimeType: 'image/png', // Always use PNG for intermediate to preserve quality
+        quality: 1,
+      });
+      
+      // Load the image data and draw it
+      const processedImage = new Image();
+      processedImage.onload = async () => {
+        finalCtx.drawImage(processedImage, 0, 0);
         
-        // Ensure stage has transparent background
-        tempStage.container().style.backgroundColor = 'transparent';
-        
-        const tempLayer = new Konva.Layer();
-        tempStage.add(tempLayer);
-        
-        // Create image node
-        const tempImage = new Konva.Image({
-          image: image,
-          x: 0,
-          y: 0,
-          width: image.width,
-          height: image.height
-        });
-        
-        // Copy filters from the original image node
-        const originalImageNode = stageRef.current.findOne('Image');
-        if (originalImageNode) {
-          tempImage.filters(originalImageNode.filters());
-          // Copy all filter parameters
-          const filterParams = ['brightness', 'contrast', 'saturation', 'hue', 'blurRadius', 'enhance', 'pixelSize', 'noise', 'threshold', 'levels'];
-          filterParams.forEach(param => {
-            if (typeof originalImageNode[param] === 'function' && typeof tempImage[param] === 'function') {
-              tempImage[param](originalImageNode[param]());
-            }
-          });
+        // Composite generative overlays if they exist
+        if (effectiveOverlayProps.showOverlay) {
+          await compositeOverlayOnCanvas(finalCanvas, finalCtx);
         }
         
-        tempLayer.add(tempImage);
-        tempImage.cache();
-        tempLayer.batchDraw();
-        
-        // Export the temp stage
-        const uri = tempStage.toDataURL({
-          pixelRatio: 1, // Export at original resolution
-          mimeType: format === 'jpeg' ? 'image/jpeg' : 'image/png',
-          quality: format === 'jpeg' ? 0.9 : 1,
-        });
-        
-        // Clean up
-        tempStage.destroy();
-        document.body.removeChild(tempContainer);
+        // Export the final composite
+        const uri = finalCanvas.toDataURL(
+          format === 'jpeg' ? 'image/jpeg' : 'image/png',
+          format === 'jpeg' ? 0.9 : 1
+        );
         
         const link = document.createElement('a');
         link.download = `edited-image-${Date.now()}.${format}`;
@@ -218,10 +260,61 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        
+        // Cleanup
+        tempStage.destroy();
+        document.body.removeChild(tempContainer);
+      };
+      
+      processedImage.src = imageDataURL;
+      
+    } catch (error) {
+      // Cleanup on error
+      document.body.removeChild(tempContainer);
+      throw error;
+    }
+  };
+
+  // Helper function to composite overlay on canvas
+  const compositeOverlayOnCanvas = async (finalCanvas: HTMLCanvasElement, finalCtx: CanvasRenderingContext2D) => {
+    try {
+      // Find the overlay canvas element
+      const overlayElement = document.querySelector('#canvas-overlay canvas') as HTMLCanvasElement;
+      
+      if (overlayElement) {
+        // Get the current container dimensions to calculate scale
+        const containerRect = containerRef.current?.getBoundingClientRect();
+        if (containerRect) {
+          // Calculate scale factors
+          const scaleX = finalCanvas.width / containerRect.width;
+          const scaleY = finalCanvas.height / containerRect.height;
+          
+          // Create a temporary canvas for scaling the overlay
+          const tempOverlayCanvas = document.createElement('canvas');
+          tempOverlayCanvas.width = finalCanvas.width;
+          tempOverlayCanvas.height = finalCanvas.height;
+          const tempOverlayCtx = tempOverlayCanvas.getContext('2d');
+          
+          if (tempOverlayCtx) {
+            // Scale and draw the overlay
+            tempOverlayCtx.globalAlpha = effectiveOverlayProps.overlayOpacity;
+            tempOverlayCtx.drawImage(
+              overlayElement,
+              0, 0, overlayElement.width, overlayElement.height,
+              0, 0, finalCanvas.width, finalCanvas.height
+            );
+            
+            // Composite the scaled overlay onto the final canvas
+            finalCtx.globalCompositeOperation = 'source-over';
+            finalCtx.drawImage(tempOverlayCanvas, 0, 0);
+          }
+        }
+      } else {
+        console.warn('Overlay canvas not found for export');
       }
     } catch (error) {
-      console.error("Export error:", error);
-      alert('Failed to export image: ' + (error as Error).message);
+      console.error('Error compositing overlay:', error);
+      // Continue with export even if overlay fails
     }
   };
   
@@ -705,6 +798,9 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           const [filterFunc, filterParams] = await applyEffect(layer.effectId, layer.settings || {});
           if (!filterFunc) continue;
           
+          // Skip generative overlay effects - they're handled separately
+          if (filterFunc === 'GENERATIVE_OVERLAY') continue;
+          
           // Check if this is a built-in Konva filter (has parameters)
           if (filterParams && Object.keys(filterParams).length > 0) {
             // Built-in Konva filter
@@ -818,6 +914,42 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     layer.visible && supportsAnimation(layer.effectId)
   );
   const animationConfig = firstAnimatedEffect ? getAnimationConfig(firstAnimatedEffect.effectId) : null;
+
+  // Extract generative overlay layers
+  const overlayLayers = effectLayers?.filter(layer => 
+    layer.visible && layer.effectId.startsWith('generative')
+  ) || [];
+
+  // Convert layer settings to overlay props for the first visible overlay
+  const primaryOverlay = overlayLayers[0];
+  const derivedOverlayProps = primaryOverlay ? {
+    showOverlay: true,
+    overlayEffect: primaryOverlay.effectId.replace('generative', '').toLowerCase() as 'stars' | 'bubbles' | 'network' | 'snow' | 'confetti' | 'fireflies',
+    overlayOpacity: (primaryOverlay.settings?.opacity ?? 0.6) * primaryOverlay.opacity,
+    overlayParticleCount: primaryOverlay.settings?.particleCount ?? 50,
+    overlayColor: primaryOverlay.settings?.color ? `#${Math.floor(primaryOverlay.settings.color).toString(16).padStart(6, '0')}` : '#ffffff',
+    overlaySpeed: primaryOverlay.settings?.speed ?? 1,
+    overlayInteractive: (primaryOverlay.settings?.interactive ?? 1) > 0.5,
+  } : {
+    showOverlay: false,
+    overlayEffect: 'stars' as const,
+    overlayOpacity: 0.6,
+    overlayParticleCount: 50,
+    overlayColor: '#ffffff',
+    overlaySpeed: 1,
+    overlayInteractive: true,
+  };
+
+  // Use derived props if no explicit overlay props are provided
+  const effectiveOverlayProps = {
+    showOverlay: showOverlay ?? derivedOverlayProps.showOverlay,
+    overlayEffect: overlayEffect ?? derivedOverlayProps.overlayEffect,
+    overlayOpacity: overlayOpacity ?? derivedOverlayProps.overlayOpacity,
+    overlayParticleCount: overlayParticleCount ?? derivedOverlayProps.overlayParticleCount,
+    overlayColor: overlayColor ?? derivedOverlayProps.overlayColor,
+    overlaySpeed: overlaySpeed ?? derivedOverlayProps.overlaySpeed,
+    overlayInteractive: overlayInteractive ?? derivedOverlayProps.overlayInteractive,
+  };
 
   // Render different states
   if (!selectedImage) {
@@ -1035,16 +1167,16 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       )}
 
       {/* Generative Overlay positioned over the canvas */}
-      {selectedImage && image && imageStatus.status === 'loaded' && (
+      {selectedImage && image && imageStatus.status === 'loaded' && effectiveOverlayProps.showOverlay && (
         <GenerativeOverlay
           id="canvas-overlay"
-          effectType={overlayEffect || 'stars'}
-          visible={showOverlay || false}
-          opacity={overlayOpacity || 0.6}
-          particleCount={overlayParticleCount || 50}
-          color={overlayColor || '#ffffff'}
-          speed={overlaySpeed || 1}
-          interactive={overlayInteractive !== false}
+          effectType={effectiveOverlayProps.overlayEffect}
+          visible={effectiveOverlayProps.showOverlay}
+          opacity={effectiveOverlayProps.overlayOpacity}
+          particleCount={effectiveOverlayProps.overlayParticleCount}
+          color={effectiveOverlayProps.overlayColor}
+          speed={effectiveOverlayProps.overlaySpeed}
+          interactive={effectiveOverlayProps.overlayInteractive}
           zIndex={20}
           className="rounded-lg"
         />

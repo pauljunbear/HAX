@@ -2,6 +2,8 @@
 
 - `src/components/GenerativeOverlay.tsx` – New component for procedural or particle-based overlays (p5.js / tsParticles).
 - `src/components/GenerativeOverlay.tsx` – ✅ Implemented tsParticles-based overlay component with 6 effect types (stars, bubbles, network, snow, confetti, fireflies).
+- `src/components/ImageEditor.tsx` – ✅ Enhanced with overlay export compositing for static PNG/JPEG exports.
+- `src/lib/animationRenderer.ts` – ✅ Updated to include simplified overlay rendering in animated GIF exports.
 - `src/components/ThreeDEffectsCanvas.tsx` – React Three Fiber canvas for 3D image-mapped effects.
 - `src/lib/export/videoExporter.ts` – Utility to export animations to WebM/MP4 via ffmpeg-wasm.
 - `src/worker/effectsWorker.ts` – Web Worker to offload heavy pixel operations and keep UI responsive.
@@ -19,10 +21,10 @@
 - [ ] 1.0 Add Generative Artistic Overlays
   - [x] 1.1 Evaluate and select a library for overlays (p5.js vs. tsParticles) with performance benchmark
   - [x] 1.2 Create `GenerativeOverlay.tsx` that renders an overlay layer on top of the existing Konva canvas
-  - [ ] 1.3 Extend `effectsConfig` and `effectCategories` to include "Generative Overlay" effects with default settings
-  - [ ] 1.4 Add parameter controls (e.g., particle count, color, speed) to `ControlPanelV3`
-  - [ ] 1.5 Support overlay visibility, ordering, and opacity in `EffectLayers`
-  - [ ] 1.6 Ensure overlays are rasterised during static export and frame capture for GIF/video export
+  - [x] 1.3 Extend `effectsConfig` and `effectCategories` to include "Generative Overlay" effects with default settings
+  - [x] 1.4 Add parameter controls (e.g., particle count, color, speed) to `ControlPanelV3`
+  - [x] 1.5 Support overlay visibility, ordering, and opacity in `EffectLayers`
+  - [x] 1.6 Ensure overlays are rasterised during static export and frame capture for GIF/video export
   - [ ] 1.7 Write unit tests for overlay rendering and settings persistence
 
 - [ ] 2.0 Integrate 3D Effects with Three.js/R3F

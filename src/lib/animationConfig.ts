@@ -153,6 +153,109 @@ export const animatedEffects: Record<string, AnimationConfig> = {
         }
       }
     ]
+  },
+
+  // Generative Overlay Effects
+  generativeStars: {
+    supportsAnimation: true,
+    defaultDuration: 3000,
+    defaultFrameRate: 30,
+    animatedParameters: ['speed'],
+    animationPresets: [
+      {
+        name: 'Twinkling Stars',
+        duration: 3000,
+        frameRate: 30,
+        parameterCurves: {
+          speed: (progress) => 1 + Math.sin(progress * Math.PI * 2) * 0.5, // Vary twinkle speed
+        }
+      }
+    ]
+  },
+
+  generativeBubbles: {
+    supportsAnimation: true,
+    defaultDuration: 4000,
+    defaultFrameRate: 24,
+    animatedParameters: ['speed'],
+    animationPresets: [
+      {
+        name: 'Rising Bubbles',
+        duration: 4000,
+        frameRate: 24,
+        parameterCurves: {
+          speed: (progress) => 1.5 + Math.sin(progress * Math.PI) * 0.5, // Vary float speed
+        }
+      }
+    ]
+  },
+
+  generativeNetwork: {
+    supportsAnimation: true,
+    defaultDuration: 3000,
+    defaultFrameRate: 30,
+    animatedParameters: ['speed'],
+    animationPresets: [
+      {
+        name: 'Network Pulse',
+        duration: 3000,
+        frameRate: 30,
+        parameterCurves: {
+          speed: (progress) => 1 + Math.sin(progress * Math.PI * 4) * 0.3, // Pulsing movement
+        }
+      }
+    ]
+  },
+
+  generativeSnow: {
+    supportsAnimation: true,
+    defaultDuration: 5000,
+    defaultFrameRate: 24,
+    animatedParameters: ['speed'],
+    animationPresets: [
+      {
+        name: 'Falling Snow',
+        duration: 5000,
+        frameRate: 24,
+        parameterCurves: {
+          speed: (progress) => 2 + Math.sin(progress * Math.PI * 2) * 0.5, // Vary fall speed
+        }
+      }
+    ]
+  },
+
+  generativeConfetti: {
+    supportsAnimation: true,
+    defaultDuration: 3000,
+    defaultFrameRate: 30,
+    animatedParameters: ['speed'],
+    animationPresets: [
+      {
+        name: 'Confetti Shower',
+        duration: 3000,
+        frameRate: 30,
+        parameterCurves: {
+          speed: (progress) => 3 + Math.sin(progress * Math.PI) * 1, // Burst and settle
+        }
+      }
+    ]
+  },
+
+  generativeFireflies: {
+    supportsAnimation: true,
+    defaultDuration: 4000,
+    defaultFrameRate: 30,
+    animatedParameters: ['speed'],
+    animationPresets: [
+      {
+        name: 'Dancing Fireflies',
+        duration: 4000,
+        frameRate: 30,
+        parameterCurves: {
+          speed: (progress) => 0.8 + Math.sin(progress * Math.PI * 3) * 0.4, // Organic movement
+        }
+      }
+    ]
   }
 };
 
