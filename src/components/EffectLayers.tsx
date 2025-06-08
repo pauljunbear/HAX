@@ -175,14 +175,12 @@ const EffectLayers: React.FC<EffectLayersProps> = ({
                     <div className="mt-2 px-2">
                       <input
                         type="range"
-                        min="0"
-                        max="100"
+                        min={0}
+                        max={100}
                         value={layer.opacity * 100}
                         onChange={(e) => onUpdateLayer(layer.id, { opacity: parseFloat(e.target.value) / 100 })}
-                        className="w-full h-0.5 bg-dark-border rounded-full appearance-none cursor-pointer
-                                 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 
-                                 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:bg-primary-accent 
-                                 [&::-webkit-slider-thumb]:rounded-full"
+                        className="w-full"
+                        aria-label="Layer opacity"
                       />
                     </div>
                   )}

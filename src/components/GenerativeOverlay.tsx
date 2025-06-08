@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect, useRef } from 'react';
 import Particles from '@tsparticles/react';
 import { loadSlim } from 'tsparticles-slim';
 import type { Container, Engine } from 'tsparticles-engine';
+import { performanceManager } from '@/lib/performanceUtils';
 
 export interface GenerativeOverlayProps {
   /** Unique identifier for the particles instance */
@@ -40,16 +41,63 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
   zIndex = 10,
   className = ''
 }) => {
-  // Initialize tsParticles engine with slim bundle
+  const containerRef = useRef<Container | null>(null);
+
+  // Initialize tsParticles engine with slim bundle (only once)
   const particlesInit = useCallback(async (engine: Engine) => {
-    console.log('Initializing tsParticles engine:', engine);
     await loadSlim(engine);
   }, []);
 
-  // Handle particles loaded callback
+  // Handle particles loaded callback with performance optimizations
   const particlesLoaded = useCallback(async (container: Container | undefined) => {
-    console.log('tsParticles container loaded:', container);
+    if (container) {
+      containerRef.current = container;
+      
+      // Register with performance manager (non-blocking)
+      try {
+        performanceManager.registerParticleContainer(container);
+      } catch (error) {
+        console.warn('Failed to register particle container:', error);
+      }
+    }
   }, []);
+
+  // Cleanup on unmount or when becoming invisible
+  useEffect(() => {
+    return () => {
+      if (containerRef.current) {
+        // Unregister from performance manager (non-blocking)
+        try {
+          performanceManager.unregisterParticleContainer(containerRef.current);
+        } catch (error) {
+          console.warn('Failed to unregister particle container:', error);
+        }
+        
+        try {
+          containerRef.current.destroy();
+        } catch (error) {
+          console.warn('Failed to destroy particle container:', error);
+        }
+        
+        containerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Pause/resume particles based on visibility
+  useEffect(() => {
+    if (containerRef.current) {
+      try {
+        if (visible) {
+          containerRef.current.play();
+        } else {
+          containerRef.current.pause();
+        }
+      } catch (error) {
+        console.warn('Failed to pause/resume particles:', error);
+      }
+    }
+  }, [visible]);
 
   // Generate particle configuration based on effect type
   const particleOptions = useMemo(() => {
@@ -59,16 +107,16 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
           value: 'transparent',
         },
       },
-      fpsLimit: 60,
-      detectRetina: true,
-      particles: {
-        number: {
-          value: particleCount,
-          density: {
-            enable: true,
-            area: 800,
+      fpsLimit: 20, // Further reduced for stability
+      detectRetina: false, // Disabled for better performance
+              particles: {
+          number: {
+            value: Math.min(particleCount, 25), // Cap particle count for stability
+            density: {
+              enable: true,
+              area: 1000, // Increased area to spread particles more
+            },
           },
-        },
         color: {
           value: color,
         },

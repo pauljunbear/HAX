@@ -1,3 +1,4 @@
+@import './variables.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,4 +18,39 @@ a {
 
 * {
   box-sizing: border-box;
+}
+
+/* Effect Preview Styles */
+.effect-preview {
+  position: fixed;
+  z-index: 1000;
+  background: rgb(var(--dark-surface));
+  padding: 4px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out;
+  border: 1px solid rgb(var(--dark-border));
+}
+
+.effect-preview-enter {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.effect-preview-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 200ms ease-in, transform 200ms ease-in;
+}
+
+.effect-preview-exit {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.effect-preview-exit-active {
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
 } 

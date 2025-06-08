@@ -4,6 +4,9 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { effectsConfig, effectCategories } from '@/lib/effects';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
+import { ARIA_LABELS, focusRingClass, announce, useKeyboardNavigation } from '@/lib/accessibility';
+import { GroupedVirtualScroll } from './VirtualScroll';
+import { EffectHoverPreview } from './EffectHoverPreview';
 
 interface ControlPanelV3Props {
   activeEffect?: string | null;
@@ -11,6 +14,7 @@ interface ControlPanelV3Props {
   onEffectChange?: (effectName: string | null) => void;
   onSettingChange?: (settingName: string, value: number) => void;
   hasImage?: boolean;
+  currentImageId?: string;
 }
 
 // Keep track of recently used effects in localStorage
@@ -33,18 +37,67 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
   onEffectChange,
   onSettingChange,
   hasImage = false,
+  currentImageId,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Adjust']));
   const [recentEffects, setRecentEffects] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [containerHeight, setContainerHeight] = useState(400);
+  const [hoveredEffect, setHoveredEffect] = useState<string | null>(null);
+  const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
   const searchInputRef = useRef<HTMLInputElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Load recent effects on mount
   useEffect(() => {
     setRecentEffects(getRecentEffects());
   }, []);
+
+  // Get settings for the active effect
+  const currentEffectSettings = useMemo(() => {
+    if (!activeEffect || !effectsConfig[activeEffect]?.settings) return [];
+    return Object.entries(effectsConfig[activeEffect].settings).map(([key, setting]) => ({
+      id: key,
+      ...(setting as any),
+      currentValue: effectSettings[key] ?? (setting as any).default,
+    }));
+  }, [activeEffect, effectSettings]);
+
+  // Calculate container height based on content
+  useEffect(() => {
+    const calculateHeight = () => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      // Reserve space for settings panel if active effect has settings
+      const settingsHeight = activeEffect && currentEffectSettings.length > 0 ? 
+        Math.min(250, 80 + (currentEffectSettings.length * 45)) : 0;
+      
+      const availableHeight = window.innerHeight - rect.top - settingsHeight - 40; // Extra padding
+      const minHeight = 300; // Minimum height to prevent UI breaking
+      const calculatedHeight = Math.max(minHeight, availableHeight);
+      
+      setContainerHeight(calculatedHeight);
+    };
+
+    // Debounce the calculation to prevent excessive calls
+    let timeoutId: NodeJS.Timeout;
+    const debouncedCalculateHeight = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(calculateHeight, 100);
+    };
+
+    debouncedCalculateHeight();
+    window.addEventListener('resize', debouncedCalculateHeight);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', debouncedCalculateHeight);
+    };
+  }, [activeEffect, currentEffectSettings.length]);
 
   // Update recent effects when active effect changes
   useEffect(() => {
@@ -110,17 +163,11 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
     return results.sort((a, b) => b.score - a.score).map(r => r.id);
   }, [searchQuery]);
 
-  // Get settings for the active effect
-  const currentEffectSettings = activeEffect && effectsConfig[activeEffect]?.settings
-    ? Object.entries(effectsConfig[activeEffect].settings).map(([key, setting]) => ({
-        id: key,
-        ...(setting as any),
-        currentValue: effectSettings[key] ?? (setting as any).default,
-      }))
-    : [];
-
   const handleEffectSelect = (effectId: string) => {
     onEffectChange?.(effectId);
+    // Announce to screen readers
+    const effectName = effectsConfig[effectId]?.label || effectId;
+    announce(`${effectName} effect selected`);
     // Auto-scroll to settings if they exist
     if (effectsConfig[effectId]?.settings) {
       setTimeout(() => {
@@ -128,6 +175,66 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
       }, 100);
     }
   };
+
+  // Hover preview handlers
+  const handleEffectHover = (effectId: string, event: React.MouseEvent) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    
+    const rect = event.currentTarget.getBoundingClientRect();
+    setHoverPosition({ 
+      x: Math.min(rect.right + 10, window.innerWidth - 170),
+      y: Math.min(rect.top, window.innerHeight - 200)
+    });
+    
+    // Delay showing preview to avoid flashing
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredEffect(effectId);
+    }, 300);
+  };
+
+  const handleEffectLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setHoveredEffect(null);
+  };
+
+  // Touch handler for mobile (press and hold)
+  const handleEffectTouchStart = (effectId: string, event: React.TouchEvent) => {
+    const touch = event.touches[0];
+    setHoverPosition({ 
+      x: Math.min(touch.clientX + 10, window.innerWidth - 170),
+      y: Math.min(touch.clientY - 170, window.innerHeight - 200)
+    });
+    
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredEffect(effectId);
+      // Haptic feedback if available
+      if ('vibrate' in navigator) {
+        navigator.vibrate(10);
+      }
+    }, 500);
+  };
+
+  const handleEffectTouchEnd = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setHoveredEffect(null);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (!hasImage) {
     return (
@@ -146,36 +253,41 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div ref={containerRef} className="h-full flex flex-col">
       {/* Sticky Header */}
       <div className="flex-shrink-0 bg-dark-surface border-b border-dark-border sticky top-0 z-10">
         {/* Effects Header */}
         <div className="p-4 pb-3">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-dark-text flex items-center">
-              <span className="text-primary-accent mr-2">✨</span>
+              <span className="text-primary-accent mr-2" aria-hidden="true">✨</span>
               Effects
             </h2>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                className="text-dark-textMuted hover:text-dark-text transition-colors p-1"
-                title={`Switch to ${viewMode === 'grid' ? 'list' : 'grid'} view`}
+                className={`text-dark-textMuted hover:text-dark-text transition-colors p-1 rounded ${focusRingClass}`}
+                aria-label={`Switch to ${viewMode === 'grid' ? 'list' : 'grid'} view`}
+                aria-pressed={viewMode === 'grid'}
               >
                 {viewMode === 'grid' ? (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                   </svg>
                 )}
               </button>
               {activeEffect && (
                 <button
-                  onClick={() => onEffectChange?.(null)}
-                  className="text-xs text-dark-textMuted hover:text-apple-red transition-colors"
+                  onClick={() => {
+                    onEffectChange?.(null);
+                    announce('Effect cleared');
+                  }}
+                  className={`text-xs text-dark-textMuted hover:text-apple-red transition-colors px-2 py-1 rounded ${focusRingClass}`}
+                  aria-label="Clear current effect"
                 >
                   Clear
                 </button>
@@ -185,20 +297,23 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
 
           {/* Search Bar with keyboard shortcut hint */}
           <div className="relative">
+            <label htmlFor="effect-search" className="sr-only">Search effects</label>
             <input
+              id="effect-search"
               ref={searchInputRef}
-              type="text"
+              type="search"
               placeholder="Search effects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-1.5 pl-8 pr-16 text-xs bg-dark-bg border border-dark-border rounded-md
-                       text-dark-text placeholder-dark-textMuted focus:outline-none focus:ring-1 
-                       focus:ring-primary-accent focus:border-primary-accent"
+              className={`w-full px-3 py-1.5 pl-8 pr-16 text-xs bg-dark-bg border border-dark-border rounded-md
+                       text-dark-text placeholder-dark-textMuted ${focusRingClass}`}
+              aria-label="Search effects"
+              aria-describedby="search-hint"
             />
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-2 top-2 text-dark-textMuted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-2 top-2 text-dark-textMuted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
-            <kbd className="absolute right-2 top-1.5 text-[10px] text-dark-textMuted bg-dark-border px-1.5 py-0.5 rounded">
+            <kbd id="search-hint" className="absolute right-2 top-1.5 text-[10px] text-dark-textMuted bg-dark-border px-1.5 py-0.5 rounded" aria-label="Press Command K to focus search">
               ⌘K
             </kbd>
           </div>
@@ -227,6 +342,10 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                       // Store in recent
                       addToRecentEffects(effectId);
                     }}
+                    onMouseEnter={(e) => handleEffectHover(effectId, e)}
+                    onMouseLeave={handleEffectLeave}
+                    onTouchStart={(e) => handleEffectTouchStart(effectId, e)}
+                    onTouchEnd={handleEffectTouchEnd}
                     className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium transition-all ${
                       activeEffect === effectId
                         ? 'bg-primary-accent text-white shadow-sm'
@@ -243,7 +362,7 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
       </div>
 
       {/* Scrollable Effects Area */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 relative">
         {/* Search Results */}
         {searchQuery && searchResults ? (
           <div className="p-4">
@@ -261,6 +380,10 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                     <button
                       key={effectId}
                       onClick={() => handleEffectSelect(effectId)}
+                      onMouseEnter={(e) => handleEffectHover(effectId, e)}
+                      onMouseLeave={handleEffectLeave}
+                      onTouchStart={(e) => handleEffectTouchStart(effectId, e)}
+                      onTouchEnd={handleEffectTouchEnd}
                       className={`text-xs rounded-lg transition-all text-left ${
                         viewMode === 'grid' 
                           ? 'px-3 py-2.5'
@@ -286,60 +409,71 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
             )}
           </div>
         ) : (
-          /* Category Groups */
-          <div className="p-4 space-y-1">
-            {Object.entries(effectCategories).map(([category, data]) => (
-              <div key={category} className="rounded-lg overflow-hidden">
+          /* Category Groups with Virtual Scrolling */
+          <GroupedVirtualScroll
+            groups={Object.entries(effectCategories).map(([category, data]) => ({
+              label: category,
+              items: expandedCategories.has(category) ? data.effects : []
+            }))}
+            itemHeight={viewMode === 'grid' ? 40 : 32}
+            groupHeaderHeight={40}
+            containerHeight={containerHeight}
+            renderGroupHeader={(category) => {
+              const data = effectCategories[category];
+              return (
                 <button
                   onClick={() => toggleCategory(category)}
-                  className="w-full flex items-center px-3 py-2 text-xs rounded-md transition-all hover:bg-dark-bg"
+                  className={`w-full flex items-center px-3 py-2 text-xs rounded-md transition-all hover:bg-dark-bg ${focusRingClass}`}
+                  aria-expanded={expandedCategories.has(category)}
+                  aria-controls={`category-${category.replace(/\s+/g, '-')}`}
+                  aria-label={ARIA_LABELS.effectCategory(category)}
                 >
                   <svg 
                     className={`w-3 h-3 mr-2 transition-transform flex-shrink-0 ${expandedCategories.has(category) ? 'rotate-90' : ''}`} 
                     fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    aria-hidden="true"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  <span className="mr-2 flex-shrink-0">{data.icon}</span>
+                  <span className="mr-2 flex-shrink-0" aria-hidden="true">{data.icon}</span>
                   <span className="font-medium text-dark-text flex-1 text-left truncate">{category}</span>
                   <span className="ml-2 text-[10px] text-dark-textMuted flex-shrink-0">
                     {data.effects.length}
                   </span>
                 </button>
-                
-                {expandedCategories.has(category) && (
-                  <div className={`mt-1 ${
-                    viewMode === 'grid' 
-                      ? 'grid grid-cols-2 gap-1.5 px-3 pb-2' 
-                      : 'space-y-0.5 px-3 pb-2'
-                  }`}>
-                    {data.effects.map(effectId => {
-                      const effect = effectsConfig[effectId];
-                      if (!effect) return null;
-                      
-                      return (
-                        <button
-                          key={effectId}
-                          onClick={() => handleEffectSelect(effectId)}
-                          className={`text-xs rounded-md transition-all text-left ${
-                            viewMode === 'grid'
-                              ? 'px-2.5 py-2'
-                              : 'w-full px-2.5 py-1.5 flex items-center'
-                          } ${
-                            activeEffect === effectId
-                              ? 'bg-primary-accent text-white'
-                              : 'bg-dark-bg hover:bg-dark-surface text-dark-textMuted hover:text-dark-text'
-                          }`}
-                        >
-                          <span className="truncate">{effect.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+              );
+            }}
+            renderItem={(effectId) => {
+              const effect = effectsConfig[effectId as string];
+              if (!effect) return null;
+              
+              return (
+                <div className={`px-3 ${viewMode === 'grid' ? 'w-1/2 float-left' : ''}`}>
+                  <button
+                    onClick={() => handleEffectSelect(effectId as string)}
+                    onMouseEnter={(e) => handleEffectHover(effectId as string, e)}
+                    onMouseLeave={handleEffectLeave}
+                    onTouchStart={(e) => handleEffectTouchStart(effectId as string, e)}
+                    onTouchEnd={handleEffectTouchEnd}
+                    className={`text-xs rounded-md transition-all text-left ${focusRingClass} ${
+                      viewMode === 'grid'
+                        ? 'px-2.5 py-2 mb-1.5 mr-1.5'
+                        : 'w-full px-2.5 py-1.5 flex items-center mb-0.5'
+                    } ${
+                      activeEffect === effectId
+                        ? 'bg-primary-accent text-white'
+                        : 'bg-dark-bg hover:bg-dark-surface text-dark-textMuted hover:text-dark-text'
+                    }`}
+                    aria-label={ARIA_LABELS.effectButton(effect.label)}
+                    aria-pressed={activeEffect === effectId}
+                  >
+                    <span className="truncate">{effect.label}</span>
+                  </button>
+                </div>
+              );
+            }}
+            className="p-4"
+          />
         )}
       </div>
 
@@ -347,7 +481,7 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
       {activeEffect && currentEffectSettings.length > 0 && (
         <div 
           ref={settingsRef}
-          className="flex-shrink-0 border-t border-dark-border bg-dark-surface"
+          className="flex-shrink-0 border-t border-dark-border bg-dark-surface max-h-64 overflow-y-auto"
         >
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
@@ -372,11 +506,13 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
             
             <div className="space-y-3">
               {currentEffectSettings.map(setting => (
-                <div key={setting.id}>
-                  <div className="flex justify-between mb-1">
-                    <label className="text-xs text-dark-textMuted">{setting.label}</label>
-                    <span className="text-xs text-dark-textMuted font-mono">
-                      {setting.currentValue.toFixed(setting.step >= 0.1 ? 1 : 0)}
+                <div key={setting.id} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-medium text-dark-text">
+                      {setting.label}
+                    </label>
+                    <span className="text-[10px] text-dark-textMuted">
+                      {setting.currentValue}
                     </span>
                   </div>
                   <input
@@ -385,18 +521,24 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                     max={setting.max}
                     step={setting.step}
                     value={setting.currentValue}
-                    onChange={e => onSettingChange?.(setting.id, parseFloat(e.target.value))}
-                    className="w-full h-1 bg-dark-border rounded-full appearance-none cursor-pointer
-                             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 
-                             [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-primary-accent 
-                             [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:hover:scale-110
-                             [&::-webkit-slider-thumb]:transition-transform"
+                    onChange={(e) => onSettingChange?.(setting.id, parseFloat(e.target.value))}
+                    className="w-full h-1 bg-dark-border rounded-lg appearance-none cursor-pointer slider"
+                    aria-label={setting.label}
                   />
                 </div>
               ))}
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Effect Preview */}
+      {hoveredEffect && currentImageId && (
+        <EffectHoverPreview
+          effectId={hoveredEffect}
+          imageUrl={currentImageId}
+          position={hoverPosition}
+        />
       )}
     </div>
   );

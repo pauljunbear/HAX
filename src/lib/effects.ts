@@ -241,7 +241,7 @@ export const applyEffect = async (
         return [Konva.Filters.Noise, { noise: settings.value ?? 0.2 }];
 
       case 'threshold':
-        return [Konva.Filters.Threshold, { threshold: settings.threshold ?? 0.5 }];
+        return [Konva.Filters.Threshold, { threshold: settings.value ?? 0.5 }];
 
       case 'posterize':
         return [Konva.Filters.Posterize, { levels: settings.levels ?? 4 }];
@@ -273,7 +273,17 @@ export const applyEffect = async (
       case 'cellular':
         return [createCellularAutomataEffect(settings), {}];
       case 'reaction-diffusion':
-        return [createReactionDiffusionEffect(settings), {}];
+        await import('./effects/reactionDiffusionEffect');
+        return [Konva.Filters.ReactionDiffusion, {
+          reactionFeedRate: settings.feedRate ?? 0.055,
+          reactionKillRate: settings.killRate ?? 0.062,
+          reactionDiffusionA: settings.diffusionA ?? 1.0,
+          reactionDiffusionB: settings.diffusionB ?? 0.5,
+          reactionIterations: settings.iterations ?? 100,
+          reactionPattern: settings.pattern ?? 0,
+          reactionColorScheme: settings.colorScheme ?? 0,
+          reactionOpacity: settings.opacity ?? 0.8
+        }];
       case 'vignette':
         return [createVignetteEffect(settings), {}];
       case 'chromaticAberration':
@@ -293,7 +303,25 @@ export const applyEffect = async (
       case 'rgbShift':
         return [createRgbShiftEffect(settings), {}];
       case 'flowField':
-        return [createFlowFieldEffect(settings), {}];
+        await import('./effects/flowFieldEffect');
+        return [Konva.Filters.FlowField, {
+          flowFieldScale: settings.scale ?? 0.01,
+          flowFieldStrength: settings.strength ?? 10,
+          flowFieldParticles: settings.particles ?? 1000,
+          flowFieldType: settings.type ?? 0,
+          flowFieldBlend: settings.blend ?? 0.7,
+          flowFieldSeed: settings.seed ?? 42
+        }];
+        
+      case 'vectorField':
+        await import('./effects/flowFieldEffect');
+        return [Konva.Filters.VectorField, {
+          vectorFieldScale: settings.scale ?? 0.02,
+          vectorFieldSpacing: settings.spacing ?? 20,
+          vectorFieldLength: settings.length ?? 15,
+          vectorFieldThickness: settings.thickness ?? 2,
+          vectorFieldColorMode: settings.colorMode ?? 0
+        }];
 
       // --- Add cases for NEW effects ---
       case 'glitchArt':
@@ -321,6 +349,8 @@ export const applyEffect = async (
       // --- Add cases for MORE UNIQUE effects ---
       case 'voronoi':
         return [createVoronoiEffect(settings), {}];
+      case 'delaunay':
+        return [createDelaunayEffect(settings), {}];
       case 'kaleidoscope':
         return [createKaleidoscopeEffect(settings), {}];
       case 'inkBleed':
@@ -378,23 +408,193 @@ export const applyEffect = async (
       case 'bioluminescence':
         return [createBioluminescenceEffect(settings), {}];
 
-      // Generative Overlay Effects - Return special marker for overlay handling
+      // Fractal Effects
+      case 'mandelbrot': {
+        const fractalModule = await import('./effects/fractalEffects');
+        
+        // Create a direct filter function
+        const mandelbrotFilter = function(imageData: KonvaImageData) {
+          const { generateMandelbrot } = fractalModule;
+          
+          // Map numeric values to expected types
+          const colorSchemeMap = ['rainbow', 'fire', 'ocean', 'psychedelic'] as const;
+          const blendModeMap = ['overlay', 'multiply', 'screen'] as const;
+          
+          const fractalSettings = {
+            centerX: settings.centerX ?? 0,
+            centerY: settings.centerY ?? 0,
+            zoom: settings.zoom ?? 1,
+            maxIterations: Math.floor(settings.iterations ?? 100),
+            colorScheme: colorSchemeMap[Math.floor(settings.colorScheme ?? 0)] || 'rainbow'
+          };
+          
+          // Generate fractal
+          const fractalData = generateMandelbrot(imageData.width, imageData.height, fractalSettings);
+          
+          // Blend with original image
+          const blendMode = blendModeMap[Math.floor(settings.blendMode ?? 0)] || 'overlay';
+          const opacity = settings.opacity ?? 0.5;
+          
+          for (let i = 0; i < imageData.data.length; i += 4) {
+            const r = imageData.data[i];
+            const g = imageData.data[i + 1];
+            const b = imageData.data[i + 2];
+
+            const fr = fractalData.data[i];
+            const fg = fractalData.data[i + 1];
+            const fb = fractalData.data[i + 2];
+
+            // Apply blend mode
+            let newR = r, newG = g, newB = b;
+
+            switch (blendMode) {
+              case 'overlay':
+                newR = r < 128 ? (2 * r * fr) / 255 : 255 - (2 * (255 - r) * (255 - fr)) / 255;
+                newG = g < 128 ? (2 * g * fg) / 255 : 255 - (2 * (255 - g) * (255 - fg)) / 255;
+                newB = b < 128 ? (2 * b * fb) / 255 : 255 - (2 * (255 - b) * (255 - fb)) / 255;
+                break;
+              case 'multiply':
+                newR = (r * fr) / 255;
+                newG = (g * fg) / 255;
+                newB = (b * fb) / 255;
+                break;
+              case 'screen':
+                newR = 255 - ((255 - r) * (255 - fr)) / 255;
+                newG = 255 - ((255 - g) * (255 - fg)) / 255;
+                newB = 255 - ((255 - b) * (255 - fb)) / 255;
+                break;
+            }
+
+            // Apply opacity
+            imageData.data[i] = Math.round(r * (1 - opacity) + newR * opacity);
+            imageData.data[i + 1] = Math.round(g * (1 - opacity) + newG * opacity);
+            imageData.data[i + 2] = Math.round(b * (1 - opacity) + newB * opacity);
+          }
+        };
+        
+        return [mandelbrotFilter, {}];
+      }
+      
+      case 'juliaSet': {
+        const fractalModule2 = await import('./effects/fractalEffects');
+        
+        // Create a direct filter function
+        const juliaSetFilter = function(imageData: KonvaImageData) {
+          const { generateJuliaSet } = fractalModule2;
+          
+          // Map numeric values to expected types
+          const colorSchemeMap = ['rainbow', 'fire', 'ocean', 'psychedelic'] as const;
+          const blendModeMap = ['overlay', 'multiply', 'screen'] as const;
+          
+          const fractalSettings = {
+            cReal: settings.cReal ?? -0.7,
+            cImag: settings.cImag ?? 0.27,
+            zoom: settings.zoom ?? 1,
+            maxIterations: Math.floor(settings.iterations ?? 100),
+            colorScheme: colorSchemeMap[Math.floor(settings.colorScheme ?? 0)] || 'psychedelic'
+          };
+          
+          // Generate fractal
+          const fractalData = generateJuliaSet(imageData.width, imageData.height, fractalSettings);
+          
+          // Blend with original image
+          const blendMode = blendModeMap[Math.floor(settings.blendMode ?? 0)] || 'overlay';
+          const opacity = settings.opacity ?? 0.5;
+          
+          for (let i = 0; i < imageData.data.length; i += 4) {
+            const r = imageData.data[i];
+            const g = imageData.data[i + 1];
+            const b = imageData.data[i + 2];
+
+            const fr = fractalData.data[i];
+            const fg = fractalData.data[i + 1];
+            const fb = fractalData.data[i + 2];
+
+            // Apply blend mode
+            let newR = r, newG = g, newB = b;
+
+            switch (blendMode) {
+              case 'overlay':
+                newR = r < 128 ? (2 * r * fr) / 255 : 255 - (2 * (255 - r) * (255 - fr)) / 255;
+                newG = g < 128 ? (2 * g * fg) / 255 : 255 - (2 * (255 - g) * (255 - fg)) / 255;
+                newB = b < 128 ? (2 * b * fb) / 255 : 255 - (2 * (255 - b) * (255 - fb)) / 255;
+                break;
+              case 'multiply':
+                newR = (r * fr) / 255;
+                newG = (g * fg) / 255;
+                newB = (b * fb) / 255;
+                break;
+              case 'screen':
+                newR = 255 - ((255 - r) * (255 - fr)) / 255;
+                newG = 255 - ((255 - g) * (255 - fg)) / 255;
+                newB = 255 - ((255 - b) * (255 - fb)) / 255;
+                break;
+            }
+
+            // Apply opacity
+            imageData.data[i] = Math.round(r * (1 - opacity) + newR * opacity);
+            imageData.data[i + 1] = Math.round(g * (1 - opacity) + newG * opacity);
+            imageData.data[i + 2] = Math.round(b * (1 - opacity) + newB * opacity);
+          }
+        };
+        
+        return [juliaSetFilter, {}];
+      }
+        
+      case 'fractalDisplacement':
+        await import('./effects/fractalDisplacementEffect');
+        return [Konva.Filters.FractalDisplacement, {
+          fractalType: settings.type ?? 0,
+          fractalScale: settings.scale ?? 0.002,
+          fractalStrength: settings.strength ?? 50,
+          fractalIterations: settings.iterations ?? 20,
+          fractalCenterX: settings.centerX ?? 0,
+          fractalCenterY: settings.centerY ?? 0,
+          fractalColorMode: settings.colorMode ?? 0,
+          fractalPhoenixP: settings.phoenixP ?? 0.5626,
+          fractalPhoenixQ: settings.phoenixQ ?? -0.5
+        }];
+        
+      case 'psychedelicKaleidoscope':
+        await import('./effects/fractalDisplacementEffect');
+        return [Konva.Filters.PsychedelicKaleidoscope, {
+          psychSegments: settings.segments ?? 6,
+          psychTwist: settings.twist ?? 1,
+          psychZoom: settings.zoom ?? 1.5,
+          psychTime: settings.time ?? 0,
+          psychColorShift: settings.colorShift ?? 0.5
+        }];
+        
+      case 'fractalMirror':
+        await import('./effects/fractalDisplacementEffect');
+        return [Konva.Filters.FractalMirror, {
+          mirrorDivisions: settings.divisions ?? 4,
+          mirrorOffset: settings.offset ?? 0.1,
+          mirrorRecursion: settings.recursion ?? 3,
+          mirrorBlend: settings.blend ?? 0.5
+        }];
+
+      // Generative Overlay Effects - DISABLED due to performance issues
       case 'generativeStars':
       case 'generativeBubbles':
       case 'generativeNetwork':
       case 'generativeSnow':
       case 'generativeConfetti':
       case 'generativeFireflies':
-        // Return a special marker indicating this is an overlay effect
-        return ['GENERATIVE_OVERLAY' as any, { effectType: effectName.replace('generative', '').toLowerCase(), settings }];
+        console.warn(`Generative overlay effect '${effectName}' has been disabled due to performance issues`);
+        return [null, null];
 
-      // 3D Effects - Return special marker for 3D handling
+      // 3D Effects - DISABLED due to poor user experience
       case 'threeDPlane':
       case 'threeDCube':
       case 'threeDTilt':
       case 'threeDParallax':
-        // Return a special marker indicating this is a 3D effect
-        return ['THREE_D_EFFECT' as any, { effectType: effectName.replace('threeD', '3d').toLowerCase(), settings }];
+        console.warn(`3D effect '${effectName}' has been disabled due to poor user experience`);
+        return [null, null];
+
+      // Orton Effect Implementation
+      case 'orton':
+        return [createOrtonEffect(settings), {}];
 
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
@@ -692,6 +892,8 @@ const createCellularAutomataEffect = (settings: Record<string, number>) => {
 };
 
 // Implementation of reaction-diffusion effect (Gray-Scott model)
+// Note: This basic implementation is kept for fallback purposes.
+// The advanced implementation is in ./effects/reactionDiffusionEffect.ts
 const createReactionDiffusionEffect = (settings: Record<string, number>) => {
   return function(imageData: KonvaImageData) {
     const width = imageData.width;
@@ -2016,6 +2218,14 @@ export const ensureKonvaInitialized = initKonva;
 // Export the configured effects
 export const getFilterConfig = () => effectsConfig;
 
+// Add missing getEffectSettings function
+export const getEffectSettings = (effectId: string | null): Record<string, any> => {
+  if (!effectId || !effectsConfig[effectId]) {
+    return {};
+  }
+  return effectsConfig[effectId].settings || {};
+};
+
 // Define all available effects with their settings
 export const effectsConfig: Record<string, EffectConfig> = {
   // Basic Adjustments
@@ -2321,22 +2531,8 @@ export const effectsConfig: Record<string, EffectConfig> = {
   },
   'reaction-diffusion': {
     label: 'Reaction-Diffusion',
-    category: 'Generative',
+    category: 'Mathematical',
     settings: {
-      iterations: {
-        label: 'Iterations',
-        min: 1,
-        max: 20,
-        default: 10,
-        step: 1,
-      },
-      scale: {
-        label: 'Scale',
-        min: 1,
-        max: 8,
-        default: 4,
-        step: 1,
-      },
       feedRate: {
         label: 'Feed Rate',
         min: 0.01,
@@ -2346,10 +2542,52 @@ export const effectsConfig: Record<string, EffectConfig> = {
       },
       killRate: {
         label: 'Kill Rate',
-        min: 0.01,
-        max: 0.1,
+        min: 0.04,
+        max: 0.08,
         default: 0.062,
         step: 0.001,
+      },
+      diffusionA: {
+        label: 'Diffusion A',
+        min: 0.5,
+        max: 1.5,
+        default: 1.0,
+        step: 0.1,
+      },
+      diffusionB: {
+        label: 'Diffusion B',
+        min: 0.1,
+        max: 1.0,
+        default: 0.5,
+        step: 0.1,
+      },
+      iterations: {
+        label: 'Iterations',
+        min: 10,
+        max: 200,
+        default: 100,
+        step: 10,
+      },
+      pattern: {
+        label: 'Pattern (0=Random, 1=Center, 2=Stripes, 3=Spots)',
+        min: 0,
+        max: 3,
+        default: 0,
+        step: 1,
+      },
+      colorScheme: {
+        label: 'Colors (0=Organic, 1=Fire, 2=Zebra, 3=Psychedelic)',
+        min: 0,
+        max: 3,
+        default: 0,
+        step: 1,
+      },
+      opacity: {
+        label: 'Opacity',
+        min: 0,
+        max: 1,
+        default: 0.8,
+        step: 0.1,
       },
     },
   },
@@ -2397,10 +2635,25 @@ export const effectsConfig: Record<string, EffectConfig> = {
   },
   flowField: {
     label: 'Flow Field',
-    category: 'Generative',
+    category: 'Mathematical',
     settings: {
-      scale: { label: 'Noise Scale', min: 0.01, max: 0.2, default: 0.05, step: 0.005 },
-      strength: { label: 'Distortion Strength', min: 1, max: 20, default: 5, step: 1 },
+      scale: { label: 'Field Scale', min: 0.001, max: 0.05, default: 0.01, step: 0.001 },
+      strength: { label: 'Flow Strength', min: 1, max: 30, default: 10, step: 1 },
+      particles: { label: 'Particle Count', min: 100, max: 5000, default: 1000, step: 100 },
+      type: { label: 'Field Type (0=Swirl, 1=Turbulence, 2=Wave, 3=Radial)', min: 0, max: 3, default: 0, step: 1 },
+      blend: { label: 'Effect Blend', min: 0, max: 1, default: 0.7, step: 0.1 },
+      seed: { label: 'Random Seed', min: 0, max: 100, default: 42, step: 1 },
+    },
+  },
+  vectorField: {
+    label: 'Vector Field',
+    category: 'Mathematical',
+    settings: {
+      scale: { label: 'Field Scale', min: 0.001, max: 0.1, default: 0.02, step: 0.001 },
+      spacing: { label: 'Vector Spacing', min: 10, max: 50, default: 20, step: 2 },
+      length: { label: 'Vector Length', min: 5, max: 30, default: 15, step: 1 },
+      thickness: { label: 'Vector Thickness', min: 1, max: 5, default: 2, step: 0.5 },
+      colorMode: { label: 'Color Mode (0=Direction, 1=Magnitude, 2=Original)', min: 0, max: 2, default: 0, step: 1 },
     },
   },
   
@@ -2522,6 +2775,17 @@ export const effectsConfig: Record<string, EffectConfig> = {
     settings: {
       numPoints: { label: 'Number of Points', min: 10, max: 500, default: 100, step: 10 },
       showLines: { label: 'Show Lines (0=No, 1=Yes)', min: 0, max: 1, default: 0, step: 1 },
+    },
+  },
+  
+  // 11b. Delaunay Triangulation Pattern
+  delaunay: {
+    label: 'Delaunay Triangulation',
+    category: 'Generative',
+    settings: {
+      numPoints: { label: 'Number of Points', min: 10, max: 500, default: 100, step: 10 },
+      showLines: { label: 'Show Lines (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+      fillTriangles: { label: 'Fill Triangles (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
     },
   },
   
@@ -2751,108 +3015,84 @@ export const effectsConfig: Record<string, EffectConfig> = {
     },
   },
 
-  // Generative Overlay Effects
-  generativeStars: {
-    label: 'Stars Overlay',
-    category: 'Generative Overlay',
+  // Mathematical & Fractal Effects
+  mandelbrot: {
+    label: 'Mandelbrot Fractal',
+    category: 'Mathematical',
     settings: {
-      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
-      particleCount: { label: 'Star Count', min: 10, max: 200, default: 50, step: 5 },
-      speed: { label: 'Twinkle Speed', min: 0.1, max: 3, default: 1, step: 0.1 },
-      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0xffffff, step: 1 },
-      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+      centerX: { label: 'Center X', min: -2, max: 2, default: 0, step: 0.01 },
+      centerY: { label: 'Center Y', min: -2, max: 2, default: 0, step: 0.01 },
+      zoom: { label: 'Zoom', min: 0.1, max: 10, default: 1, step: 0.1 },
+      iterations: { label: 'Iterations', min: 10, max: 500, default: 100, step: 10 },
+      colorScheme: { label: 'Color (0=Rainbow, 1=Fire, 2=Ocean, 3=Psychedelic)', min: 0, max: 3, default: 0, step: 1 },
+      blendMode: { label: 'Blend (0=Overlay, 1=Multiply, 2=Screen)', min: 0, max: 2, default: 0, step: 1 },
+      opacity: { label: 'Opacity', min: 0.1, max: 1, default: 0.5, step: 0.05 }
     },
   },
-  generativeBubbles: {
-    label: 'Bubbles Overlay',
-    category: 'Generative Overlay',
+  juliaSet: {
+    label: 'Julia Set Fractal',
+    category: 'Mathematical',
     settings: {
-      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
-      particleCount: { label: 'Bubble Count', min: 10, max: 150, default: 40, step: 5 },
-      speed: { label: 'Float Speed', min: 0.5, max: 4, default: 1.5, step: 0.1 },
-      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0x87ceeb, step: 1 },
-      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+      cReal: { label: 'Constant Real', min: -2, max: 2, default: -0.7, step: 0.01 },
+      cImag: { label: 'Constant Imaginary', min: -2, max: 2, default: 0.27, step: 0.01 },
+      zoom: { label: 'Zoom', min: 0.1, max: 10, default: 1, step: 0.1 },
+      iterations: { label: 'Iterations', min: 10, max: 500, default: 100, step: 10 },
+      colorScheme: { label: 'Color (0=Rainbow, 1=Fire, 2=Ocean, 3=Psychedelic)', min: 0, max: 3, default: 3, step: 1 },
+      blendMode: { label: 'Blend (0=Overlay, 1=Multiply, 2=Screen)', min: 0, max: 2, default: 0, step: 1 },
+      opacity: { label: 'Opacity', min: 0.1, max: 1, default: 0.5, step: 0.05 }
     },
   },
-  generativeNetwork: {
-    label: 'Network Overlay',
-    category: 'Generative Overlay',
+  fractalDisplacement: {
+    label: 'Fractal Displacement',
+    category: 'Mathematical',
     settings: {
-      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
-      particleCount: { label: 'Node Count', min: 10, max: 100, default: 30, step: 5 },
-      speed: { label: 'Movement Speed', min: 0.2, max: 2, default: 1, step: 0.1 },
-      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0x00ff88, step: 1 },
-      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+      type: { label: 'Fractal Type (0=Newton, 1=Burning Ship, 2=Tricorn, 3=Phoenix)', min: 0, max: 3, default: 0, step: 1 },
+      scale: { label: 'Fractal Scale', min: 0.0001, max: 0.01, default: 0.002, step: 0.0001 },
+      strength: { label: 'Displacement Strength', min: 10, max: 200, default: 50, step: 5 },
+      iterations: { label: 'Iterations', min: 5, max: 50, default: 20, step: 1 },
+      centerX: { label: 'Center X', min: -2, max: 2, default: 0, step: 0.01 },
+      centerY: { label: 'Center Y', min: -2, max: 2, default: 0, step: 0.01 },
+      colorMode: { label: 'Color Mode (0=Displacement, 1=Blend, 2=Psychedelic)', min: 0, max: 2, default: 0, step: 1 },
+      phoenixP: { label: 'Phoenix P (for type 3)', min: -1, max: 1, default: 0.5626, step: 0.001 },
+      phoenixQ: { label: 'Phoenix Q (for type 3)', min: -1, max: 1, default: -0.5, step: 0.001 }
     },
   },
-  generativeSnow: {
-    label: 'Snow Overlay',
-    category: 'Generative Overlay',
+  psychedelicKaleidoscope: {
+    label: 'Psychedelic Kaleidoscope',
+    category: 'Mathematical',
     settings: {
-      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
-      particleCount: { label: 'Snowflake Count', min: 20, max: 300, default: 80, step: 10 },
-      speed: { label: 'Fall Speed', min: 0.5, max: 5, default: 2, step: 0.1 },
-      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0xffffff, step: 1 },
-      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+      segments: { label: 'Segments', min: 3, max: 16, default: 6, step: 1 },
+      twist: { label: 'Twist Amount', min: 0, max: 5, default: 1, step: 0.1 },
+      zoom: { label: 'Zoom', min: 0.5, max: 3, default: 1.5, step: 0.1 },
+      time: { label: 'Animation Time', min: 0, max: 10, default: 0, step: 0.1 },
+      colorShift: { label: 'Color Shift', min: 0, max: 2, default: 0.5, step: 0.1 }
     },
   },
-  generativeConfetti: {
-    label: 'Confetti Overlay',
-    category: 'Generative Overlay',
+  fractalMirror: {
+    label: 'Fractal Mirror',
+    category: 'Mathematical',
     settings: {
-      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
-      particleCount: { label: 'Piece Count', min: 20, max: 200, default: 60, step: 5 },
-      speed: { label: 'Fall Speed', min: 1, max: 6, default: 3, step: 0.2 },
-      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0xff6b6b, step: 1 },
-      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
-    },
-  },
-  generativeFireflies: {
-    label: 'Fireflies Overlay',
-    category: 'Generative Overlay',
-    settings: {
-      opacity: { label: 'Opacity', min: 0, max: 1, default: 0.6, step: 0.05 },
-      particleCount: { label: 'Firefly Count', min: 5, max: 50, default: 20, step: 2 },
-      speed: { label: 'Flight Speed', min: 0.2, max: 2, default: 0.8, step: 0.1 },
-      color: { label: 'Color (Hex)', min: 0x000000, max: 0xffffff, default: 0xffff00, step: 1 },
-      interactive: { label: 'Interactive (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
+      divisions: { label: 'Mirror Divisions', min: 2, max: 8, default: 4, step: 1 },
+      offset: { label: 'Pattern Offset', min: 0.01, max: 0.5, default: 0.1, step: 0.01 },
+      recursion: { label: 'Recursion Levels', min: 1, max: 5, default: 3, step: 1 },
+      blend: { label: 'Blend Amount', min: 0, max: 1, default: 0.5, step: 0.1 }
     },
   },
 
-  // 3D Effects
-  threeDPlane: {
-    label: '3D Plane',
-    category: '3D Effects',
+  // Note: Generative overlay effects have been removed due to performance issues
+  // They caused browser freezing and poor user experience on personal computers
+
+  // 3D Effects - REMOVED due to poor user experience and lack of practical value
+
+  // Orton Effect Implementation
+  orton: {
+    label: 'Orton Effect',
+    category: 'Artistic',
     settings: {
-      depth: { label: 'Depth', min: 0.1, max: 3, default: 1, step: 0.1 },
-      controlsEnabled: { label: 'Controls (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
-    },
-  },
-  threeDCube: {
-    label: '3D Cube',
-    category: '3D Effects',
-    settings: {
-      depth: { label: 'Depth', min: 0.1, max: 3, default: 1, step: 0.1 },
-      rotationSpeed: { label: 'Rotation Speed', min: 0.1, max: 3, default: 1, step: 0.1 },
-      controlsEnabled: { label: 'Controls (0=No, 1=Yes)', min: 0, max: 1, default: 1, step: 1 },
-    },
-  },
-  threeDTilt: {
-    label: '3D Tilt Effect',
-    category: '3D Effects',
-    settings: {
-      depth: { label: 'Depth', min: 0.1, max: 3, default: 1, step: 0.1 },
-      tiltIntensity: { label: 'Tilt Intensity', min: 0.1, max: 1, default: 0.2, step: 0.05 },
-      controlsEnabled: { label: 'Controls (0=No, 1=Yes)', min: 0, max: 1, default: 0, step: 1 },
-    },
-  },
-  threeDParallax: {
-    label: '3D Parallax',
-    category: '3D Effects',
-    settings: {
-      depth: { label: 'Depth', min: 0.1, max: 3, default: 1, step: 0.1 },
-      tiltIntensity: { label: 'Parallax Intensity', min: 0.1, max: 1, default: 0.2, step: 0.05 },
-      controlsEnabled: { label: 'Controls (0=No, 1=Yes)', min: 0, max: 1, default: 0, step: 1 },
+      blur: { label: 'Blur', min: 1, max: 20, default: 5, step: 1 },
+      brightness: { label: 'Brightness', min: 0, max: 1, default: 0.2, step: 0.01 },
+      glow: { label: 'Glow', min: 0, max: 1, default: 0.5, step: 0.01 },
+      blendMode: { label: 'Blend Mode', min: 0, max: 2, default: 0, step: 1 }, // 0=Screen, 1=Overlay, 2=Soft Light
     },
   },
 }; 
@@ -3347,6 +3587,9 @@ const createChromaticGlitchEffect = (settings: Record<string, number>) => {
     const { data, width, height } = imageData;
     const amount = Math.max(0, settings.amount ?? 5);
     const frequency = Math.max(1, settings.frequency ?? 5);
+    
+    // Debug logging
+    console.log('Chromatic glitch effect applied with settings:', { amount, frequency, width, height });
     
     // For preview, ensure we have visible effect
     const effectiveAmount = amount || 8;
@@ -3952,16 +4195,12 @@ export const effectCategories = {
     description: 'Overlays and filters',
     effects: ['noise', 'threshold', 'posterize', 'oldPhoto', 'lensFlare', 'edgeDetection', 'fractalNoise', 'circuitBoard']
   },
-  'Generative Overlay': {
-    icon: '✨',
-    description: 'Animated particle overlays',
-    effects: ['generativeStars', 'generativeBubbles', 'generativeNetwork', 'generativeSnow', 'generativeConfetti', 'generativeFireflies']
+  'Mathematical': {
+    icon: '∑',
+    description: 'Mathematical and fractal patterns',
+    effects: ['mandelbrot', 'juliaSet', 'voronoi']
   },
-  '3D Effects': {
-    icon: '🎲',
-    description: '3D transformations and depth effects',
-    effects: ['threeDPlane', 'threeDCube', 'threeDTilt', 'threeDParallax']
-  }
+  // Note: Generative Overlay and 3D Effects categories removed due to performance issues and poor user experience
 };
 
 // Helper function to get category for an effect
@@ -4492,3 +4731,236 @@ function hslToRgb(h: number, s: number, l: number): { r: number, g: number, b: n
   
   return { r, g, b };
 }
+
+// Implementation of Delaunay Triangulation Effect
+const createDelaunayEffect = (settings: Record<string, number>) => {
+  return function(imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const numPoints = Math.max(10, Math.floor(settings.numPoints ?? 100));
+    const showLines = (settings.showLines ?? 1) > 0.5;
+    const fillTriangles = (settings.fillTriangles ?? 1) > 0.5;
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data); // Keep original for color sampling
+    
+    // Generate random points including corners for better coverage
+    const points: Array<{x: number, y: number, r: number, g: number, b: number}> = [];
+    
+    // Add corner points
+    points.push({x: 0, y: 0, r: 0, g: 0, b: 0});
+    points.push({x: width-1, y: 0, r: 0, g: 0, b: 0});
+    points.push({x: 0, y: height-1, r: 0, g: 0, b: 0});
+    points.push({x: width-1, y: height-1, r: 0, g: 0, b: 0});
+    
+    // Add random internal points
+    for (let i = 0; i < numPoints - 4; i++) {
+      const px = Math.floor(Math.random() * width);
+      const py = Math.floor(Math.random() * height);
+      points.push({ x: px, y: py, r: 0, g: 0, b: 0 });
+    }
+    
+    // Sample colors from original image
+    for (const p of points) {
+      const pIndex = (Math.floor(p.y) * width + Math.floor(p.x)) * 4;
+      p.r = tempData[pIndex];
+      p.g = tempData[pIndex + 1];
+      p.b = tempData[pIndex + 2];
+    }
+    
+    // Simple Delaunay triangulation using Bowyer-Watson algorithm
+    const triangles = computeDelaunayTriangulation(points);
+    
+    // Clear canvas
+    if (fillTriangles) {
+      data.fill(255); // White background
+    }
+    
+    // Draw triangles
+    for (const triangle of triangles) {
+      const [p1, p2, p3] = triangle;
+      
+      if (fillTriangles) {
+        // Calculate average color of triangle vertices
+        const avgR = Math.floor((p1.r + p2.r + p3.r) / 3);
+        const avgG = Math.floor((p1.g + p2.g + p3.g) / 3);
+        const avgB = Math.floor((p1.b + p2.b + p3.b) / 3);
+        
+        // Fill triangle using scanline algorithm
+        fillTriangle(data, width, height, p1, p2, p3, avgR, avgG, avgB);
+      }
+      
+      if (showLines) {
+        // Draw triangle edges
+        drawLine(data, width, p1.x, p1.y, p2.x, p2.y, 0, 0, 0);
+        drawLine(data, width, p2.x, p2.y, p3.x, p3.y, 0, 0, 0);
+        drawLine(data, width, p3.x, p3.y, p1.x, p1.y, 0, 0, 0);
+      }
+    }
+  };
+  
+  // Helper function for Delaunay triangulation
+  function computeDelaunayTriangulation(points: Array<{x: number, y: number, r: number, g: number, b: number}>) {
+    const triangles: Array<[typeof points[0], typeof points[0], typeof points[0]]> = [];
+    
+    // Create super triangle that contains all points
+    const maxCoord = Math.max(...points.map(p => Math.max(p.x, p.y))) * 2;
+    const superTriangle = [
+      {x: -maxCoord, y: -maxCoord, r: 0, g: 0, b: 0},
+      {x: maxCoord * 3, y: -maxCoord, r: 0, g: 0, b: 0},
+      {x: -maxCoord, y: maxCoord * 3, r: 0, g: 0, b: 0}
+    ];
+    
+    triangles.push([superTriangle[0], superTriangle[1], superTriangle[2]]);
+    
+    // Add points one by one
+    for (const point of points) {
+      const badTriangles: typeof triangles = [];
+      
+      // Find triangles whose circumcircle contains the point
+      for (const triangle of triangles) {
+        if (isInCircumcircle(point, triangle)) {
+          badTriangles.push(triangle);
+        }
+      }
+      
+      // Find boundary of bad triangles
+      const polygon: Array<[typeof points[0], typeof points[0]]> = [];
+      for (const triangle of badTriangles) {
+        for (let i = 0; i < 3; i++) {
+          const edge: [typeof points[0], typeof points[0]] = [triangle[i], triangle[(i + 1) % 3]];
+          
+          // Check if edge is shared with another bad triangle
+          let isShared = false;
+          for (const other of badTriangles) {
+            if (other === triangle) continue;
+            if (hasEdge(other, edge[0], edge[1])) {
+              isShared = true;
+              break;
+            }
+          }
+          
+          if (!isShared) {
+            polygon.push(edge);
+          }
+        }
+      }
+      
+      // Remove bad triangles
+      for (const bad of badTriangles) {
+        const index = triangles.indexOf(bad);
+        if (index > -1) triangles.splice(index, 1);
+      }
+      
+      // Create new triangles from polygon edges to point
+      for (const edge of polygon) {
+        triangles.push([edge[0], edge[1], point]);
+      }
+    }
+    
+    // Remove triangles that share vertices with super triangle
+    return triangles.filter(triangle => 
+      !superTriangle.some(sp => triangle.includes(sp as any))
+    );
+  }
+  
+  function isInCircumcircle(p: {x: number, y: number}, triangle: [{x: number, y: number}, {x: number, y: number}, {x: number, y: number}]) {
+    const [p1, p2, p3] = triangle;
+    
+    const ax = p1.x - p.x;
+    const ay = p1.y - p.y;
+    const bx = p2.x - p.x;
+    const by = p2.y - p.y;
+    const cx = p3.x - p.x;
+    const cy = p3.y - p.y;
+    
+    const det = ax * (by * cx * cx + by * cy * cy - bx * bx * cy - bx * cy * cy) -
+                ay * (bx * cx * cx + bx * cy * cy - ax * ax * cy - ax * cx * cy) +
+                (ax * ax + ay * ay) * (bx * cy - by * cx);
+    
+    return det > 0;
+  }
+  
+  function hasEdge(triangle: [{x: number, y: number}, {x: number, y: number}, {x: number, y: number}], p1: {x: number, y: number}, p2: {x: number, y: number}) {
+    let count = 0;
+    for (const p of triangle) {
+      if ((p.x === p1.x && p.y === p1.y) || (p.x === p2.x && p.y === p2.y)) {
+        count++;
+      }
+    }
+    return count === 2;
+  }
+  
+  function fillTriangle(data: Uint8ClampedArray, width: number, height: number, 
+                       p1: {x: number, y: number}, p2: {x: number, y: number}, p3: {x: number, y: number},
+                       r: number, g: number, b: number) {
+    // Sort points by y coordinate
+    const points = [p1, p2, p3].sort((a, b) => a.y - b.y);
+    const [top, mid, bot] = points;
+    
+    // Scan from top to bottom
+    for (let y = Math.max(0, Math.floor(top.y)); y <= Math.min(height - 1, Math.ceil(bot.y)); y++) {
+      let x1, x2;
+      
+      if (y < mid.y) {
+        // Top half of triangle
+        x1 = interpolateX(top, mid, y);
+        x2 = interpolateX(top, bot, y);
+      } else {
+        // Bottom half of triangle
+        x1 = interpolateX(mid, bot, y);
+        x2 = interpolateX(top, bot, y);
+      }
+      
+      // Ensure x1 <= x2
+      if (x1 > x2) [x1, x2] = [x2, x1];
+      
+      // Fill horizontal line
+      for (let x = Math.max(0, Math.floor(x1)); x <= Math.min(width - 1, Math.ceil(x2)); x++) {
+        const index = (y * width + x) * 4;
+        data[index] = r;
+        data[index + 1] = g;
+        data[index + 2] = b;
+        data[index + 3] = 255;
+      }
+    }
+  }
+  
+  function interpolateX(p1: {x: number, y: number}, p2: {x: number, y: number}, y: number): number {
+    if (Math.abs(p2.y - p1.y) < 0.001) return p1.x;
+    return p1.x + (p2.x - p1.x) * (y - p1.y) / (p2.y - p1.y);
+  }
+  
+  function drawLine(data: Uint8ClampedArray, width: number, x0: number, y0: number, x1: number, y1: number, r: number, g: number, b: number) {
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+    
+    let x = Math.floor(x0);
+    let y = Math.floor(y0);
+    
+    while (true) {
+      if (x >= 0 && x < width && y >= 0 && y < data.length / (width * 4)) {
+        const index = (y * width + x) * 4;
+        data[index] = r;
+        data[index + 1] = g;
+        data[index + 2] = b;
+        data[index + 3] = 255;
+      }
+      
+      if (x === Math.floor(x1) && y === Math.floor(y1)) break;
+      
+      const e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y += sy;
+      }
+    }
+  }
+};
+
+// 13. Ink Bleed Implementation (Simplified)
