@@ -3,27 +3,36 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig } from '@/lib/effects';
+import { EffectLayer } from '@/hooks/useEffectLayers';
 
 interface AppleControlsPanelProps {
   activeEffect?: string | null;
+  effectLayers: EffectLayer[];
   effectSettings?: Record<string, number>;
   onSettingChange?: (settingName: string, value: number) => void;
   onExport?: (format: string) => void;
   onResetSettings?: () => void;
   onClearAllEffects?: () => void;
-  onRemoveEffect?: () => void;
+  onRemoveEffect?: (layerId: string) => void;
+  onSetActiveLayer?: (layerId: string) => void;
+  onToggleLayerVisibility?: (layerId: string) => void;
   hasImage?: boolean;
+  isCollapsed?: boolean;
 }
 
 const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   activeEffect,
+  effectLayers,
   effectSettings = {},
   onSettingChange,
   onExport,
   onResetSettings,
   onClearAllEffects,
   onRemoveEffect,
-  hasImage = false
+  onSetActiveLayer,
+  onToggleLayerVisibility,
+  hasImage = false,
+  isCollapsed = false
 }) => {
   const [activeTab, setActiveTab] = useState<'settings' | 'layers' | 'export' | 'history'>('settings');
 
@@ -41,6 +50,27 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
     { id: 'export', label: 'Export', icon: '📤', disabled: !hasImage },
     { id: 'history', label: 'History', icon: '↩️', disabled: false }
   ] as const;
+
+  if (isCollapsed) {
+    return (
+      <div className="p-3 pt-16 h-full flex flex-col items-center">
+        <div className="space-y-3">
+          <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center" title="Settings">
+            <span className="text-purple-600 dark:text-purple-400 text-sm">⚙️</span>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center" title="Layers">
+            <span className="text-gray-600 dark:text-gray-400 text-sm">📚</span>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center" title="Export">
+            <span className="text-gray-600 dark:text-gray-400 text-sm">📤</span>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center" title="History">
+            <span className="text-gray-600 dark:text-gray-400 text-sm">↩️</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-800">
@@ -179,47 +209,73 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                 </h3>
                 <button 
                   onClick={onClearAllEffects}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+                  disabled={effectLayers.length === 0}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium disabled:text-gray-400 disabled:dark:text-gray-600 disabled:cursor-not-allowed"
                 >
                   Clear All
                 </button>
               </div>
               
               <div className="space-y-3">
-                {activeEffect ? (
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                          <span className="text-blue-600 dark:text-blue-400 text-xs">✨</span>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                            {currentEffectConfig?.label}
-                          </h4>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {currentEffectConfig?.category}
-                          </p>
+                {effectLayers.length > 0 ? (
+                  effectLayers.map((layer) => {
+                    const layerEffectConfig = effectsConfig[layer.effectId];
+                    return (
+                      <div 
+                        key={layer.id}
+                        onClick={() => onSetActiveLayer?.(layer.id)}
+                        className={`rounded-xl p-4 border transition-colors cursor-pointer ${
+                          activeEffect === layer.id
+                            ? 'bg-blue-50 dark:bg-gray-700/50 border-blue-500'
+                            : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                {layerEffectConfig?.label}
+                              </h4>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {layerEffectConfig?.category}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleLayerVisibility?.(layer.id);
+                              }}
+                              className="w-6 h-6 rounded-md bg-gray-200 dark:bg-gray-600 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+                            >
+                              <svg className={`w-3 h-3 ${layer.visible ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                {layer.visible ? (
+                                  <>
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </>
+                                ) : (
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7 .946-3.11 3.586-5.442 6.834-6.175m5.444-1.122a.75.75 0 01.133.417v.465a.75.75 0 01-.416.685c-1.33.56-2.535 1.34-3.566 2.37A9.97 9.97 0 0012 15a9.97 9.97 0 00-2.37-3.566c-1.03-1.03-2.235-1.81-3.565-2.37a.75.75 0 01-.416-.684V6.417a.75.75 0 01.133-.417L4.175 4.175m15.65 15.65l-1.06-1.06M4.175 4.175L3.115 3.115" />
+                                )}
+                              </svg>
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemoveEffect?.(layer.id);
+                              }}
+                              className="w-6 h-6 rounded-md bg-gray-200 dark:bg-gray-600 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors"
+                            >
+                              <svg className="w-3 h-3 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <button className="w-6 h-6 rounded-md bg-gray-200 dark:bg-gray-600 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">
-                          <svg className="w-3 h-3 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        </button>
-                        <button 
-                          onClick={onRemoveEffect}
-                          className="w-6 h-6 rounded-md bg-gray-200 dark:bg-gray-600 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors"
-                        >
-                          <svg className="w-3 h-3 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    )
+                  })
                 ) : (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-2xl flex items-center justify-center">

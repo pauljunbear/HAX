@@ -169,10 +169,18 @@ export default function Home() {
     clearEffectLayers();
   };
 
-  const handleRemoveEffect = () => {
-    console.log("Removing active effect");
-    if (activeEffectLayerId) {
-      removeEffectLayer(activeEffectLayerId);
+  const handleRemoveEffect = (layerId: string) => {
+    console.log(`Removing effect layer: ${layerId}`);
+    removeEffectLayer(layerId);
+  };
+
+  const handleToggleLayerVisibility = (layerId: string) => {
+    console.log(`Toggling visibility for layer: ${layerId}`);
+    // This assumes your useEffectLayers hook has a function like toggleLayerVisibility
+    // If not, you'll need to implement it. For now, let's add it to the hook.
+    const layer = effectLayers.find(l => l.id === layerId);
+    if (layer) {
+      updateEffectLayer(layerId, { ...layer, visible: !layer.visible });
     }
   };
 
@@ -246,12 +254,15 @@ export default function Home() {
         }
         rightSidebar={
           <AppleControlsPanel
-            activeEffect={activeEffect}
+            activeEffect={activeEffectLayerId}
+            effectLayers={effectLayers}
             effectSettings={effectSettings}
             onSettingChange={handleSettingChange}
             onResetSettings={handleResetSettings}
             onClearAllEffects={handleClearAllEffects}
             onRemoveEffect={handleRemoveEffect}
+            onSetActiveLayer={setActiveEffectLayer}
+            onToggleLayerVisibility={handleToggleLayerVisibility}
             onExport={(format) => {
               // Handle export
               if (imageEditorRef.current) {
