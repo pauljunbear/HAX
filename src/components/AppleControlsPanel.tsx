@@ -129,12 +129,20 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       {currentEffectConfig?.label}
                     </h3>
-                    <button
-                      onClick={onResetSettings}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
-                    >
-                      Reset
-                    </button>
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={onResetSettings}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                      >
+                        Reset
+                      </button>
+                      <button
+                        onClick={() => onRemoveEffect?.(activeEffect)}
+                        className="text-xs text-red-600 dark:text-red-400 hover:underline font-medium"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="space-y-6">

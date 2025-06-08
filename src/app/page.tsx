@@ -131,6 +131,17 @@ export default function Home() {
     testImage.src = imageDataUrl;
   };
 
+  const handleNewImage = () => {
+    setSelectedImage(null);
+    setOriginalImage(null);
+    clearEffectLayers();
+    clearHistory({ activeEffect: null, effectSettings: {} });
+    setImageError(null);
+    if (imageEditorRef.current?.reset) {
+      imageEditorRef.current.reset();
+    }
+  };
+
   const handleEffectChange = (effectName: string | null) => {
     console.log("Effect changed to:", effectName);
     
@@ -245,9 +256,10 @@ export default function Home() {
       
       <AppleStyleLayout
         hasImage={!!selectedImage}
+        onNewImage={handleNewImage}
         leftSidebar={
           <AppleEffectsBrowser
-            activeEffect={activeEffect}
+            activeEffect={activeEffectLayerId}
             onEffectChange={handleEffectChange}
             hasImage={!!selectedImage}
           />
