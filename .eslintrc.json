@@ -1,0 +1,18 @@
+{
+  "extends": [
+    "next/core-web-vitals"
+  ],
+  "rules": {
+    // General
+    "no-console": "off",
+    "prefer-const": "error",
+    "no-var": "error",
+    
+    // React
+    "react/prop-types": "off",
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "off",
+    "react/display-name": "off",
+    "react/no-unescaped-entities": "off"
+  }
+} 

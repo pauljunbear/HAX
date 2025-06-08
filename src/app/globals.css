@@ -85,20 +85,55 @@ html {
 
 /* Better slider thumb for mobile */
 input[type="range"] {
-  @apply appearance-none bg-[rgb(var(--apple-gray-200))] h-1.5 rounded-full;
+  @apply appearance-none h-1.5 rounded-full;
   -webkit-appearance: none;
   cursor: pointer;
+  background: rgb(var(--apple-gray-200));
+}
+
+@media (prefers-color-scheme: dark) {
+  input[type="range"] {
+    background: rgb(var(--apple-gray-700));
+  }
 }
 
 input[type="range"]::-webkit-slider-thumb {
-  @apply appearance-none w-5 h-5 rounded-full bg-white border-2 border-[rgb(var(--primary))] cursor-pointer;
+  @apply appearance-none w-5 h-5 rounded-full cursor-pointer;
   -webkit-appearance: none;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background: white;
+  border: 2px solid #3b82f6;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.15);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  input[type="range"]::-webkit-slider-thumb {
+    background: rgb(var(--apple-gray-100));
+    border: 2px solid #60a5fa;
+  }
 }
 
 input[type="range"]::-moz-range-thumb {
-  @apply appearance-none w-5 h-5 rounded-full bg-white border-2 border-[rgb(var(--primary))] cursor-pointer;
+  @apply appearance-none w-5 h-5 rounded-full cursor-pointer;
+  background: white;
+  border: 2px solid rgb(var(--primary));
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  input[type="range"]::-moz-range-thumb {
+    background: rgb(var(--apple-gray-100));
+    border: 2px solid rgb(var(--primary-light));
+  }
 }
 
 /* Larger thumb on mobile */
@@ -246,4 +281,63 @@ body.mobile-menu-open {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--apple-gray-400));
-} 
+}
+
+/* Effect application feedback */
+.effect-applying {
+  @apply relative overflow-hidden;
+}
+
+.effect-applying::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.3), transparent);
+  animation: shimmer 1s ease-in-out;
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* Enhanced button hierarchy */
+.btn-primary-enhanced {
+  @apply inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-xl transition-all duration-200 shadow-sm hover:shadow-lg hover:-translate-y-0.5;
+}
+
+.btn-secondary-enhanced {
+  @apply inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 border border-gray-300 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600;
+}
+
+.btn-ghost-enhanced {
+  @apply inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-xl transition-all duration-200 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700;
+}
+
+/* Visual feedback for rapid interactions */
+.effect-card-active {
+  @apply ring-2 ring-blue-500 ring-offset-2 bg-blue-50 dark:bg-blue-900/20;
+}
+
+.effect-card-applying {
+  @apply animate-pulse bg-blue-100 dark:bg-blue-900/30;
+}
+
+/* Better focus states */
+.focus-apple {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800;
+}
+
+/* Smooth panel transitions */
+.panel-transition {
+  @apply transition-all duration-300 ease-out;
+}
+
+/* Enhanced shadows for depth */
+.shadow-apple-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+.shadow-apple-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+.shadow-apple-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+.shadow-apple-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); } 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useRef, useState, useEffect } from 'react';
+import React, { Suspense, useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
@@ -46,8 +46,16 @@ const ImagePlane: React.FC<{
   // Get mouse position for parallax effects
   const { mouse } = useThree();
   
-  // Animation loop
+  // Performance throttling
+  const lastFrameTimeRef = useRef(0);
+  const frameThrottle = 1000 / 30; // Limit to 30fps for performance
+
+  // Animation loop with performance throttling
   useFrame((state, delta) => {
+    const now = state.clock.elapsedTime * 1000;
+    if (now - lastFrameTimeRef.current < frameThrottle) return;
+    lastFrameTimeRef.current = now;
+    
     if (!meshRef.current) return;
     
     switch (effectType) {
@@ -58,25 +66,25 @@ const ImagePlane: React.FC<{
         break;
         
       case '3dTilt':
-        // Tilt based on mouse position
-        meshRef.current.rotation.x = mouse.y * tiltIntensity;
-        meshRef.current.rotation.y = mouse.x * tiltIntensity;
+        // Tilt based on mouse position (reduced sensitivity)
+        meshRef.current.rotation.x = mouse.y * tiltIntensity * 0.5;
+        meshRef.current.rotation.y = mouse.x * tiltIntensity * 0.5;
         break;
         
       case '3dParallax':
-        // Subtle parallax movement
-        meshRef.current.position.x = mouse.x * tiltIntensity * 0.5;
-        meshRef.current.position.y = mouse.y * tiltIntensity * 0.5;
-        meshRef.current.rotation.x = mouse.y * tiltIntensity * 0.3;
-        meshRef.current.rotation.y = mouse.x * tiltIntensity * 0.3;
+        // Subtle parallax movement (reduced intensity)
+        meshRef.current.position.x = mouse.x * tiltIntensity * 0.3;
+        meshRef.current.position.y = mouse.y * tiltIntensity * 0.3;
+        meshRef.current.rotation.x = mouse.y * tiltIntensity * 0.2;
+        meshRef.current.rotation.y = mouse.x * tiltIntensity * 0.2;
         break;
         
       default:
         // 3dPlane - subtle hover effect
         if (hovered) {
-          meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, depth * 0.1, 0.1);
+          meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, depth * 0.1, 0.05);
         } else {
-          meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, 0, 0.1);
+          meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, 0, 0.05);
         }
         break;
     }
@@ -129,12 +137,30 @@ const ThreeDEffectsCanvas: React.FC<ThreeDEffectsCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [webGLSupported, setWebGLSupported] = useState(true);
+  const [shouldRender, setShouldRender] = useState(false);
   
   // Check WebGL support
   useEffect(() => {
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     setWebGLSupported(!!gl);
+  }, []);
+
+  // Performance optimization: Only render when visible and after a delay
+  useEffect(() => {
+    if (visible && imageUrl) {
+      const timer = setTimeout(() => setShouldRender(true), 100);
+      return () => clearTimeout(timer);
+    } else {
+      setShouldRender(false);
+    }
+  }, [visible, imageUrl]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      setShouldRender(false);
+    };
   }, []);
   
   // Fallback for devices without WebGL support
@@ -152,8 +178,13 @@ const ThreeDEffectsCanvas: React.FC<ThreeDEffectsCanvasProps> = ({
     );
   }
   
-  if (!visible || !imageUrl) {
-    return null;
+  if (!visible || !imageUrl || !shouldRender) {
+    return (
+      <div 
+        className={`relative ${className}`}
+        style={{ width, height, zIndex, background: 'transparent' }}
+      />
+    );
   }
   
   return (
@@ -165,10 +196,17 @@ const ThreeDEffectsCanvas: React.FC<ThreeDEffectsCanvasProps> = ({
         ref={canvasRef}
         style={{ width: '100%', height: '100%' }}
         camera={{ position: [0, 0, 5], fov: 75 }}
+        frameloop="demand" // Only render when needed for performance
         gl={{ 
           alpha: true, 
-          antialias: true,
-          powerPreference: 'high-performance'
+          antialias: false, // Disable antialiasing for performance
+          powerPreference: 'default',
+          stencil: false,
+          depth: false
+        }}
+        onCreated={({ gl }) => {
+          // Optimize WebGL context for performance
+          gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         }}
       >
         {/* Camera and controls */}

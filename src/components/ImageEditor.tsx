@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from '@/hooks/useImage';
 import { applyEffect, getFilterConfig, ensureKonvaInitialized } from '@/lib/effects';
@@ -8,12 +8,22 @@ import { SelectionType, SelectionData } from './SelectionTool';
 import SelectionToolbar from './SelectionToolbar';
 import { EffectLayer } from './EffectLayers';
 import { supportsAnimation, getAnimationConfig } from '@/lib/animationConfig';
-import { renderAnimationFrames, exportAsGif, downloadBlob } from '@/lib/animationRenderer';
+import { renderAnimationFrames, exportAsGif, exportAnimationAs, downloadBlob, downloadVideo, exportMultiLayerAnimation, AnimatedEffectLayer } from '@/lib/animationRenderer';
 import { motion, AnimatePresence } from 'framer-motion';
 import Konva from 'konva';
-import { applyCompositeEffects, createCompositeFilter, FilterFunction } from '@/lib/effects';
-import GenerativeOverlay from './GenerativeOverlay';
-import ThreeDEffectsCanvas from './ThreeDEffectsCanvas';
+// Note: ThreeDEffectsCanvas removed due to poor user experience
+// Note: GenerativeOverlay removed due to performance issues
+import { PerformanceMonitor, usePerformanceMonitor, PerformanceMetrics } from './PerformanceMonitor';
+import { getWorkerManager, cleanupWorkerManager } from '@/lib/performance/WorkerManager';
+import { BatchProcessor, BatchOperation } from '@/lib/performance/BatchProcessor';
+import { ARIA_LABELS, focusRingClass, announce } from '@/lib/accessibility';
+import { getEffectPreviewCache } from '@/lib/performance/EffectPreviewCache';
+import { VirtualScroll } from './VirtualScroll';
+import { BeforeAfterSplitView } from './BeforeAfterSplitView';
+import { TouchGestures } from './TouchGestures';
+import { useKeyboardShortcuts, EDITOR_SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
+import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
+import { triggerHaptic, createToggleHapticHandler, createRangeHapticHandler } from '@/lib/haptics'
 
 interface ImageEditorProps {
   selectedImage?: string | null;
@@ -60,7 +70,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportQuality, setExportQuality] = useState<number>(0.9); // 0.0 to 1.0
-  const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'gif'>('png');
+  const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'gif' | 'webm' | 'mp4'>('png');
   const [isBrowser, setIsBrowser] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>({});
@@ -70,13 +80,114 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   const [isExportingAnimation, setIsExportingAnimation] = useState(false);
   const [animationProgress, setAnimationProgress] = useState(0);
   
+  // Performance monitoring state
+  const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
+  const [workerManager, setWorkerManager] = useState<any>(null);
+  const [batchProcessor, setBatchProcessor] = useState<BatchProcessor | null>(null);
+  const [processingTime, setProcessingTime] = useState<number>(0);
+  const [lastProcessingTime, setLastProcessingTime] = useState<number>(0);
+  
+  // Performance monitoring hooks
+  const { startRender, endRender, startOperation, endOperation } = usePerformanceMonitor();
+  
+  const [originalImage, setOriginalImage] = useState<HTMLImageElement | null>(null);
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Create haptic feedback handlers
+  const effectToggleHaptic = createToggleHapticHandler('success')
+  const effectAmountHaptic = createRangeHapticHandler(0, 100, 10)
+  const exportHaptic = createToggleHapticHandler('success')
+  const resetHaptic = createToggleHapticHandler('warning')
+  const splitViewHaptic = createToggleHapticHandler('medium')
+  
   // Debug ref attachment
   useEffect(() => {
     console.log("ImageEditor component mounted, ref:", ref);
   }, [ref]);
+
+  // Touch gesture handlers
+  const handleZoom = useCallback((scale: number) => {
+    if (stageRef.current) {
+      stageRef.current.scale({ x: scale, y: scale });
+      stageRef.current.batchDraw();
+    }
+  }, []);
+
+  const handleRotate = useCallback((rotation: number) => {
+    if (stageRef.current) {
+      stageRef.current.rotation(rotation);
+      stageRef.current.batchDraw();
+    }
+  }, []);
+
+  const handlePan = useCallback((x: number, y: number) => {
+    if (stageRef.current) {
+      stageRef.current.position({ x, y });
+      stageRef.current.batchDraw();
+    }
+  }, []);
+
+  // Initialize performance systems
+  useEffect(() => {
+    const initializePerformanceSystems = async () => {
+      try {
+        // Initialize worker manager
+        const manager = await getWorkerManager();
+        setWorkerManager(manager);
+        console.log('✅ WorkerManager initialized successfully');
+        
+        // Test worker with a simple operation
+        try {
+          const testImageData = new ImageData(100, 100);
+          const result = await manager.applyEffect('blur', { intensity: 5 }, testImageData);
+          console.log('✅ Worker test successful:', result.width, 'x', result.height);
+        } catch (error) {
+          console.warn('⚠️ Worker test failed:', error);
+        }
+        
+        // Initialize batch processor
+        const processor = new BatchProcessor();
+        setBatchProcessor(processor);
+        console.log('✅ BatchProcessor initialized successfully');
+        
+      } catch (error) {
+        console.error('❌ Failed to initialize performance systems:', error);
+        // Continue without workers - graceful degradation
+      }
+    };
+
+    if (isBrowser) {
+      initializePerformanceSystems();
+    }
+  }, [isBrowser]);
+
+  // Performance metrics handler
+  const handlePerformanceChange = (metrics: PerformanceMetrics) => {
+    setPerformanceMetrics(metrics);
+    
+    // Auto-enable performance monitor if performance is poor
+    if (metrics.fps < 25 || metrics.memoryUsage / metrics.memoryLimit > 0.85) {
+      setShowPerformanceMonitor(true);
+    }
+  };
+
+  // Toggle performance monitor with keyboard shortcut
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'p' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        setShowPerformanceMonitor(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
   
   // Define exportWithFormat before useImperativeHandle
-  const exportWithFormat = async (format: 'png' | 'jpeg' | 'gif') => {
+  const exportWithFormat = async (format: 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4') => {
     if (!stageRef.current || !image) return;
     
     const animatedLayers = effectLayers?.filter(layer => 
@@ -87,85 +198,196 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     const animationConfig = firstAnimatedEffect ? getAnimationConfig(firstAnimatedEffect.effectId) : null;
     
     try {
-      if (format === 'gif' && animatedLayers.length > 0 && firstAnimatedEffect && animationConfig) {
-        // Show progress dialog
+      if ((format === 'gif' || format === 'webm' || format === 'mp4') && animatedLayers.length > 0 && firstAnimatedEffect && animationConfig) {
+        // Show enhanced progress dialog with cancel option
         const progressDialog = document.createElement('div');
         progressDialog.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+        const formatName = format.toUpperCase();
+        const exportingText = format === 'gif' ? 'Creating Animated GIF' : `Creating ${formatName} Video`;
+        
+        // Track if export was cancelled
+        let exportCancelled = false;
+        
         progressDialog.innerHTML = `
-          <div class="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
-            <h3 class="text-sm font-semibold mb-4">Creating Animated GIF</h3>
-            <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
-              <div id="progress-bar" class="bg-primary-accent h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+          <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-semibold">${exportingText}</h3>
+              <button id="cancel-export-btn" class="text-gray-400 hover:text-gray-600 text-xl leading-none" title="Cancel export">&times;</button>
             </div>
-            <p id="progress-text" class="text-xs text-gray-600">Preparing...</p>
+            <div class="w-full bg-gray-200 rounded-full h-3 mb-3">
+              <div id="progress-bar" class="bg-primary-accent h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div class="space-y-2">
+              <p id="progress-text" class="text-xs text-gray-600">Preparing...</p>
+              <p id="progress-details" class="text-xs text-gray-500"></p>
+              <div id="optimization-info" class="text-xs bg-blue-50 text-blue-700 p-2 rounded hidden">
+                <span class="font-medium">Optimization:</span> <span id="optimization-text"></span>
+              </div>
+            </div>
           </div>
         `;
         document.body.appendChild(progressDialog);
         
+        // Set up cancel functionality
+        const cancelBtn = progressDialog.querySelector('#cancel-export-btn') as HTMLButtonElement;
+        cancelBtn.addEventListener('click', () => {
+          exportCancelled = true;
+          document.body.removeChild(progressDialog);
+          console.log('Export cancelled by user');
+        });
+        
         const progressBar = progressDialog.querySelector('#progress-bar') as HTMLElement;
         const progressText = progressDialog.querySelector('#progress-text') as HTMLElement;
-        
-        const options = {
-          duration: 2000, // 2 seconds default
-          frameRate: 24,
-          quality: 10,
-          width: image.width,
-          height: image.height,
-          onProgress: (progress: number) => {
-            progressBar.style.width = `${progress * 50}%`;
-            progressText.textContent = `Rendering frames... ${Math.round(progress * 100)}%`;
-          },
-          // Include overlay props if overlay is active
-          overlayProps: effectiveOverlayProps.showOverlay ? {
-            effectType: effectiveOverlayProps.overlayEffect,
-            opacity: effectiveOverlayProps.overlayOpacity,
-            particleCount: effectiveOverlayProps.overlayParticleCount,
-            color: effectiveOverlayProps.overlayColor,
-            speed: effectiveOverlayProps.overlaySpeed,
-            interactive: effectiveOverlayProps.overlayInteractive,
-          } : undefined
-        };
+        const progressDetails = progressDialog.querySelector('#progress-details') as HTMLElement;
+        const optimizationInfo = progressDialog.querySelector('#optimization-info') as HTMLElement;
+        const optimizationText = progressDialog.querySelector('#optimization-text') as HTMLElement;
         
         // Get current settings for the animated effect
         const currentSettings = effectLayers?.find(
           layer => layer.effectId === firstAnimatedEffect.effectId
         )?.settings || {};
         
-        // Render frames
-        const frames = await renderAnimationFrames(
-          image,
-          firstAnimatedEffect.effectId,
-          currentSettings,
-          animationConfig,
-          options
-        );
-        
-        // Export as GIF
-        await exportAsGif(frames, {
-          quality: 10,
-          onProgress: (progress: number) => {
-            progressBar.style.width = `${50 + progress * 50}%`;
-            progressText.textContent = `Creating GIF... ${Math.round(progress * 100)}%`;
-          },
-          onComplete: (blob: Blob) => {
-            downloadBlob(blob, `animated-${Date.now()}.gif`);
-            document.body.removeChild(progressDialog);
-          },
-          onError: (error: Error) => {
-            console.error('GIF export error:', error);
-            document.body.removeChild(progressDialog);
-            alert('Failed to export GIF: ' + error.message);
-          }
-        });
+        if (format === 'gif') {
+          // GIF export with multiple animated layers
+          
+          // Prepare all animated effect layers
+          const animatedEffectLayers: AnimatedEffectLayer[] = animatedLayers.map(layer => {
+            const config = getAnimationConfig(layer.effectId);
+            return {
+              effectId: layer.effectId,
+              settings: layer.settings || {},
+              animationConfig: config
+            };
+          });
+          
+          // Use multi-layer export for GIF
+          await exportMultiLayerAnimation(
+            image,
+            animatedEffectLayers,
+            {
+              duration: 2000, // 2 seconds default
+              frameRate: 24,
+              width: image.width,
+              height: image.height,
+              exportFormat: format,
+              exportQuality: 8,
+              onProgress: (stage, progress) => {
+                if (exportCancelled) return;
+                progressBar.style.width = `${progress * 100}%`;
+                progressText.textContent = `${stage}... ${Math.round(progress * 100)}%`;
+                if (stage === 'Rendering frames') {
+                  const estimatedFrames = Math.ceil((2000 / 1000) * 24);
+                  progressDetails.textContent = `Processing ${animatedLayers.length} animated effects - Frame ${Math.ceil(progress * estimatedFrames)} of ${estimatedFrames}`;
+                } else {
+                  progressDetails.textContent = 'Encoding frames with optimized settings...';
+                }
+              },
+              onComplete: (blob, exportedFormat) => {
+                if (exportCancelled) return;
+                const finalSizeKB = Math.round(blob.size / 1024);
+                console.log(`GIF export completed: ${finalSizeKB}KB`);
+                
+                // Show completion message briefly
+                progressText.textContent = `Export completed! File size: ${finalSizeKB}KB`;
+                progressDetails.textContent = 'Starting download...';
+                
+                setTimeout(() => {
+                  downloadBlob(blob, `animated-${Date.now()}.gif`);
+                  if (document.body.contains(progressDialog)) {
+                    document.body.removeChild(progressDialog);
+                  }
+                }, 1000);
+              },
+              onError: (error) => {
+                console.error('GIF export error:', error);
+                if (document.body.contains(progressDialog)) {
+                  document.body.removeChild(progressDialog);
+                }
+                if (!exportCancelled) {
+                  alert('Failed to export GIF: ' + error.message);
+                }
+              }
+            }
+          );
+        } else {
+          // Video export (WebM/MP4) with multiple animated layers
+          
+          // Prepare all animated effect layers
+          const animatedEffectLayers: AnimatedEffectLayer[] = animatedLayers.map(layer => {
+            const config = getAnimationConfig(layer.effectId);
+            return {
+              effectId: layer.effectId,
+              settings: layer.settings || {},
+              animationConfig: config
+            };
+          });
+          
+          // Debug logging
+          console.log('Starting video export with layers:', animatedEffectLayers);
+          console.log('Image dimensions:', image.width, 'x', image.height);
+          console.log('Export format:', format);
+          
+          // Use multi-layer export
+          await exportMultiLayerAnimation(
+            image,
+            animatedEffectLayers,
+            {
+              duration: 3000, // 3 seconds for video
+              frameRate: format === 'webm' ? 30 : 24, // Higher framerate for video
+              width: image.width,
+              height: image.height,
+              exportFormat: format,
+              exportQuality: 8, // High quality (1-10 scale)
+              onProgress: (stage, progress) => {
+                if (exportCancelled) return;
+                console.log(`Export progress: ${stage} - ${Math.round(progress * 100)}%`);
+                progressBar.style.width = `${progress * 100}%`;
+                progressText.textContent = `${stage}... ${Math.round(progress * 100)}%`;
+                if (stage === 'Rendering frames') {
+                  const estimatedFrames = Math.ceil((3000 / 1000) * (format === 'webm' ? 30 : 24));
+                  progressDetails.textContent = `Processing ${animatedLayers.length} animated effects - Frame ${Math.ceil(progress * estimatedFrames)} of ${estimatedFrames}`;
+                } else {
+                  progressDetails.textContent = `Encoding ${format.toUpperCase()} with quality ${8}/10`;
+                }
+              },
+              onComplete: (blob, exportedFormat) => {
+                if (exportCancelled) return;
+                const finalSizeMB = (blob.size / 1024 / 1024).toFixed(2);
+                console.log(`${exportedFormat.toUpperCase()} export completed: ${finalSizeMB}MB`);
+                
+                // Show completion message
+                progressText.textContent = `Export completed! File size: ${finalSizeMB}MB`;
+                progressDetails.textContent = 'Starting download...';
+                
+                setTimeout(() => {
+                  downloadVideo(blob, exportedFormat as 'webm' | 'mp4', 'animated-effect');
+                  if (document.body.contains(progressDialog)) {
+                    document.body.removeChild(progressDialog);
+                  }
+                }, 1000);
+              },
+              onError: (error) => {
+                console.error('Video export error:', error);
+                if (document.body.contains(progressDialog)) {
+                  document.body.removeChild(progressDialog);
+                }
+                if (!exportCancelled) {
+                  alert('Failed to export video: ' + error.message);
+                }
+              }
+            }
+          );
+        }
         
       } else {
         // Static image export with overlay compositing
-        await exportStaticImageWithOverlay(format);
+        await exportStaticImageWithOverlay(format as 'png' | 'jpeg');
       }
     } catch (error) {
       console.error("Export error:", error);
       alert('Failed to export image: ' + (error as Error).message);
     }
+    exportHaptic(true)
   };
 
   // Helper function to export static image with overlay compositing
@@ -244,10 +466,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       processedImage.onload = async () => {
         finalCtx.drawImage(processedImage, 0, 0);
         
-        // Composite generative overlays if they exist
-        if (effectiveOverlayProps.showOverlay) {
-          await compositeOverlayOnCanvas(finalCanvas, finalCtx);
-        }
+        // Note: Overlay composition removed since generative overlays are disabled
         
         // Export the final composite
         const uri = finalCanvas.toDataURL(
@@ -349,6 +568,12 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
               <button class="export-option w-full py-3 px-4 bg-primary-accent hover:bg-primary-accent/90 text-white rounded-lg text-sm font-medium transition-colors" data-format="gif">
                 Export as GIF (Animated)
               </button>
+              <button class="export-option w-full py-3 px-4 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors" data-format="webm">
+                Export as WebM (Video)
+              </button>
+              <button class="export-option w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors" data-format="mp4">
+                Export as MP4 (Video)
+              </button>
             ` : ''}
           </div>
           <button class="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700" id="cancel-export">
@@ -363,7 +588,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       const handleClick = (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.classList.contains('export-option')) {
-          const selectedFormat = target.getAttribute('data-format') as 'png' | 'jpeg' | 'gif';
+          const selectedFormat = target.getAttribute('data-format') as 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4';
           document.body.removeChild(dialog);
           exportWithFormat(selectedFormat);
         } else if (target.id === 'cancel-export' || target === dialog) {
@@ -372,21 +597,21 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       };
       
       dialog.addEventListener('click', handleClick);
-      }
+    }
   }, [exportTrigger, effectLayers, image, exportWithFormat, onExportComplete]);
   
   // Expose the export method via ref
   useImperativeHandle(ref, () => {
     console.log("useImperativeHandle called, creating ref object");
     return {
-      exportImage: async (format?: 'png' | 'jpeg' | 'gif') => {
+      exportImage: async (format?: 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4') => {
         console.log("Export method called on ImageEditor ref");
         console.log("Current effect layers:", effectLayers);
         
         if (!stageRef.current || !image) {
           console.error("Cannot export: Stage or image not ready");
           return;
-      }
+        }
 
         // Check if we have animated effects
         const animatedLayers = effectLayers?.filter(layer => 
@@ -420,6 +645,12 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
                     <button class="export-option w-full py-3 px-4 bg-primary-accent hover:bg-primary-accent/90 text-white rounded-lg text-sm font-medium transition-colors" data-format="gif">
                       Export as GIF (Animated)
                     </button>
+                    <button class="export-option w-full py-3 px-4 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors" data-format="webm">
+                      Export as WebM (Video)
+                    </button>
+                    <button class="export-option w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors" data-format="mp4">
+                      Export as MP4 (Video)
+                    </button>
                   ` : ''}
                 </div>
                 <button class="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700" id="cancel-export">
@@ -434,7 +665,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
             const handleClick = (e: MouseEvent) => {
               const target = e.target as HTMLElement;
               if (target.classList.contains('export-option')) {
-                const selectedFormat = target.getAttribute('data-format') as 'png' | 'jpeg' | 'gif';
+                const selectedFormat = target.getAttribute('data-format') as 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4';
                 document.body.removeChild(dialog);
                 exportWithFormat(selectedFormat);
               } else if (target.id === 'cancel-export' || target === dialog) {
@@ -459,7 +690,10 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         return stageRef.current.toDataURL({
           pixelRatio: window.devicePixelRatio || 1,
         });
-      }
+      },
+      
+      // Add function to get the stage reference
+      getStage: () => stageRef.current
     };
   }, [image, stageRef, imageSize, effectLayers, exportWithFormat]);
 
@@ -468,6 +702,45 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     setIsBrowser(true);
     console.log("Browser detected, component mounted");
   }, []);
+
+  // Generate effect previews when image is loaded
+  useEffect(() => {
+    if (image && imageStatus.status === 'loaded' && selectedImage && isBrowser) {
+      console.log('Generating effect previews for loaded image');
+      
+      // Generate previews for common effects in the background
+      const previewCache = getEffectPreviewCache();
+      const commonEffects = [
+        'brightness', 'contrast', 'saturation', 'hue', 'blur', 'sharpen',
+        'vintage', 'sepia', 'grayscale', 'pixelate', 'edgeDetection',
+        'emboss', 'mandelbrot', 'juliaSet', 'voronoi', 'delaunay'
+      ];
+      
+      // Generate previews with a small delay to not block UI
+      setTimeout(async () => {
+        try {
+          await previewCache.generatePreviews(
+            selectedImage,
+            commonEffects.slice(0, 10), // Start with first 10 effects
+            image
+          );
+          console.log('Initial previews generated');
+          
+          // Generate remaining previews with lower priority
+          setTimeout(async () => {
+            await previewCache.generatePreviews(
+              selectedImage,
+              commonEffects.slice(10),
+              image
+            );
+            console.log('All previews generated');
+          }, 1000);
+        } catch (error) {
+          console.error('Failed to generate previews:', error);
+        }
+      }, 500);
+    }
+  }, [image, imageStatus, selectedImage, isBrowser]);
 
   // Debug effect to log state changes
   useEffect(() => {
@@ -633,7 +906,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       }
     };
 
-        updateSize();
+    updateSize();
     window.addEventListener('resize', updateSize);
     
     // Also update on orientation change for mobile
@@ -752,14 +1025,18 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
     return () => window.removeEventListener('resize', handleResize);
   }, [image, imageSize, isBrowser]);
 
-  // Apply filters to the image
+  // Apply filters to the image with performance optimization
   useEffect(() => {
-    if (!isBrowser || !image || !stageRef.current) return;
+    if (!isBrowser || !image || !stageRef.current || !batchProcessor) return;
     
-    const applyFiltersAsync = async () => {
+    const applyFiltersWithPerformanceOptimization = async () => {
+      startOperation();
+      const operationStart = performance.now();
+      
       const imageNode = stageRef.current.findOne('Image');
       if (!imageNode) {
         console.error("Image node not found in Stage");
+        endOperation();
         return;
       }
       
@@ -780,130 +1057,114 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
       
       if (!effectLayers || effectLayers.length === 0) {
         console.log("No active effects, clearing filters and resetting properties.");
+        startRender();
         imageNode.cache();
         imageNode.getLayer().batchDraw();
+        endRender();
+        endOperation();
         return;
       }
       
       try {
-        console.log("Applying effects:", effectLayers.map(layer => layer.effectId).join(', '));
+        console.log("🎨 Applying effects:", effectLayers.map(layer => `${layer.effectId}(${layer.opacity})`).join(', '));
+        console.log("📊 WorkerManager available:", !!workerManager);
+        console.log("⚡ BatchProcessor available:", !!batchProcessor);
         
-        // Separate effects into built-in Konva filters and custom filters
-        const builtInFilters: any[] = [];
-        const builtInParams: Record<string, any> = {};
-        const customEffects: Array<{ layer: EffectLayer, filterFunc: any }> = [];
+        // Simpler approach: Use Konva filters with graceful worker fallback for heavy operations
+        const filters: any[] = [];
+        const filterParams: Record<string, any> = {};
         
         for (const layer of effectLayers) {
           if (!layer.visible) continue;
           
-          const [filterFunc, filterParams] = await applyEffect(layer.effectId, layer.settings || {});
-          if (!filterFunc) continue;
+          console.log(`🔧 Processing effect: ${layer.effectId} with opacity ${layer.opacity}, settings:`, layer.settings);
           
-          // Skip generative overlay effects - they're handled separately
-          if (filterFunc === 'GENERATIVE_OVERLAY') continue;
+          const [filterFunc, params] = await applyEffect(layer.effectId, layer.settings || {});
+          
+          if (!filterFunc) {
+            console.warn(`⚠️ No filter function returned for effect: ${layer.effectId}`);
+            continue;
+          }
+          
+          console.log(`✅ Filter function obtained for ${layer.effectId}:`, typeof filterFunc, params ? 'with params' : 'no params');
+          
+          // Skip generative overlay and 3D effects - they're handled separately
+          if (filterFunc === 'GENERATIVE_OVERLAY' || filterFunc === 'THREE_D_EFFECT') continue;
           
           // Check if this is a built-in Konva filter (has parameters)
-          if (filterParams && Object.keys(filterParams).length > 0) {
+          if (params && Object.keys(params).length > 0) {
             // Built-in Konva filter
-            builtInFilters.push(filterFunc);
+            filters.push(filterFunc);
             
-            // Apply opacity to numeric parameters
-            if (layer.opacity < 1) {
-              const adjustedParams: Record<string, any> = {};
-              for (const [key, value] of Object.entries(filterParams)) {
-                if (typeof value === 'number') {
-                  // Special handling for specific parameters
-                  if (key === 'brightness' || key === 'contrast' || key === 'enhance') {
-                    adjustedParams[key] = value * layer.opacity;
-                  } else {
-                    adjustedParams[key] = value;
-                  }
+            // Apply opacity adjustment to numeric parameters
+            for (const [key, value] of Object.entries(params)) {
+              if (typeof value === 'number') {
+                // Apply layer opacity to effect intensity
+                if (key === 'brightness' || key === 'contrast' || key === 'enhance') {
+                  filterParams[key] = (filterParams[key] || 0) + value * layer.opacity;
+                } else if (key === 'saturation' || key === 'hue') {
+                  filterParams[key] = (filterParams[key] || 0) + value * layer.opacity;
                 } else {
-                  adjustedParams[key] = value;
+                  filterParams[key] = value; // For non-additive params like blur radius
                 }
-              }
-              Object.assign(builtInParams, adjustedParams);
-            } else {
-              Object.assign(builtInParams, filterParams);
-            }
-          } else {
-            // Custom effect that modifies imageData
-            customEffects.push({ layer, filterFunc });
-          }
-        }
-        
-        // If we have custom effects, create a composite filter
-        if (customEffects.length > 0) {
-          const compositeFilter = function(imageData: any) {
-            // Store original for blending
-            const originalData = new Uint8ClampedArray(imageData.data);
-            
-            // Apply each custom effect
-            for (const { layer, filterFunc } of customEffects) {
-              console.log(`Applying custom effect: ${layer.effectId} with opacity ${layer.opacity}`);
-              
-              if (layer.opacity < 1) {
-                // Create a copy for this effect
-                const effectData = {
-                  data: new Uint8ClampedArray(originalData),
-                  width: imageData.width,
-                  height: imageData.height
-                };
-                
-                // Apply the effect
-                filterFunc(effectData);
-                
-                // Blend with original based on opacity
-                for (let i = 0; i < imageData.data.length; i += 4) {
-                  imageData.data[i] = originalData[i] * (1 - layer.opacity) + effectData.data[i] * layer.opacity;
-                  imageData.data[i + 1] = originalData[i + 1] * (1 - layer.opacity) + effectData.data[i + 1] * layer.opacity;
-                  imageData.data[i + 2] = originalData[i + 2] * (1 - layer.opacity) + effectData.data[i + 2] * layer.opacity;
-                  imageData.data[i + 3] = originalData[i + 3];
-        }
               } else {
-                // Apply directly
-                filterFunc(imageData);
+                filterParams[key] = value;
               }
-              
-              // Update original for next effect
-              originalData.set(imageData.data);
             }
-          };
-          
-          // Add composite filter to the beginning
-          builtInFilters.unshift(compositeFilter);
+          } else if (typeof filterFunc === 'function') {
+            // Custom filter function - apply directly
+            filters.push(filterFunc);
+          }
         }
         
         // Apply all filters
-        if (builtInFilters.length > 0) {
-          imageNode.filters(builtInFilters);
+        console.log(`🎯 Applying ${filters.length} filters to image node`);
+        
+        if (filters.length > 0) {
+          imageNode.filters(filters);
           
-          // Set built-in filter parameters
-          console.log("Setting built-in filter params:", builtInParams);
-          for (const [key, value] of Object.entries(builtInParams)) {
+          // Set filter parameters
+          console.log("🔨 Setting filter params:", filterParams);
+          for (const [key, value] of Object.entries(filterParams)) {
             if (typeof imageNode[key] === 'function') {
+              console.log(`   Setting ${key} = ${value}`);
               imageNode[key](value);
+            } else {
+              console.warn(`   ⚠️ Method ${key} not found on image node`);
             }
           }
         } else {
+          console.log("🧹 No filters to apply, clearing all filters");
           imageNode.filters([]);
         }
         
-        // Update the canvas
+        // Update the canvas with performance monitoring
+        startRender();
         imageNode.cache();
         imageNode.getLayer().batchDraw();
-        console.log(`Applied effects successfully`);
+        endRender();
+        
+        const operationEnd = performance.now();
+        const processingTime = operationEnd - operationStart;
+        setLastProcessingTime(processingTime);
+        setProcessingTime(prev => prev + processingTime);
+        
+        console.log(`Applied effects successfully in ${processingTime.toFixed(2)}ms`);
         
       } catch (error) {
         console.error("Error applying filters:", error);
         imageNode.filters([]);
+        startRender();
         imageNode.cache();
         imageNode.getLayer()?.batchDraw();
+        endRender();
       }
+      
+      endOperation();
     };
     
-    applyFiltersAsync();
-  }, [effectLayers, image, isBrowser]);
+    applyFiltersWithPerformanceOptimization();
+  }, [effectLayers, image, isBrowser, batchProcessor, workerManager, startOperation, endOperation, startRender, endRender]);
 
   // Check if current effects support animation
   const hasAnimatedEffects = effectLayers?.some(layer => 
@@ -916,37 +1177,29 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   );
   const animationConfig = firstAnimatedEffect ? getAnimationConfig(firstAnimatedEffect.effectId) : null;
 
-  // Extract generative overlay layers
-  const overlayLayers = effectLayers?.filter(layer => 
-    layer.visible && layer.effectId.startsWith('generative')
-  ) || [];
+  // Note: Generative overlay layers have been removed due to performance issues
+  const overlayLayers: any[] = [];
 
   // Extract 3D effect layers
   const threeDLayers = effectLayers?.filter(layer => 
     layer.visible && layer.effectId.startsWith('threeD')
   ) || [];
 
-  // Convert layer settings to overlay props for the first visible overlay
-  const primaryOverlay = overlayLayers[0];
+  // No primary overlay since generative overlays are disabled
+  const primaryOverlay = null;
   
   // Convert layer settings to 3D props for the first visible 3D effect
   const primary3DEffect = threeDLayers[0];
-  const derivedOverlayProps = primaryOverlay ? {
-    showOverlay: true,
-    overlayEffect: primaryOverlay.effectId.replace('generative', '').toLowerCase() as 'stars' | 'bubbles' | 'network' | 'snow' | 'confetti' | 'fireflies',
-    overlayOpacity: (primaryOverlay.settings?.opacity ?? 0.6) * primaryOverlay.opacity,
-    overlayParticleCount: primaryOverlay.settings?.particleCount ?? 50,
-    overlayColor: primaryOverlay.settings?.color ? `#${Math.floor(primaryOverlay.settings.color).toString(16).padStart(6, '0')}` : '#ffffff',
-    overlaySpeed: primaryOverlay.settings?.speed ?? 1,
-    overlayInteractive: (primaryOverlay.settings?.interactive ?? 1) > 0.5,
-  } : {
+  
+  // Generative overlays are disabled - always return disabled state
+  const derivedOverlayProps = {
     showOverlay: false,
     overlayEffect: 'stars' as const,
-    overlayOpacity: 0.6,
-    overlayParticleCount: 50,
+    overlayOpacity: 0,
+    overlayParticleCount: 0,
     overlayColor: '#ffffff',
-    overlaySpeed: 1,
-    overlayInteractive: true,
+    overlaySpeed: 0,
+    overlayInteractive: false,
   };
 
   // Create derived 3D props from effect layers
@@ -980,6 +1233,92 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   // Effective 3D props from derived values
   const effective3DProps = derived3DProps;
 
+  // Set up keyboard shortcuts
+  const { getShortcuts } = useKeyboardShortcuts({
+    shortcuts: EDITOR_SHORTCUTS.map(shortcut => ({
+      ...shortcut,
+      action: () => {
+        switch (shortcut.key) {
+          case 'z':
+            if (shortcut.ctrlKey && shortcut.shiftKey) {
+              // Redo
+              console.log('Redo action')
+            } else if (shortcut.ctrlKey) {
+              // Undo
+              console.log('Undo action')
+            }
+            break
+          case 's':
+            if (shortcut.ctrlKey) {
+              // Save
+              console.log('Save action')
+            }
+            break
+          case 'o':
+            if (shortcut.ctrlKey) {
+              // Open
+              handleUploadClick()
+            }
+            break
+          case 'e':
+            if (shortcut.ctrlKey) {
+              // Export
+              console.log('Export action')
+            }
+            break
+          case 'b':
+            if (shortcut.ctrlKey) {
+              // Toggle before/after view (disabled)
+              console.log('Before/after view disabled')
+            }
+            break
+          case 'r':
+            if (shortcut.ctrlKey) {
+              // Reset
+              console.log('Reset action')
+            }
+            break
+          case 'f':
+            if (shortcut.ctrlKey) {
+              // Toggle fullscreen
+              console.log('Toggle fullscreen action')
+            }
+            break
+          case 'h':
+            if (shortcut.ctrlKey) {
+              // Show shortcuts help
+              setShowShortcutsHelp(true)
+            }
+            break
+          case 'Escape':
+            // Close dialogs
+            setShowShortcutsHelp(false)
+            break
+          case 'Delete':
+            // Delete selected effect
+            console.log('Delete selected effect')
+            break
+          case 'ArrowLeft':
+            // Previous effect
+            console.log('Previous effect')
+            break
+          case 'ArrowRight':
+            // Next effect
+            console.log('Next effect')
+            break
+          case 'ArrowUp':
+            // Increase effect value
+            console.log('Increase effect value')
+            break
+          case 'ArrowDown':
+            // Decrease effect value
+            console.log('Decrease effect value')
+            break
+        }
+      }
+    }))
+  })
+
   // Render different states
   if (!selectedImage) {
     return (
@@ -988,6 +1327,8 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        role="region"
+        aria-label={ARIA_LABELS.dropZone}
       >
         <div className={`w-full max-w-lg mx-auto p-6 ${isDragging ? 'border-2 border-emerald-400 bg-emerald-50' : 'border-2 border-dashed border-gray-300 bg-gray-50'} rounded-lg text-center transition-all`}>
           <div className="mb-6">
@@ -1001,9 +1342,10 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
           </p>
           <button
             onClick={handleUploadClick}
-            className="px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition-colors inline-flex items-center"
+            className={`px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition-colors inline-flex items-center ${focusRingClass}`}
+            aria-label={ARIA_LABELS.uploadImage}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             Select Image
@@ -1090,143 +1432,89 @@ const ImageEditor = forwardRef<any, ImageEditorProps>((
   }
 
   return (
-    <div 
-      ref={containerRef} 
-      className="relative w-full h-full flex items-center justify-center canvas-bg overflow-hidden"
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-    >
-      {isBrowser && stageSize.width > 0 && stageSize.height > 0 && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          className="relative"
-        >
-      <Stage
-        ref={stageRef}
-        width={stageSize.width}
-        height={stageSize.height}
-            className="canvas-bg shadow-xl rounded-lg touch-none"
-            style={{ touchAction: 'none' }}
-      >
-        {/* Main image layer */}
-        <Layer>
-              <AnimatePresence>
-                {image && imageStatus.status === 'loaded' && (
-            <KonvaImage
-              image={image}
-                    x={(stageSize.width - imageSize.width) / 2}
-                    y={(stageSize.height - imageSize.height) / 2}
-                    width={imageSize.width}
-                    height={imageSize.height}
-                    ref={(node) => {
-                      if (node) {
-                        // Ensure image is cached for Konva performance
-                        node.cache();
-                      }
-                    }}
-            />
+    <div className="h-screen flex overflow-hidden bg-gray-50 dark:bg-gray-900">
+
+
+      <div className="flex-1 flex flex-col">
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 20 }}
+              className="fixed inset-0 z-50 lg:hidden"
+            >
+              {/* Mobile menu content */}
+            </motion.div>
           )}
-              </AnimatePresence>
-        </Layer>
-      </Stage>
+        </AnimatePresence>
+
+        {/* Left Panel - Effects (Desktop) */}
+        <motion.div className="hidden lg:flex lg:w-80 lg:flex-col lg:fixed lg:inset-y-0">
+          {/* Effects panel content */}
         </motion.div>
-      )}
-      
-      {/* Responsive Drop zone overlay */}
-      {!selectedImage && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-5 rounded-lg border-2 border-dashed border-gray-300 p-4 md:p-8"
-        >
-          <div className="text-center">
-            <svg className="mx-auto h-10 w-10 md:h-12 md:w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <p className="mt-2 text-xs md:text-sm text-gray-600">Drop your image here or click to browse</p>
+
+        {/* Main Canvas Area */}
+        <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-800">
+          {/* Top Toolbar */}
+          <div className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700 p-3">
+            {/* Toolbar content */}
           </div>
-        </motion.div>
-      )}
 
-      {/* Responsive Loading indicator */}
-      {isLoading && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80"
-        >
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-6 w-6 md:h-8 md:w-8 border-b-2 border-primary-accent"></div>
-            <p className="mt-2 text-xs md:text-sm text-gray-600">Processing...</p>
-                        </div>
-        </motion.div>
-      )}
-
-      {/* Responsive Error message */}
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-xs bg-red-50 border border-red-200 text-red-800 px-3 py-2 md:px-4 md:py-3 rounded-lg shadow-lg text-xs md:text-sm"
-        >
-          <p className="font-medium">Error</p>
-          <p>{error}</p>
-        </motion.div>
-          )}
-      
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg, image/png, image/gif, image/webp"
-        onChange={handleFileChange}
-        className="hidden"
-      />
-      
-      {/* Debug info */}
-      {process.env.NODE_ENV !== 'production' && Object.keys(debugInfo).length > 0 && (
-        <div className="absolute top-2 left-2 text-xs bg-black/80 text-white p-2 rounded-md font-mono opacity-70 hover:opacity-100 transition-opacity">
-          <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+          {/* Canvas Container */}
+          <div 
+            ref={containerRef}
+            className="flex-1 relative overflow-hidden"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {isLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-900/80 z-50">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-emerald-500 border-gray-200"></div>
+                <span className="ml-3 text-gray-600 dark:text-gray-400">Processing image...</span>
+              </div>
+            ) : (
+              <TouchGestures
+                onZoom={handleZoom}
+                onRotate={handleRotate}
+                onPan={handlePan}
+                minScale={0.5}
+                maxScale={3}
+                enabled={true}
+              >
+                <Stage
+                  ref={stageRef}
+                  width={stageSize.width}
+                  height={stageSize.height}
+                  className="bg-white dark:bg-gray-900"
+                >
+                  <Layer>
+                    {image && (
+                      <KonvaImage
+                        image={image}
+                        width={imageSize.width}
+                        height={imageSize.height}
+                        x={(stageSize.width - imageSize.width) / 2}
+                        y={(stageSize.height - imageSize.height) / 2}
+                      />
+                    )}
+                  </Layer>
+                </Stage>
+              </TouchGestures>
+            )}
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* Generative Overlay positioned over the canvas */}
-      {selectedImage && image && imageStatus.status === 'loaded' && effectiveOverlayProps.showOverlay && (
-        <GenerativeOverlay
-          id="canvas-overlay"
-          effectType={effectiveOverlayProps.overlayEffect}
-          visible={effectiveOverlayProps.showOverlay}
-          opacity={effectiveOverlayProps.overlayOpacity}
-          particleCount={effectiveOverlayProps.overlayParticleCount}
-          color={effectiveOverlayProps.overlayColor}
-          speed={effectiveOverlayProps.overlaySpeed}
-          interactive={effectiveOverlayProps.overlayInteractive}
-          zIndex={20}
-          className="rounded-lg"
-        />
-      )}
-
-      {/* 3D Effects Canvas positioned over the Konva canvas */}
-      {selectedImage && image && imageStatus.status === 'loaded' && effective3DProps.show3D && (
-        <ThreeDEffectsCanvas
-          imageUrl={selectedImage}
-          effectType={effective3DProps.threeDEffect}
-          visible={effective3DProps.show3D}
-          depth={effective3DProps.threeDDepth}
-          rotationSpeed={effective3DProps.threeDRotationSpeed}
-          tiltIntensity={effective3DProps.threeDTiltIntensity}
-          controlsEnabled={effective3DProps.threeDControlsEnabled}
-          width={stageSize.width}
-          height={stageSize.height}
-          zIndex={15}
-          className="absolute inset-0 rounded-lg"
-        />
-      )}
+      {/* Keyboard Shortcuts Help */}
+      <KeyboardShortcutsHelp
+        isOpen={showShortcutsHelp}
+        onClose={() => setShowShortcutsHelp(false)}
+        shortcuts={getShortcuts()}
+      />
     </div>
   );
 });

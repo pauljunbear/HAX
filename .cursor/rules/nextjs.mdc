@@ -16,7 +16,6 @@ globs: **/*.tsx, **/*.ts, src/**/*.ts, src/**/*.tsx
 - Place shared components in `components` directory
 - Place utilities and helpers in `lib` directory
 - Use lowercase with dashes for directories (e.g., `components/auth-wizard`)
-
 ## Components
 - Use Server Components by default
 - Mark client components explicitly with 'use client'
@@ -54,4 +53,4 @@ globs: **/*.tsx, **/*.ts, src/**/*.ts, src/**/*.tsx
 - Minimize client-side state
 - Use React Context sparingly
 - Prefer server state when possible
-- Implement proper loading states   
+- Implement proper loading states 

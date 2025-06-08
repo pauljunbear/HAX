@@ -1,0 +1,39 @@
+:root {
+  /* Primary Colors */
+  --primary: 88 80 236;
+  --primary-light: 116 109 255;
+  --primary-dark: 70 63 189;
+  --primary-accent: 88 80 236;
+
+  /* Canvas Colors */
+  --canvas-bg: 245 245 245;
+
+  /* Dark Theme Colors */
+  --dark-bg: 10 10 10;
+  --dark-surface: 18 18 18;
+  --dark-border: 28 28 28;
+  --dark-text: 235 235 235;
+  --dark-text-muted: 140 140 140;
+
+  /* Apple Colors */
+  --apple-blue: 0 122 255;
+  --apple-red: 255 59 48;
+  --apple-green: 52 199 89;
+  --apple-yellow: 255 204 0;
+  --apple-orange: 255 149 0;
+  --apple-purple: 175 82 222;
+  --apple-teal: 90 200 250;
+  --apple-indigo: 88 86 214;
+
+  /* Apple Gray Scale */
+  --apple-gray-50: 250 250 250;
+  --apple-gray-100: 245 245 245;
+  --apple-gray-200: 229 229 229;
+  --apple-gray-300: 212 212 212;
+  --apple-gray-400: 163 163 163;
+  --apple-gray-500: 115 115 115;
+  --apple-gray-600: 82 82 82;
+  --apple-gray-700: 64 64 64;
+  --apple-gray-800: 38 38 38;
+  --apple-gray-900: 23 23 23;
+} 
