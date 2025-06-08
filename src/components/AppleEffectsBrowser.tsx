@@ -8,14 +8,12 @@ interface AppleEffectsBrowserProps {
   activeEffect?: string | null;
   onEffectChange?: (effectName: string | null) => void;
   hasImage?: boolean;
-  isCollapsed?: boolean;
 }
 
 const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   activeEffect,
   onEffectChange,
-  hasImage = false,
-  isCollapsed = false
+  hasImage = false
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -66,24 +64,6 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
     }
     setFavorites(newFavorites);
   };
-
-  if (isCollapsed) {
-    return (
-      <div className="p-3 pt-16 h-full flex flex-col items-center">
-        <div className="space-y-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center" title="All Effects">
-            <span className="text-blue-600 dark:text-blue-400 text-sm">✨</span>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center" title="Search">
-            <span className="text-gray-600 dark:text-gray-400 text-sm">🔍</span>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center" title="Favorites">
-            <span className="text-gray-600 dark:text-gray-400 text-sm">⭐</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-800">
