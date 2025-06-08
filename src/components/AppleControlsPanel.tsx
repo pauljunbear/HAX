@@ -17,7 +17,6 @@ interface AppleControlsPanelProps {
   onSetActiveLayer?: (layerId: string) => void;
   onToggleLayerVisibility?: (layerId: string) => void;
   hasImage?: boolean;
-  isCollapsed?: boolean;
 }
 
 const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
@@ -31,12 +30,14 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   onRemoveEffect,
   onSetActiveLayer,
   onToggleLayerVisibility,
-  hasImage = false,
-  isCollapsed = false
+  hasImage = false
 }) => {
   const [activeTab, setActiveTab] = useState<'settings' | 'layers' | 'export' | 'history'>('settings');
+  
+  const activeLayer = effectLayers.find(layer => layer.id === activeEffect);
+  const activeEffectName = activeLayer?.effectId;
+  const currentEffectConfig = activeEffectName ? effectsConfig[activeEffectName] : null;
 
-  const currentEffectConfig = activeEffect ? effectsConfig[activeEffect] : null;
   const currentEffectSettings = currentEffectConfig?.settings ? 
     Object.entries(currentEffectConfig.settings).map(([key, setting]) => ({
       id: key,
@@ -50,27 +51,6 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
     { id: 'export', label: 'Export', icon: '📤', disabled: !hasImage },
     { id: 'history', label: 'History', icon: '↩️', disabled: false }
   ] as const;
-
-  if (isCollapsed) {
-    return (
-      <div className="p-3 pt-16 h-full flex flex-col items-center">
-        <div className="space-y-3">
-          <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center" title="Settings">
-            <span className="text-purple-600 dark:text-purple-400 text-sm">⚙️</span>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center" title="Layers">
-            <span className="text-gray-600 dark:text-gray-400 text-sm">📚</span>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center" title="Export">
-            <span className="text-gray-600 dark:text-gray-400 text-sm">📤</span>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center" title="History">
-            <span className="text-gray-600 dark:text-gray-400 text-sm">↩️</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-800">

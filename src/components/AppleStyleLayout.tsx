@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 
 interface AppleStyleLayoutProps {
   children: React.ReactNode;
@@ -24,37 +24,23 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
       {/* Left Sidebar - Effects Browser */}
       <motion.div
         initial={false}
-        animate={{ 
-          width: leftCollapsed ? 60 : 280,
-          opacity: leftCollapsed ? 0.8 : 1
-        }}
-        transition={{ 
-          type: "spring", 
-          damping: 25, 
-          stiffness: 200,
-          duration: 0.3
-        }}
-        className="relative bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-sm"
+        animate={{ width: leftCollapsed ? 0 : 280 }}
+        transition={{ type: "spring", damping: 30, stiffness: 250 }}
+        className="bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-sm relative"
       >
-        {/* Collapse Toggle */}
-        <button
-          onClick={() => setLeftCollapsed(!leftCollapsed)}
-          className="absolute top-4 right-3 z-10 w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
-          aria-label={leftCollapsed ? "Expand effects panel" : "Collapse effects panel"}
-        >
-          <svg 
-            className={`w-3 h-3 text-gray-600 dark:text-gray-400 transition-transform ${leftCollapsed ? 'rotate-180' : ''}`}
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
+        <div className="absolute inset-y-0 right-0 translate-x-1/2 top-1/2 -translate-y-1/2 z-20">
+          <button
+            onClick={() => setLeftCollapsed(!leftCollapsed)}
+            className="w-6 h-12 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-r-lg flex items-center justify-center transition-colors"
+            aria-label={leftCollapsed ? "Expand effects panel" : "Collapse effects panel"}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-
-        {/* Sidebar Content */}
-        <div className="h-full overflow-hidden">
-          {React.cloneElement(leftSidebar as React.ReactElement<any>, { isCollapsed: leftCollapsed })}
+            <svg className={`w-4 h-4 text-gray-600 dark:text-gray-400 transition-transform ${leftCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        </div>
+        <div className="w-[280px] h-full overflow-hidden">
+          {leftSidebar}
         </div>
       </motion.div>
 
@@ -75,17 +61,10 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
           </div>
           
           <div className="flex items-center space-x-3">
-            {/* Global Actions - Only show when image is loaded */}
             {hasImage && (
-              <>
-                <button className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                  New Image
-                </button>
-                <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Use Export tab →
-                </span>
-              </>
+              <button className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                New Image
+              </button>
             )}
           </div>
         </div>
@@ -99,37 +78,23 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
       {/* Right Sidebar - Active Controls */}
       <motion.div
         initial={false}
-        animate={{ 
-          width: rightCollapsed ? 60 : 320,
-          opacity: rightCollapsed ? 0.8 : 1
-        }}
-        transition={{ 
-          type: "spring", 
-          damping: 25, 
-          stiffness: 200,
-          duration: 0.3
-        }}
-        className="relative bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-sm"
+        animate={{ width: rightCollapsed ? 0 : 320 }}
+        transition={{ type: "spring", damping: 30, stiffness: 250 }}
+        className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-sm relative"
       >
-        {/* Collapse Toggle */}
-        <button
-          onClick={() => setRightCollapsed(!rightCollapsed)}
-          className="absolute top-4 left-3 z-10 w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center justify-center transition-colors"
-          aria-label={rightCollapsed ? "Expand controls panel" : "Collapse controls panel"}
-        >
-          <svg 
-            className={`w-3 h-3 text-gray-600 dark:text-gray-400 transition-transform ${rightCollapsed ? 'rotate-180' : ''}`}
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
+        <div className="absolute inset-y-0 left-0 -translate-x-1/2 top-1/2 -translate-y-1/2 z-20">
+          <button
+            onClick={() => setRightCollapsed(!rightCollapsed)}
+            className="w-6 h-12 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-l-lg flex items-center justify-center transition-colors"
+            aria-label={rightCollapsed ? "Expand controls panel" : "Collapse controls panel"}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-
-        {/* Sidebar Content */}
-        <div className="h-full overflow-hidden">
-          {React.cloneElement(rightSidebar as React.ReactElement<any>, { isCollapsed: rightCollapsed })}
+            <svg className={`w-4 h-4 text-gray-600 dark:text-gray-400 transition-transform ${rightCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+        <div className="w-[320px] h-full overflow-hidden">
+          {rightSidebar}
         </div>
       </motion.div>
     </div>
