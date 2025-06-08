@@ -8,12 +8,14 @@ interface AppleEffectsBrowserProps {
   activeEffect?: string | null;
   onEffectChange?: (effectName: string | null) => void;
   hasImage?: boolean;
+  isCollapsed?: boolean;
 }
 
 const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   activeEffect,
   onEffectChange,
-  hasImage = false
+  hasImage = false,
+  isCollapsed = false
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -65,7 +67,23 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
     setFavorites(newFavorites);
   };
 
-
+  if (isCollapsed) {
+    return (
+      <div className="p-3 pt-16 h-full flex flex-col items-center">
+        <div className="space-y-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center" title="All Effects">
+            <span className="text-blue-600 dark:text-blue-400 text-sm">✨</span>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center" title="Search">
+            <span className="text-gray-600 dark:text-gray-400 text-sm">🔍</span>
+          </div>
+          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center" title="Favorites">
+            <span className="text-gray-600 dark:text-gray-400 text-sm">⭐</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-800">
@@ -123,7 +141,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
-              {categoryIcons[category]} {category}
+              {category}
             </button>
           ))}
         </div>
@@ -183,7 +201,6 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
               <div key={category} className="px-6">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center">
-                    <span className="mr-2">{categoryIcons[category] || '🎯'}</span>
                     {category}
                   </h3>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -227,71 +244,6 @@ interface EffectCardProps {
   onToggleFavorite: () => void;
 }
 
-// Effect icon mapping for better visual distinction
-const getEffectIcon = (effectId: string, category: string): string => {
-  const iconMap: Record<string, string> = {
-    // Color effects
-    'brightness': '☀️',
-    'contrast': '⚫',
-    'saturation': '🌈',
-    'hueRotation': '🎨',
-    'temperature': '🌡️',
-    'threshold': '⚪',
-    
-    // Artistic effects
-    'blur': '🌫️',
-    'sharpen': '🔍',
-    'emboss': '🗿',
-    'posterize': '🎭',
-    'solarize': '🌞',
-    'invert': '🔄',
-    
-    // Distortion effects
-    'pixelate': '🔲',
-    'noise': '📺',
-    'kaleidoscope': '🔮',
-    'ripple': '🌊',
-    'swirl': '🌀',
-    'bulge': '🔍',
-    
-    // Mathematical effects
-    'mandelbrot': '🌀',
-    'julia': '💫',
-    'fractalDisplacement': '🔬',
-    'reactionDiffusion': '🧪',
-    'flowField': '💨',
-    
-    // Filters
-    'sepia': '📸',
-    'vintage': '📷',
-    'blackAndWhite': '⚫',
-    'vignette': '🎯',
-    
-    // Generative
-    'perlinNoise': '🌫️',
-    'voronoi': '🔷',
-    'cellular': '🔬',
-    
-    // New effects
-    'orton': '✨',
-    'lightLeak': '💡',
-    'smartSharpen': '🔍',
-    'clarity': '💎'
-  };
-  
-  return iconMap[effectId] || categoryIcons[category] || '🎯';
-};
-
-const categoryIcons: Record<string, string> = {
-  'Color': '🎨',
-  'Artistic': '🖼️',
-  'Distortion': '🌀',
-  'Mathematical': '📐',
-  'Filters': '🔍',
-  'Generative': '✨',
-  'Overlay': '📱'
-};
-
 const EffectCard: React.FC<EffectCardProps> = ({
   effectId,
   effect,
@@ -300,32 +252,19 @@ const EffectCard: React.FC<EffectCardProps> = ({
   onSelect,
   onToggleFavorite
 }) => {
-  const effectIcon = getEffectIcon(effectId, effect.category);
-  
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className={`relative group cursor-pointer rounded-lg overflow-hidden transition-all ${
+      className={`relative group cursor-pointer rounded-lg overflow-hidden transition-all border ${
         isActive 
-          ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-          : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
+          ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20 border-blue-500' 
+          : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent'
       }`}
       onClick={onSelect}
     >
-      {/* Compact Effect Card */}
       <div className="p-3">
-        <div className="flex items-center space-x-3">
-          {/* Effect Icon */}
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-            isActive 
-              ? 'bg-blue-100 dark:bg-blue-900/40' 
-              : 'bg-white dark:bg-gray-800'
-          }`}>
-            <span className="text-sm">{effectIcon}</span>
-          </div>
-          
-          {/* Effect Info */}
+        <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
               {effect.label}
@@ -335,7 +274,6 @@ const EffectCard: React.FC<EffectCardProps> = ({
             </p>
           </div>
           
-          {/* Favorite Button */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -354,7 +292,6 @@ const EffectCard: React.FC<EffectCardProps> = ({
         </div>
       </div>
       
-      {/* Active Indicator */}
       {isActive && (
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-2 left-2 w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -362,6 +299,16 @@ const EffectCard: React.FC<EffectCardProps> = ({
       )}
     </motion.div>
   );
+};
+
+const categoryIcons: Record<string, string> = {
+  'Color': '🎨',
+  'Artistic': '🖼️',
+  'Distortion': '🌀',
+  'Mathematical': '📐',
+  'Filters': '🔍',
+  'Generative': '✨',
+  'Overlay': '📱'
 };
 
 export default AppleEffectsBrowser; 

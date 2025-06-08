@@ -54,36 +54,7 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
 
         {/* Sidebar Content */}
         <div className="h-full overflow-hidden">
-          {!leftCollapsed ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ delay: 0.1 }}
-              className="h-full"
-            >
-              {leftSidebar}
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="p-3 pt-16"
-            >
-              {/* Collapsed state icons */}
-              <div className="space-y-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <span className="text-blue-600 dark:text-blue-400 text-sm">✨</span>
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                  <span className="text-gray-600 dark:text-gray-400 text-sm">🔍</span>
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                  <span className="text-gray-600 dark:text-gray-400 text-sm">⭐</span>
-                </div>
-              </div>
-            </motion.div>
-          )}
+          {React.cloneElement(leftSidebar as React.ReactElement<any>, { isCollapsed: leftCollapsed })}
         </div>
       </motion.div>
 
@@ -158,36 +129,7 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
 
         {/* Sidebar Content */}
         <div className="h-full overflow-hidden">
-          {!rightCollapsed ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ delay: 0.1 }}
-              className="h-full"
-            >
-              {rightSidebar}
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="p-3 pt-16"
-            >
-              {/* Collapsed state icons */}
-              <div className="space-y-3">
-                <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                  <span className="text-purple-600 dark:text-purple-400 text-sm">⚙️</span>
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                  <span className="text-gray-600 dark:text-gray-400 text-sm">📚</span>
-                </div>
-                <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                  <span className="text-gray-600 dark:text-gray-400 text-sm">↩️</span>
-                </div>
-              </div>
-            </motion.div>
-          )}
+          {React.cloneElement(rightSidebar as React.ReactElement<any>, { isCollapsed: rightCollapsed })}
         </div>
       </motion.div>
     </div>
