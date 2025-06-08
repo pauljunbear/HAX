@@ -8,16 +8,29 @@ interface AppleEffectsBrowserProps {
   activeEffect?: string | null;
   onEffectChange?: (effectName: string | null) => void;
   hasImage?: boolean;
+  onNewImage?: () => void;
 }
 
 const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   activeEffect,
   onEffectChange,
-  hasImage = false
+  hasImage = false,
+  onNewImage
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
+    'Adjust': true,
+    'Blur & Focus': true,
+  });
+
+  const toggleCategory = (category: string) => {
+    setOpenCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
 
   // Search functionality
   const filteredEffects = useMemo(() => {
@@ -69,9 +82,16 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
     <div className="h-full flex flex-col bg-white dark:bg-gray-800">
       {/* Header */}
       <div className="p-6 border-b border-gray-100 dark:border-gray-700">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-          Effects
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Effects
+          </h2>
+          {hasImage && (
+            <button onClick={onNewImage} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+              New Image
+            </button>
+          )}
+        </div>
         
         {/* Search */}
         <div className="relative">
@@ -179,33 +199,55 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
           <div className="space-y-6">
             {filteredEffects.map(({ category, effects }) => (
               <div key={category} className="px-6">
-                <div className="flex items-center justify-between mb-3">
+                <button 
+                  onClick={() => toggleCategory(category)}
+                  className="w-full flex items-center justify-between mb-3"
+                >
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center">
                     {category}
                   </h3>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {effects.length}
-                  </span>
-                </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {effects.length}
+                    </span>
+                    <svg 
+                      className={`w-4 h-4 text-gray-400 transition-transform ${openCategories[category] ? 'rotate-90' : ''}`} 
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </button>
                 
-                <div className="space-y-2">
-                  {effects.map(effectId => {
-                    const effect = effectsConfig[effectId];
-                    if (!effect) return null;
-                    
-                    return (
-                      <EffectCard
-                        key={effectId}
-                        effectId={effectId}
-                        effect={effect}
-                        isActive={activeEffect === effectId}
-                        isFavorite={favorites.has(effectId)}
-                        onSelect={() => onEffectChange?.(effectId)}
-                        onToggleFavorite={() => toggleFavorite(effectId)}
-                      />
-                    );
-                  })}
-                </div>
+                <AnimatePresence>
+                  {openCategories[category] && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="space-y-2 pb-6">
+                        {effects.map(effectId => {
+                          const effect = effectsConfig[effectId];
+                          if (!effect) return null;
+                          
+                          return (
+                            <EffectCard
+                              key={effectId}
+                              effectId={effectId}
+                              effect={effect}
+                              isActive={activeEffect === effectId}
+                              isFavorite={favorites.has(effectId)}
+                              onSelect={() => onEffectChange?.(effectId)}
+                              onToggleFavorite={() => toggleFavorite(effectId)}
+                            />
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ))}
           </div>

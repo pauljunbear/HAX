@@ -8,13 +8,15 @@ interface AppleStyleLayoutProps {
   leftSidebar: React.ReactNode;
   rightSidebar: React.ReactNode;
   hasImage?: boolean;
+  onNewImage: () => void;
 }
 
 const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
   children,
   leftSidebar,
   rightSidebar,
-  hasImage = false
+  hasImage = false,
+  onNewImage
 }) => {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -28,10 +30,10 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
         transition={{ type: "spring", damping: 30, stiffness: 250 }}
         className="bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0 shadow-sm relative"
       >
-        <div className="absolute inset-y-0 right-0 translate-x-1/2 top-1/2 -translate-y-1/2 z-20">
+        <div className="absolute inset-y-0 right-0 flex items-center pr-4">
           <button
             onClick={() => setLeftCollapsed(!leftCollapsed)}
-            className="w-6 h-12 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-r-lg flex items-center justify-center transition-colors"
+            className="w-6 h-6 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full flex items-center justify-center transition-colors"
             aria-label={leftCollapsed ? "Expand effects panel" : "Collapse effects panel"}
           >
             <svg className={`w-4 h-4 text-gray-600 dark:text-gray-400 transition-transform ${leftCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -40,7 +42,9 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
           </button>
         </div>
         <div className="w-[280px] h-full overflow-hidden">
-          {leftSidebar}
+          {React.cloneElement(leftSidebar as React.ReactElement<any>, { 
+            onNewImage: onNewImage,
+          })}
         </div>
       </motion.div>
 
@@ -57,14 +61,6 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <span>Ready</span>
               </div>
-            )}
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            {hasImage && (
-              <button className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                New Image
-              </button>
             )}
           </div>
         </div>
@@ -85,7 +81,7 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
         <div className="absolute inset-y-0 left-0 -translate-x-1/2 top-1/2 -translate-y-1/2 z-20">
           <button
             onClick={() => setRightCollapsed(!rightCollapsed)}
-            className="w-6 h-12 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-l-lg flex items-center justify-center transition-colors"
+            className="w-6 h-6 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full flex items-center justify-center transition-colors"
             aria-label={rightCollapsed ? "Expand controls panel" : "Collapse controls panel"}
           >
             <svg className={`w-4 h-4 text-gray-600 dark:text-gray-400 transition-transform ${rightCollapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
