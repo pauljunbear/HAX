@@ -151,6 +151,31 @@ export default function Home() {
     }
   };
 
+  const handleResetSettings = () => {
+    console.log("Resetting settings for active effect");
+    if (activeEffectLayerId && activeEffectLayer) {
+      // Reset all settings to their default values
+      const effectConfig = require('@/lib/effects').effectsConfig[activeEffectLayer.effectId];
+      if (effectConfig?.settings) {
+        Object.entries(effectConfig.settings).forEach(([key, setting]: [string, any]) => {
+          updateLayerSettings(activeEffectLayerId, key, setting.default);
+        });
+      }
+    }
+  };
+
+  const handleClearAllEffects = () => {
+    console.log("Clearing all effects");
+    clearEffectLayers();
+  };
+
+  const handleRemoveEffect = () => {
+    console.log("Removing active effect");
+    if (activeEffectLayerId) {
+      removeEffectLayer(activeEffectLayerId);
+    }
+  };
+
   const handleUndo = () => {
     undo();
   };
@@ -224,6 +249,9 @@ export default function Home() {
             activeEffect={activeEffect}
             effectSettings={effectSettings}
             onSettingChange={handleSettingChange}
+            onResetSettings={handleResetSettings}
+            onClearAllEffects={handleClearAllEffects}
+            onRemoveEffect={handleRemoveEffect}
             onExport={(format) => {
               // Handle export
               if (imageEditorRef.current) {

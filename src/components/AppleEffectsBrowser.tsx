@@ -65,15 +65,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
     setFavorites(newFavorites);
   };
 
-  const categoryIcons: Record<string, string> = {
-    'Color': '🎨',
-    'Artistic': '🖼️',
-    'Distortion': '🌀',
-    'Mathematical': '📐',
-    'Filters': '🔍',
-    'Generative': '✨',
-    'Overlay': '📱'
-  };
+
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-800">
@@ -165,7 +157,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
                 {Array.from(favorites).map(effectId => {
                   const effect = effectsConfig[effectId];
                   if (!effect) return null;
@@ -199,7 +191,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                   </span>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
                   {effects.map(effectId => {
                     const effect = effectsConfig[effectId];
                     if (!effect) return null;
@@ -235,6 +227,71 @@ interface EffectCardProps {
   onToggleFavorite: () => void;
 }
 
+// Effect icon mapping for better visual distinction
+const getEffectIcon = (effectId: string, category: string): string => {
+  const iconMap: Record<string, string> = {
+    // Color effects
+    'brightness': '☀️',
+    'contrast': '⚫',
+    'saturation': '🌈',
+    'hueRotation': '🎨',
+    'temperature': '🌡️',
+    'threshold': '⚪',
+    
+    // Artistic effects
+    'blur': '🌫️',
+    'sharpen': '🔍',
+    'emboss': '🗿',
+    'posterize': '🎭',
+    'solarize': '🌞',
+    'invert': '🔄',
+    
+    // Distortion effects
+    'pixelate': '🔲',
+    'noise': '📺',
+    'kaleidoscope': '🔮',
+    'ripple': '🌊',
+    'swirl': '🌀',
+    'bulge': '🔍',
+    
+    // Mathematical effects
+    'mandelbrot': '🌀',
+    'julia': '💫',
+    'fractalDisplacement': '🔬',
+    'reactionDiffusion': '🧪',
+    'flowField': '💨',
+    
+    // Filters
+    'sepia': '📸',
+    'vintage': '📷',
+    'blackAndWhite': '⚫',
+    'vignette': '🎯',
+    
+    // Generative
+    'perlinNoise': '🌫️',
+    'voronoi': '🔷',
+    'cellular': '🔬',
+    
+    // New effects
+    'orton': '✨',
+    'lightLeak': '💡',
+    'smartSharpen': '🔍',
+    'clarity': '💎'
+  };
+  
+  return iconMap[effectId] || categoryIcons[category] || '🎯';
+};
+
+const categoryIcons: Record<string, string> = {
+  'Color': '🎨',
+  'Artistic': '🖼️',
+  'Distortion': '🌀',
+  'Mathematical': '📐',
+  'Filters': '🔍',
+  'Generative': '✨',
+  'Overlay': '📱'
+};
+
 const EffectCard: React.FC<EffectCardProps> = ({
   effectId,
   effect,
@@ -243,50 +300,59 @@ const EffectCard: React.FC<EffectCardProps> = ({
   onSelect,
   onToggleFavorite
 }) => {
+  const effectIcon = getEffectIcon(effectId, effect.category);
+  
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className={`relative group cursor-pointer rounded-xl overflow-hidden transition-all ${
+      className={`relative group cursor-pointer rounded-lg overflow-hidden transition-all ${
         isActive 
           ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' 
           : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
       }`}
       onClick={onSelect}
     >
-      {/* Effect Preview */}
-      <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-600 dark:to-gray-700 flex items-center justify-center">
-        <div className="w-8 h-8 bg-white dark:bg-gray-800 rounded-lg shadow-sm flex items-center justify-center">
-          <span className="text-xs">✨</span>
+      {/* Compact Effect Card */}
+      <div className="p-3">
+        <div className="flex items-center space-x-3">
+          {/* Effect Icon */}
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+            isActive 
+              ? 'bg-blue-100 dark:bg-blue-900/40' 
+              : 'bg-white dark:bg-gray-800'
+          }`}>
+            <span className="text-sm">{effectIcon}</span>
+          </div>
+          
+          {/* Effect Info */}
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              {effect.label}
+            </h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              {effect.category}
+            </p>
+          </div>
+          
+          {/* Favorite Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite();
+            }}
+            className={`w-6 h-6 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${
+              isFavorite 
+                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' 
+                : 'text-gray-400 hover:text-yellow-500 opacity-0 group-hover:opacity-100'
+            }`}
+          >
+            <svg className="w-3 h-3" fill={isFavorite ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+          </button>
         </div>
       </div>
-      
-      {/* Effect Info */}
-      <div className="p-3">
-        <h4 className="text-xs font-medium text-gray-900 dark:text-white truncate">
-          {effect.label}
-        </h4>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          {effect.category}
-        </p>
-      </div>
-      
-      {/* Favorite Button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleFavorite();
-        }}
-        className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-          isFavorite 
-            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' 
-            : 'bg-white/80 dark:bg-gray-800/80 text-gray-400 hover:text-yellow-500 opacity-0 group-hover:opacity-100'
-        }`}
-      >
-        <svg className="w-3 h-3" fill={isFavorite ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-        </svg>
-      </button>
       
       {/* Active Indicator */}
       {isActive && (
