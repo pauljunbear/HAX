@@ -3,7 +3,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig } from '@/lib/effects';
-import { EffectLayer } from '@/hooks/useEffectLayers';
+
+interface EffectLayer {
+  id: string;
+  effectId: string;
+  settings: Record<string, number>;
+  visible: boolean;
+}
 
 interface AppleControlsPanelProps {
   activeEffect?: string | null;
@@ -30,61 +36,50 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   onRemoveEffect,
   onSetActiveLayer,
   onToggleLayerVisibility,
-  hasImage = false
+  hasImage = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<'settings' | 'layers' | 'export' | 'history'>('settings');
-  
-  const activeLayer = effectLayers.find(layer => layer.id === activeEffect);
-  const activeEffectName = activeLayer?.effectId;
-  const currentEffectConfig = activeEffectName ? effectsConfig[activeEffectName] : null;
+  const [activeTab, setActiveTab] = useState<'settings' | 'layers' | 'export' | 'history'>(
+    'settings'
+  );
 
-  const currentEffectSettings = currentEffectConfig?.settings ? 
-    Object.entries(currentEffectConfig.settings).map(([key, setting]) => ({
-      id: key,
+  // Get the active layer
+  const activeLayer = effectLayers.find(layer => layer.id === activeEffect);
+  const activeEffectConfig = activeLayer ? effectsConfig[activeLayer.effectId] : null;
+
+  // Get current effect settings with proper fallbacks
+  const currentEffectSettings =
+    activeEffectConfig?.settings?.map(setting => ({
       ...setting,
-      currentValue: effectSettings[key] ?? setting.default
-    })) : [];
+      currentValue: effectSettings[setting.id] ?? setting.defaultValue,
+    })) || [];
 
   const tabs = [
-    { id: 'settings', label: 'Settings', icon: '⚙️', disabled: !activeEffect },
-    { id: 'layers', label: 'Layers', icon: '📚', disabled: false },
-    { id: 'export', label: 'Export', icon: '📤', disabled: !hasImage },
-    { id: 'history', label: 'History', icon: '↩️', disabled: false }
-  ] as const;
+    { id: 'settings', label: 'Settings', icon: '⚙️' },
+    { id: 'layers', label: 'Layers', icon: '📚' },
+    { id: 'export', label: 'Export', icon: '📤' },
+    { id: 'history', label: 'History', icon: '🕐' },
+  ];
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-800">
-      {/* Tab Navigation */}
-      <div className="border-b border-gray-100 dark:border-gray-700">
-        <div className="flex">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => !tab.disabled && setActiveTab(tab.id)}
-              disabled={tab.disabled}
-              className={`flex-1 px-4 py-3 text-xs font-medium transition-all relative ${
-                activeTab === tab.id
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : tab.disabled
-                  ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              <div className="flex flex-col items-center space-y-1">
-                <span className="text-sm">{tab.icon}</span>
-                <span>{tab.label}</span>
-              </div>
-              
-              {activeTab === tab.id && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"
-                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                />
-              )}
-            </button>
-          ))}
-        </div>
+    <div className="glass-card-compact w-80 h-full flex flex-col">
+      {/* Compact Tab Navigation */}
+      <div className="flex border-b border-white/20 bg-white/10 rounded-t-lg">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex-1 px-3 py-2 text-compact font-medium transition-all duration-200 ${
+              activeTab === tab.id
+                ? 'text-blue-600 bg-white/20 border-b-2 border-blue-500'
+                : 'text-gray-600 hover:text-gray-800 hover:bg-white/10'
+            }`}
+          >
+            <div className="flex flex-col items-center space-y-1">
+              <span className="text-sm">{tab.icon}</span>
+              <span className="text-compact-sm">{tab.label}</span>
+            </div>
+          </button>
+        ))}
       </div>
 
       {/* Tab Content */}
@@ -97,79 +92,78 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="p-6"
+              className="p-4"
             >
-              {!activeEffect ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
-                    <span className="text-2xl">⚙️</span>
+              {!activeLayer ? (
+                <div className="text-center py-8">
+                  <div className="w-12 h-12 mx-auto mb-3 bg-gray-100/80 rounded-xl flex items-center justify-center">
+                    <span className="text-lg">⚙️</span>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-compact font-medium text-gray-900 mb-1">
                     No Effect Selected
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Choose an effect to adjust its settings
-                  </p>
-                </div>
-              ) : currentEffectSettings.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center">
-                    <span className="text-2xl text-blue-600 dark:text-blue-400">✨</span>
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    {currentEffectConfig?.label}
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    This effect has no adjustable settings
+                  <p className="text-compact-sm text-gray-500">
+                    Select an effect to adjust settings
                   </p>
                 </div>
               ) : (
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {currentEffectConfig?.label}
-                    </h3>
-                    <div className="flex items-center space-x-4">
-                      <button
-                        onClick={onResetSettings}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                      >
-                        Reset
-                      </button>
-                      <button
-                        onClick={() => onRemoveEffect?.(activeEffect)}
-                        className="text-xs text-red-600 dark:text-red-400 hover:underline font-medium"
-                      >
-                        Remove
-                      </button>
+                <div className="space-y-4">
+                  {/* Effect Header */}
+                  <div className="glass-card-compact p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h3 className="text-compact font-semibold text-gray-900">
+                          {activeEffectConfig?.label}
+                        </h3>
+                        <p className="text-compact-sm text-gray-500">
+                          {activeEffectConfig?.category}
+                        </p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={onResetSettings}
+                          className="glass-button-compact text-compact text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Reset
+                        </button>
+                        <button
+                          onClick={() => activeLayer && onRemoveEffect?.(activeLayer.id)}
+                          className="glass-button-compact text-compact text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div className="space-y-6">
+
+                  {/* Settings Controls */}
+                  <div className="space-y-4">
                     {currentEffectSettings.map(setting => (
-                      <div key={setting.id}>
-                        <div className="flex items-center justify-between mb-3">
-                          <label className="text-sm font-medium text-gray-900 dark:text-white">
+                      <div key={setting.id} className="glass-card-compact p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-compact font-medium text-gray-900">
                             {setting.label}
                           </label>
-                          <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                            {setting.currentValue}
+                          <span className="text-compact text-gray-500 font-mono bg-gray-100/50 px-2 py-0.5 rounded">
+                            {setting.currentValue.toFixed(2)}
                           </span>
                         </div>
-                        
-                        <div className="relative">
+
+                        <div className="space-y-2">
                           <input
                             type="range"
                             min={setting.min}
                             max={setting.max}
                             step={setting.step}
                             value={setting.currentValue}
-                            onChange={(e) => onSettingChange?.(setting.id, parseFloat(e.target.value))}
-                            className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider-thumb"
+                            onChange={e =>
+                              onSettingChange?.(setting.id, parseFloat(e.target.value))
+                            }
+                            className="apple-slider-compact w-full"
                           />
-                          
+
                           {/* Range markers */}
-                          <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1">
+                          <div className="flex justify-between text-compact-sm text-gray-400">
                             <span>{setting.min}</span>
                             <span>{setting.max}</span>
                           </div>
@@ -189,90 +183,118 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="p-6"
+              className="p-4"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Effect Stack
-                </h3>
-                <button 
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-compact font-semibold text-gray-900">Effect Stack</h3>
+                <button
                   onClick={onClearAllEffects}
                   disabled={effectLayers.length === 0}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium disabled:text-gray-400 disabled:dark:text-gray-600 disabled:cursor-not-allowed"
+                  className="glass-button-compact text-compact text-blue-600 hover:text-blue-700 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
                 >
                   Clear All
                 </button>
               </div>
-              
-              <div className="space-y-3">
+
+              <div className="space-y-2">
                 {effectLayers.length > 0 ? (
-                  effectLayers.map((layer) => {
+                  effectLayers.map(layer => {
                     const layerEffectConfig = effectsConfig[layer.effectId];
                     return (
-                      <div 
+                      <div
                         key={layer.id}
                         onClick={() => onSetActiveLayer?.(layer.id)}
-                        className={`rounded-xl p-4 border transition-colors cursor-pointer ${
+                        className={`glass-card-compact p-3 cursor-pointer transition-all duration-200 ${
                           activeEffect === layer.id
-                            ? 'bg-blue-50 dark:bg-gray-700/50 border-blue-500'
-                            : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600/50'
+                            ? 'bg-blue-50/80 border-blue-500/60 shadow-md'
+                            : 'hover:bg-white/90 hover:shadow-md'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-2">
                             <div>
-                              <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                              <h4 className="text-compact font-medium text-gray-900">
                                 {layerEffectConfig?.label}
                               </h4>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                              <p className="text-compact-sm text-gray-500">
                                 {layerEffectConfig?.category}
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <button 
-                              onClick={(e) => {
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={e => {
                                 e.stopPropagation();
                                 onToggleLayerVisibility?.(layer.id);
                               }}
-                              className="w-6 h-6 rounded-md bg-gray-200 dark:bg-gray-600 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+                              className="glass-button-compact w-5 h-5 flex items-center justify-center"
                             >
-                              <svg className={`w-3 h-3 ${layer.visible ? 'text-gray-600 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg
+                                className={`w-3 h-3 ${layer.visible ? 'text-gray-600' : 'text-gray-400'}`}
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
                                 {layer.visible ? (
                                   <>
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                    />
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                    />
                                   </>
                                 ) : (
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7 .946-3.11 3.586-5.442 6.834-6.175m5.444-1.122a.75.75 0 01.133.417v.465a.75.75 0 01-.416.685c-1.33.56-2.535 1.34-3.566 2.37A9.97 9.97 0 0012 15a9.97 9.97 0 00-2.37-3.566c-1.03-1.03-2.235-1.81-3.565-2.37a.75.75 0 01-.416-.684V6.417a.75.75 0 01.133-.417L4.175 4.175m15.65 15.65l-1.06-1.06M4.175 4.175L3.115 3.115" />
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7 .946-3.11 3.586-5.442 6.834-6.175m5.444-1.122a.75.75 0 01.133.417v.465a.75.75 0 01-.416.685c-1.33.56-2.535 1.34-3.566 2.37A9.97 9.97 0 0012 15a9.97 9.97 0 00-2.37-3.566c-1.03-1.03-2.235-1.81-3.565-2.37a.75.75 0 01-.416-.684V6.417a.75.75 0 01.133-.417L4.175 4.175m15.65 15.65l-1.06-1.06M4.175 4.175L3.115 3.115"
+                                  />
                                 )}
                               </svg>
                             </button>
-                            <button 
-                              onClick={(e) => {
+                            <button
+                              onClick={e => {
                                 e.stopPropagation();
                                 onRemoveEffect?.(layer.id);
                               }}
-                              className="w-6 h-6 rounded-md bg-gray-200 dark:bg-gray-600 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors"
+                              className="glass-button-compact w-5 h-5 flex items-center justify-center hover:bg-red-100/80"
                             >
-                              <svg className="w-3 h-3 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              <svg
+                                className="w-3 h-3 text-gray-600 hover:text-red-600 transition-colors"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
                               </svg>
                             </button>
                           </div>
                         </div>
                       </div>
-                    )
+                    );
                   })
                 ) : (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
-                      <span className="text-2xl">📚</span>
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 mx-auto mb-3 bg-gray-100/80 rounded-xl flex items-center justify-center">
+                      <span className="text-lg">📚</span>
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    <h3 className="text-compact font-medium text-gray-900 mb-1">
                       No Effects Applied
                     </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-compact-sm text-gray-500">
                       Effects will appear here as you apply them
                     </p>
                   </div>
@@ -288,99 +310,192 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="p-6"
+              className="p-4"
             >
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-                Export Options
-              </h3>
-              
+              <h3 className="text-compact font-semibold text-gray-900 mb-4">Export Options</h3>
+
               {!hasImage ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
-                    <span className="text-2xl">📤</span>
+                <div className="text-center py-8">
+                  <div className="w-12 h-12 mx-auto mb-3 bg-gray-100/80 rounded-xl flex items-center justify-center">
+                    <span className="text-lg">📤</span>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-compact font-medium text-gray-900 mb-1">
                     No Image to Export
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-compact-sm text-gray-500">
                     Upload an image to enable export options
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {/* Quick Export Buttons */}
-                  <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="space-y-3 mb-4">
                     <button
-                      onClick={() => onExport?.('png')}
-                      className="p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-xl transition-colors border border-blue-200 dark:border-blue-800"
+                      onClick={() => {
+                        console.log('🖱️ PNG button clicked in AppleControlsPanel');
+                        console.log('🖱️ onExport function exists:', !!onExport);
+                        onExport?.('png');
+                      }}
+                      className="w-full p-4 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                      style={{
+                        background:
+                          'radial-gradient(ellipse 228.79% 417.98% at 45.00% -30.45%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.50) 94%)',
+                        boxShadow: '0px 1.46px 8.75px rgba(0, 0, 0, 0.07)',
+                        borderRadius: '20px',
+                        backdropFilter: 'blur(21.87px)',
+                      }}
                     >
-                      <div className="text-center">
-                        <div className="w-8 h-8 mx-auto mb-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center">
-                          <span className="text-blue-600 dark:text-blue-400 text-sm font-semibold">PNG</span>
+                      <div
+                        className="w-full h-16 px-4 py-3 flex items-center justify-between"
+                        style={{
+                          opacity: 0.9,
+                          background: 'white',
+                          boxShadow: '0px 0.73px 1.46px rgba(255, 255, 255, 0.15) inset',
+                          borderRadius: '12px',
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-8 h-8 rounded-md"
+                            style={{
+                              opacity: 0.7,
+                              background:
+                                'linear-gradient(138deg, #7ADDE1 7%, #1359EC 45%, #A533CC 100%)',
+                            }}
+                          />
+                          <div className="w-1 h-8 bg-purple-400 rounded-full" />
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900 text-left">
+                              PNG Export
+                            </h4>
+                            <p className="text-xs text-gray-500 text-left">
+                              High quality, lossless
+                            </p>
+                          </div>
                         </div>
-                        <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                          High Quality
-                        </h4>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                          Best for editing
-                        </p>
+                        <div className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          PNG
+                        </div>
                       </div>
                     </button>
-                    
+
                     <button
-                      onClick={() => onExport?.('jpeg')}
-                      className="p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-xl transition-colors border border-green-200 dark:border-green-800"
+                      onClick={() => {
+                        console.log('🖱️ JPEG button clicked in AppleControlsPanel');
+                        console.log('🖱️ onExport function exists:', !!onExport);
+                        onExport?.('jpeg');
+                      }}
+                      className="w-full p-4 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                      style={{
+                        background:
+                          'radial-gradient(ellipse 228.79% 417.98% at 45.00% -30.45%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.50) 94%)',
+                        boxShadow: '0px 1.46px 8.75px rgba(0, 0, 0, 0.07)',
+                        borderRadius: '20px',
+                        backdropFilter: 'blur(21.87px)',
+                      }}
                     >
-                      <div className="text-center">
-                        <div className="w-8 h-8 mx-auto mb-2 bg-green-100 dark:bg-green-900/40 rounded-lg flex items-center justify-center">
-                          <span className="text-green-600 dark:text-green-400 text-sm font-semibold">JPG</span>
+                      <div
+                        className="w-full h-16 px-4 py-3 flex items-center justify-between"
+                        style={{
+                          opacity: 0.9,
+                          background: 'white',
+                          boxShadow: '0px 0.73px 1.46px rgba(255, 255, 255, 0.15) inset',
+                          borderRadius: '12px',
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-8 h-8 rounded-md"
+                            style={{
+                              opacity: 0.7,
+                              background:
+                                'linear-gradient(138deg, #7ADDE1 7%, #1359EC 45%, #A533CC 100%)',
+                            }}
+                          />
+                          <div className="w-1 h-8 bg-purple-400 rounded-full" />
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900 text-left">
+                              JPEG Export
+                            </h4>
+                            <p className="text-xs text-gray-500 text-left">
+                              Smaller size, web-ready
+                            </p>
+                          </div>
                         </div>
-                        <h4 className="text-sm font-medium text-green-900 dark:text-green-100">
-                          Smaller Size
-                        </h4>
-                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                          Best for sharing
-                        </p>
+                        <div className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded">
+                          JPG
+                        </div>
                       </div>
                     </button>
                   </div>
 
                   {/* Animated Export */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                      Animated Export
-                    </h4>
-                    <div className="space-y-2">
+                  <div className="border-t border-gray-200/50 pt-3">
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">Animated Export</h4>
+                    <div className="space-y-3">
                       {[
-                        { format: 'gif', label: 'GIF', description: 'Universal animated format', color: 'purple' },
-                        { format: 'webm', label: 'WebM', description: 'High quality video', color: 'orange' }
-                      ].map((option) => (
+                        {
+                          format: 'gif',
+                          label: 'GIF Export',
+                          description: 'Universal animated format',
+                          color: 'purple',
+                          bgColor: 'bg-purple-50',
+                          textColor: 'text-purple-600',
+                        },
+                        {
+                          format: 'webm',
+                          label: 'WebM Export',
+                          description: 'High quality video',
+                          color: 'orange',
+                          bgColor: 'bg-orange-50',
+                          textColor: 'text-orange-600',
+                        },
+                      ].map(option => (
                         <button
                           key={option.format}
                           onClick={() => onExport?.(option.format)}
-                          className="w-full p-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors text-left"
+                          className="w-full p-4 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                          style={{
+                            background:
+                              'radial-gradient(ellipse 228.79% 417.98% at 45.00% -30.45%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.50) 94%)',
+                            boxShadow: '0px 1.46px 8.75px rgba(0, 0, 0, 0.07)',
+                            borderRadius: '20px',
+                            backdropFilter: 'blur(21.87px)',
+                          }}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-semibold ${
-                                option.color === 'purple' 
-                                  ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400'
-                                  : 'bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400'
-                              }`}>
-                                {option.format.toUpperCase()}
-                              </div>
+                          <div
+                            className="w-full h-16 px-4 py-3 flex items-center justify-between"
+                            style={{
+                              opacity: 0.9,
+                              background: 'white',
+                              boxShadow: '0px 0.73px 1.46px rgba(255, 255, 255, 0.15) inset',
+                              borderRadius: '12px',
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-8 h-8 rounded-md"
+                                style={{
+                                  opacity: 0.7,
+                                  background:
+                                    'linear-gradient(138deg, #7ADDE1 7%, #1359EC 45%, #A533CC 100%)',
+                                }}
+                              />
+                              <div className="w-1 h-8 bg-purple-400 rounded-full" />
                               <div>
-                                <h5 className="text-sm font-medium text-gray-900 dark:text-white">
+                                <h4 className="text-sm font-medium text-gray-900 text-left">
                                   {option.label}
-                                </h5>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                </h4>
+                                <p className="text-xs text-gray-500 text-left">
                                   {option.description}
                                 </p>
                               </div>
                             </div>
-                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3" />
-                            </svg>
+                            <div
+                              className={`text-xs font-semibold ${option.textColor} ${option.bgColor} px-2 py-1 rounded`}
+                            >
+                              {option.format.toUpperCase()}
+                            </div>
                           </div>
                         </button>
                       ))}
@@ -398,26 +513,17 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="p-6"
+              className="p-4"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  History
-                </h3>
-                <button className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
-                  Clear
-                </button>
-              </div>
-              
-              <div className="text-center py-12">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-2xl flex items-center justify-center">
-                  <span className="text-2xl">↩️</span>
+              <h3 className="text-compact font-semibold text-gray-900 mb-4">Edit History</h3>
+
+              <div className="text-center py-8">
+                <div className="w-12 h-12 mx-auto mb-3 bg-gray-100/80 rounded-xl flex items-center justify-center">
+                  <span className="text-lg">🕐</span>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  No History Yet
-                </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Your editing history will appear here
+                <h3 className="text-compact font-medium text-gray-900 mb-1">History Coming Soon</h3>
+                <p className="text-compact-sm text-gray-500">
+                  Undo/redo functionality will be available here
                 </p>
               </div>
             </motion.div>
@@ -428,4 +534,4 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   );
 };
 
-export default AppleControlsPanel; 
+export default AppleControlsPanel;
