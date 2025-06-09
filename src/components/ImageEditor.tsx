@@ -108,82 +108,111 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
           if (format === 'png' || format === 'jpeg') {
             console.log('📸 Exporting static image at original resolution...');
 
-            // Create a temporary container for clean export
-            const tempContainer = document.createElement('div');
-            tempContainer.style.position = 'absolute';
-            tempContainer.style.top = '-9999px';
-            tempContainer.style.left = '-9999px';
-            tempContainer.style.background = 'transparent';
-            document.body.appendChild(tempContainer);
+            // Create a completely isolated canvas for clean export
+            const canvas = document.createElement('canvas');
+            canvas.width = image.width;
+            canvas.height = image.height;
+            canvas.style.position = 'absolute';
+            canvas.style.top = '-9999px';
+            canvas.style.left = '-9999px';
+            document.body.appendChild(canvas);
 
-            // Create a temporary stage with original image dimensions
-            const tempStage = new Konva.Stage({
-              container: tempContainer,
-              width: image.width,
-              height: image.height,
-              listening: false,
-            });
-
-            const tempLayer = new Konva.Layer();
-            tempStage.add(tempLayer);
-
-            // Create a clean image node at original size
-            const tempImage = new Konva.Image({
-              image: image,
-              x: 0,
-              y: 0,
-              width: image.width,
-              height: image.height,
-            });
-
-            // Copy filters and settings from the original image node
-            const originalImageNode = stageRef.current.findOne('Image');
-            if (originalImageNode) {
-              // Copy all applied filters
-              tempImage.filters(originalImageNode.filters());
-
-              // Copy all filter parameters
-              const filterParams = [
-                'brightness',
-                'contrast',
-                'saturation',
-                'hue',
-                'blurRadius',
-                'enhance',
-                'pixelSize',
-                'noise',
-                'threshold',
-                'levels',
-              ];
-
-              filterParams.forEach(param => {
-                if (
-                  typeof originalImageNode[param] === 'function' &&
-                  typeof tempImage[param] === 'function'
-                ) {
-                  try {
-                    tempImage[param](originalImageNode[param]());
-                  } catch (error) {
-                    console.warn(`Could not copy filter parameter ${param}:`, error);
-                  }
-                }
-              });
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              throw new Error('Could not get canvas context');
             }
 
-            tempLayer.add(tempImage);
-            tempImage.cache();
-            tempLayer.batchDraw();
+            // Set transparent background
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Export the clean image
-            const dataURL = tempStage.toDataURL({
-              mimeType: format === 'jpeg' ? 'image/jpeg' : 'image/png',
-              quality: format === 'jpeg' ? 0.9 : 1,
-              pixelRatio: 1,
-            });
+            // Get the original image node to check for applied effects
+            const originalImageNode = stageRef.current.findOne('Image') as any;
 
-            // Clean up temporary elements
-            document.body.removeChild(tempContainer);
-            tempStage.destroy();
+            if (originalImageNode && originalImageNode.filters().length > 0) {
+              // If there are effects applied, we need to render them
+              // Create a temporary off-screen stage just for rendering
+              const tempContainer = document.createElement('div');
+              tempContainer.style.position = 'absolute';
+              tempContainer.style.top = '-9999px';
+              tempContainer.style.left = '-9999px';
+              tempContainer.style.width = image.width + 'px';
+              tempContainer.style.height = image.height + 'px';
+              tempContainer.style.background = 'transparent';
+              tempContainer.style.border = 'none';
+              tempContainer.style.padding = '0';
+              tempContainer.style.margin = '0';
+              document.body.appendChild(tempContainer);
+
+              const tempStage = new Konva.Stage({
+                container: tempContainer,
+                width: image.width,
+                height: image.height,
+                listening: false,
+              });
+
+              const tempLayer = new Konva.Layer();
+              tempStage.add(tempLayer);
+
+              // Create a clean image node at exact dimensions
+              const tempImage = new Konva.Image({
+                image: image,
+                x: 0,
+                y: 0,
+                width: image.width,
+                height: image.height,
+                listening: false,
+              });
+
+              // Copy only the effects/filters, not any positioning or styling
+              if (originalImageNode.filters().length > 0) {
+                tempImage.filters(originalImageNode.filters());
+
+                // Copy filter parameters that affect pixel data, not layout
+                const safeFilterParams = [
+                  'brightness',
+                  'contrast',
+                  'saturation',
+                  'hue',
+                  'blurRadius',
+                ];
+                safeFilterParams.forEach(param => {
+                  if (
+                    typeof originalImageNode[param] === 'function' &&
+                    typeof tempImage[param] === 'function'
+                  ) {
+                    try {
+                      tempImage[param](originalImageNode[param]());
+                    } catch (error) {
+                      console.warn(`Could not copy filter parameter ${param}:`, error);
+                    }
+                  }
+                });
+              }
+
+              tempLayer.add(tempImage);
+              tempImage.cache();
+              tempLayer.batchDraw();
+
+              // Render to our clean canvas
+              const tempCanvas = tempStage.toCanvas();
+              ctx.drawImage(tempCanvas, 0, 0);
+
+              // Clean up
+              document.body.removeChild(tempContainer);
+              tempStage.destroy();
+            } else {
+              // No effects applied, just draw the raw image
+              ctx.drawImage(image, 0, 0);
+            }
+
+            // Export the clean canvas
+            const dataURL = canvas.toDataURL(
+              format === 'jpeg' ? 'image/jpeg' : 'image/png',
+              format === 'jpeg' ? 0.9 : 1
+            );
+
+            // Clean up
+            document.body.removeChild(canvas);
 
             console.log('📸 Generated clean data URL, creating download...');
 
