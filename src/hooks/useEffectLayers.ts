@@ -2,7 +2,8 @@ import { useState, useCallback } from 'react';
 import { EffectLayer } from '@/components/EffectLayers';
 import { effectsConfig } from '@/lib/effects';
 
-const generateLayerId = () => `effect-layer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const generateLayerId = () =>
+  `effect-layer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 const useEffectLayers = () => {
   const [layers, setLayers] = useState<EffectLayer[]>([]);
@@ -17,7 +18,7 @@ const useEffectLayers = () => {
     const defaultSettings: Record<string, number> = {};
     if (effect.settings) {
       Object.entries(effect.settings).forEach(([key, setting]) => {
-        defaultSettings[key] = setting.default;
+        defaultSettings[key] = setting.defaultValue;
       });
     }
 
@@ -35,28 +36,27 @@ const useEffectLayers = () => {
   }, []);
 
   // Remove a layer
-  const removeLayer = useCallback((layerId: string) => {
-    setLayers(prev => {
-      const filtered = prev.filter(layer => layer.id !== layerId);
-      
-      // Update active layer if needed
-      if (activeLayerId === layerId && filtered.length > 0) {
-        setActiveLayerId(filtered[filtered.length - 1].id);
-      } else if (filtered.length === 0) {
-        setActiveLayerId(null);
-      }
-      
-      return filtered;
-    });
-  }, [activeLayerId]);
+  const removeLayer = useCallback(
+    (layerId: string) => {
+      setLayers(prev => {
+        const filtered = prev.filter(layer => layer.id !== layerId);
+
+        // Update active layer if needed
+        if (activeLayerId === layerId && filtered.length > 0) {
+          setActiveLayerId(filtered[filtered.length - 1].id);
+        } else if (filtered.length === 0) {
+          setActiveLayerId(null);
+        }
+
+        return filtered;
+      });
+    },
+    [activeLayerId]
+  );
 
   // Update a layer
   const updateLayer = useCallback((layerId: string, updates: Partial<EffectLayer>) => {
-    setLayers(prev => 
-      prev.map(layer => 
-        layer.id === layerId ? { ...layer, ...updates } : layer
-      )
-    );
+    setLayers(prev => prev.map(layer => (layer.id === layerId ? { ...layer, ...updates } : layer)));
   }, []);
 
   // Reorder layers
@@ -89,7 +89,7 @@ const useEffectLayers = () => {
   const getCombinedEffect = useCallback(() => {
     const visibleLayers = layers.filter(layer => layer.visible);
     if (visibleLayers.length === 0) return null;
-    
+
     // Return all visible layers to be applied in order
     return visibleLayers;
   }, [layers]);
@@ -101,24 +101,23 @@ const useEffectLayers = () => {
   }, []);
 
   // Duplicate a layer
-  const duplicateLayer = useCallback((layerId: string) => {
-    const layerToDuplicate = layers.find(l => l.id === layerId);
-    if (!layerToDuplicate) return;
+  const duplicateLayer = useCallback(
+    (layerId: string) => {
+      const layerToDuplicate = layers.find(l => l.id === layerId);
+      if (!layerToDuplicate) return;
 
-    const newLayer: EffectLayer = {
-      ...layerToDuplicate,
-      id: generateLayerId(),
-      settings: { ...layerToDuplicate.settings },
-    };
+      const newLayer: EffectLayer = {
+        ...layerToDuplicate,
+        id: generateLayerId(),
+        settings: { ...layerToDuplicate.settings },
+      };
 
-    const index = layers.findIndex(l => l.id === layerId);
-    setLayers(prev => [
-      ...prev.slice(0, index + 1),
-      newLayer,
-      ...prev.slice(index + 1)
-    ]);
-    setActiveLayerId(newLayer.id);
-  }, [layers]);
+      const index = layers.findIndex(l => l.id === layerId);
+      setLayers(prev => [...prev.slice(0, index + 1), newLayer, ...prev.slice(index + 1)]);
+      setActiveLayerId(newLayer.id);
+    },
+    [layers]
+  );
 
   return {
     layers,
@@ -136,4 +135,4 @@ const useEffectLayers = () => {
   };
 };
 
-export default useEffectLayers; 
+export default useEffectLayers;

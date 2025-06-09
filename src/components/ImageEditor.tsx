@@ -1,37 +1,37 @@
 'use client';
 
-import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+  useCallback,
+} from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from '@/hooks/useImage';
 import { applyEffect, getFilterConfig, ensureKonvaInitialized } from '@/lib/effects';
-import { SelectionType, SelectionData } from './SelectionTool';
-import SelectionToolbar from './SelectionToolbar';
+// Removed unused imports
 import { EffectLayer } from './EffectLayers';
 import { supportsAnimation, getAnimationConfig } from '@/lib/animationConfig';
-import { renderAnimationFrames, exportAsGif, exportAnimationAs, downloadBlob, downloadVideo, exportMultiLayerAnimation, AnimatedEffectLayer } from '@/lib/animationRenderer';
+import {
+  renderAnimationFrames,
+  exportAsGif,
+  exportAnimationAs,
+  downloadBlob,
+  downloadVideo,
+  exportMultiLayerAnimation,
+  AnimatedEffectLayer,
+} from '@/lib/animationRenderer';
 import { motion, AnimatePresence } from 'framer-motion';
 import Konva from 'konva';
-// Note: ThreeDEffectsCanvas removed due to poor user experience
-// Note: GenerativeOverlay removed due to performance issues
-import { PerformanceMonitor, usePerformanceMonitor, PerformanceMetrics } from './PerformanceMonitor';
-import { getWorkerManager, cleanupWorkerManager } from '@/lib/performance/WorkerManager';
-import { BatchProcessor, BatchOperation } from '@/lib/performance/BatchProcessor';
-import { ARIA_LABELS, focusRingClass, announce } from '@/lib/accessibility';
-import { getEffectPreviewCache } from '@/lib/performance/EffectPreviewCache';
-import { VirtualScroll } from './VirtualScroll';
-import { BeforeAfterSplitView } from './BeforeAfterSplitView';
-import { TouchGestures } from './TouchGestures';
-import { useKeyboardShortcuts, EDITOR_SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
-import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
-import { triggerHaptic, createToggleHapticHandler, createRangeHapticHandler } from '@/lib/haptics'
 
 interface ImageEditorProps {
   selectedImage?: string | null;
-  effectLayers?: EffectLayer[];  // Changed from activeEffect to effectLayers
+  effectLayers?: EffectLayer[];
   onImageUpload?: (imageDataUrl: string) => void;
   exportTrigger?: number;
   onExportComplete?: () => void;
-  // Generative overlay props
   showOverlay?: boolean;
   overlayEffect?: 'stars' | 'bubbles' | 'network' | 'snow' | 'confetti' | 'fireflies';
   overlayOpacity?: number;
@@ -43,1480 +43,406 @@ interface ImageEditorProps {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
-// Wrap component with forwardRef
-const ImageEditor = forwardRef<any, ImageEditorProps>((
-  {
-    selectedImage,
-    effectLayers,
-    onImageUpload,
-    exportTrigger,
-    onExportComplete,
-    showOverlay,
-    overlayEffect,
-    overlayOpacity,
-    overlayParticleCount,
-    overlayColor,
-    overlaySpeed,
-    overlayInteractive,
-  },
-  ref
-) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const stageRef = useRef<any>(null);
-  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const [image, imageStatus] = useImage(selectedImage || '');
-  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [exportQuality, setExportQuality] = useState<number>(0.9); // 0.0 to 1.0
-  const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'gif' | 'webm' | 'mp4'>('png');
-  const [isBrowser, setIsBrowser] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>({});
-  const [showExportOptions, setShowExportOptions] = useState(false);
-  const [animationDuration, setAnimationDuration] = useState(2000);
-  const [animationFrameRate, setAnimationFrameRate] = useState(30);
-  const [isExportingAnimation, setIsExportingAnimation] = useState(false);
-  const [animationProgress, setAnimationProgress] = useState(0);
-  
-  // Performance monitoring state
-  const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
-  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
-  const [workerManager, setWorkerManager] = useState<any>(null);
-  const [batchProcessor, setBatchProcessor] = useState<BatchProcessor | null>(null);
-  const [processingTime, setProcessingTime] = useState<number>(0);
-  const [lastProcessingTime, setLastProcessingTime] = useState<number>(0);
-  
-  // Performance monitoring hooks
-  const { startRender, endRender, startOperation, endOperation } = usePerformanceMonitor();
-  
-  const [originalImage, setOriginalImage] = useState<HTMLImageElement | null>(null);
-  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
-  // Create haptic feedback handlers
-  const effectToggleHaptic = createToggleHapticHandler('success')
-  const effectAmountHaptic = createRangeHapticHandler(0, 100, 10)
-  const exportHaptic = createToggleHapticHandler('success')
-  const resetHaptic = createToggleHapticHandler('warning')
-  const splitViewHaptic = createToggleHapticHandler('medium')
-  
-  // Debug ref attachment
-  useEffect(() => {
-    console.log("ImageEditor component mounted, ref:", ref);
-  }, [ref]);
+const ImageEditor = forwardRef<any, ImageEditorProps>(
+  (
+    {
+      selectedImage,
+      effectLayers,
+      onImageUpload,
+      exportTrigger,
+      onExportComplete,
+      showOverlay,
+      overlayEffect,
+      overlayOpacity,
+      overlayParticleCount,
+      overlayColor,
+      overlaySpeed,
+      overlayInteractive,
+    },
+    ref
+  ) => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const stageRef = useRef<any>(null);
+    const [image, imageStatus] = useImage(selectedImage || '');
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [exportQuality, setExportQuality] = useState<number>(0.9);
+    const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'gif' | 'webm' | 'mp4'>(
+      'png'
+    );
+    const [isBrowser, setIsBrowser] = useState(false);
+    const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
+    const [isExportingAnimation, setIsExportingAnimation] = useState(false);
+    const [animationProgress, setAnimationProgress] = useState(0);
 
-  // Touch gesture handlers
-  const handleZoom = useCallback((scale: number) => {
-    if (stageRef.current) {
-      stageRef.current.scale({ x: scale, y: scale });
-      stageRef.current.batchDraw();
-    }
-  }, []);
+    // Simplified state (removed unused performance monitoring)
 
-  const handleRotate = useCallback((rotation: number) => {
-    if (stageRef.current) {
-      stageRef.current.rotation(rotation);
-      stageRef.current.batchDraw();
-    }
-  }, []);
+    // Performance monitoring hooks (simplified)
+    const startRender = () => {};
+    const endRender = () => {};
+    const startOperation = () => {};
+    const endOperation = () => {};
 
-  const handlePan = useCallback((x: number, y: number) => {
-    if (stageRef.current) {
-      stageRef.current.position({ x, y });
-      stageRef.current.batchDraw();
-    }
-  }, []);
+    // Removed unused state variables
 
-  // Initialize performance systems
-  useEffect(() => {
-    const initializePerformanceSystems = async () => {
-      try {
-        // Initialize worker manager
-        const manager = await getWorkerManager();
-        setWorkerManager(manager);
-        console.log('✅ WorkerManager initialized successfully');
-        
-        // Test worker with a simple operation
-        try {
-          const testImageData = new ImageData(100, 100);
-          const result = await manager.applyEffect('blur', { intensity: 5 }, testImageData);
-          console.log('✅ Worker test successful:', result.width, 'x', result.height);
-        } catch (error) {
-          console.warn('⚠️ Worker test failed:', error);
-        }
-        
-        // Initialize batch processor
-        const processor = new BatchProcessor();
-        setBatchProcessor(processor);
-        console.log('✅ BatchProcessor initialized successfully');
-        
-      } catch (error) {
-        console.error('❌ Failed to initialize performance systems:', error);
-        // Continue without workers - graceful degradation
-      }
-    };
+    // Simplified haptic handlers (removed unused ones)
 
-    if (isBrowser) {
-      initializePerformanceSystems();
-    }
-  }, [isBrowser]);
+    // Clean export function that preserves original image dimensions and applies effects
+    const exportWithFormat = useCallback(
+      async (format: 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4') => {
+        console.log('🚀 exportWithFormat called with format:', format);
+        console.log('🖼️ Stage available:', !!stageRef.current);
+        console.log('🖼️ Image available:', !!image);
 
-  // Performance metrics handler
-  const handlePerformanceChange = (metrics: PerformanceMetrics) => {
-    setPerformanceMetrics(metrics);
-    
-    // Auto-enable performance monitor if performance is poor
-    if (metrics.fps < 25 || metrics.memoryUsage / metrics.memoryLimit > 0.85) {
-      setShowPerformanceMonitor(true);
-    }
-  };
-
-  // Toggle performance monitor with keyboard shortcut
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'p' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
-        e.preventDefault();
-        setShowPerformanceMonitor(prev => !prev);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []);
-  
-  // Define exportWithFormat before useImperativeHandle
-  const exportWithFormat = async (format: 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4') => {
-    if (!stageRef.current || !image) return;
-    
-    const animatedLayers = effectLayers?.filter(layer => 
-      layer.visible && supportsAnimation(layer.effectId)
-    ) || [];
-    
-    const firstAnimatedEffect = animatedLayers[0];
-    const animationConfig = firstAnimatedEffect ? getAnimationConfig(firstAnimatedEffect.effectId) : null;
-    
-    try {
-      if ((format === 'gif' || format === 'webm' || format === 'mp4') && animatedLayers.length > 0 && firstAnimatedEffect && animationConfig) {
-        // Show enhanced progress dialog with cancel option
-        const progressDialog = document.createElement('div');
-        progressDialog.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
-        const formatName = format.toUpperCase();
-        const exportingText = format === 'gif' ? 'Creating Animated GIF' : `Creating ${formatName} Video`;
-        
-        // Track if export was cancelled
-        let exportCancelled = false;
-        
-        progressDialog.innerHTML = `
-          <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-sm font-semibold">${exportingText}</h3>
-              <button id="cancel-export-btn" class="text-gray-400 hover:text-gray-600 text-xl leading-none" title="Cancel export">&times;</button>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-3 mb-3">
-              <div id="progress-bar" class="bg-primary-accent h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
-            </div>
-            <div class="space-y-2">
-              <p id="progress-text" class="text-xs text-gray-600">Preparing...</p>
-              <p id="progress-details" class="text-xs text-gray-500"></p>
-              <div id="optimization-info" class="text-xs bg-blue-50 text-blue-700 p-2 rounded hidden">
-                <span class="font-medium">Optimization:</span> <span id="optimization-text"></span>
-              </div>
-            </div>
-          </div>
-        `;
-        document.body.appendChild(progressDialog);
-        
-        // Set up cancel functionality
-        const cancelBtn = progressDialog.querySelector('#cancel-export-btn') as HTMLButtonElement;
-        cancelBtn.addEventListener('click', () => {
-          exportCancelled = true;
-          document.body.removeChild(progressDialog);
-          console.log('Export cancelled by user');
-        });
-        
-        const progressBar = progressDialog.querySelector('#progress-bar') as HTMLElement;
-        const progressText = progressDialog.querySelector('#progress-text') as HTMLElement;
-        const progressDetails = progressDialog.querySelector('#progress-details') as HTMLElement;
-        const optimizationInfo = progressDialog.querySelector('#optimization-info') as HTMLElement;
-        const optimizationText = progressDialog.querySelector('#optimization-text') as HTMLElement;
-        
-        // Get current settings for the animated effect
-        const currentSettings = effectLayers?.find(
-          layer => layer.effectId === firstAnimatedEffect.effectId
-        )?.settings || {};
-        
-        if (format === 'gif') {
-          // GIF export with multiple animated layers
-          
-          // Prepare all animated effect layers
-          const animatedEffectLayers: AnimatedEffectLayer[] = animatedLayers.map(layer => {
-            const config = getAnimationConfig(layer.effectId);
-            return {
-              effectId: layer.effectId,
-              settings: layer.settings || {},
-              animationConfig: config
-            };
-          });
-          
-          // Use multi-layer export for GIF
-          await exportMultiLayerAnimation(
-            image,
-            animatedEffectLayers,
-            {
-              duration: 2000, // 2 seconds default
-              frameRate: 24,
-              width: image.width,
-              height: image.height,
-              exportFormat: format,
-              exportQuality: 8,
-              onProgress: (stage, progress) => {
-                if (exportCancelled) return;
-                progressBar.style.width = `${progress * 100}%`;
-                progressText.textContent = `${stage}... ${Math.round(progress * 100)}%`;
-                if (stage === 'Rendering frames') {
-                  const estimatedFrames = Math.ceil((2000 / 1000) * 24);
-                  progressDetails.textContent = `Processing ${animatedLayers.length} animated effects - Frame ${Math.ceil(progress * estimatedFrames)} of ${estimatedFrames}`;
-                } else {
-                  progressDetails.textContent = 'Encoding frames with optimized settings...';
-                }
-              },
-              onComplete: (blob, exportedFormat) => {
-                if (exportCancelled) return;
-                const finalSizeKB = Math.round(blob.size / 1024);
-                console.log(`GIF export completed: ${finalSizeKB}KB`);
-                
-                // Show completion message briefly
-                progressText.textContent = `Export completed! File size: ${finalSizeKB}KB`;
-                progressDetails.textContent = 'Starting download...';
-                
-                setTimeout(() => {
-                  downloadBlob(blob, `animated-${Date.now()}.gif`);
-                  if (document.body.contains(progressDialog)) {
-                    document.body.removeChild(progressDialog);
-                  }
-                }, 1000);
-              },
-              onError: (error) => {
-                console.error('GIF export error:', error);
-                if (document.body.contains(progressDialog)) {
-                  document.body.removeChild(progressDialog);
-                }
-                if (!exportCancelled) {
-                  alert('Failed to export GIF: ' + error.message);
-                }
-              }
-            }
-          );
-        } else {
-          // Video export (WebM/MP4) with multiple animated layers
-          
-          // Prepare all animated effect layers
-          const animatedEffectLayers: AnimatedEffectLayer[] = animatedLayers.map(layer => {
-            const config = getAnimationConfig(layer.effectId);
-            return {
-              effectId: layer.effectId,
-              settings: layer.settings || {},
-              animationConfig: config
-            };
-          });
-          
-          // Debug logging
-          console.log('Starting video export with layers:', animatedEffectLayers);
-          console.log('Image dimensions:', image.width, 'x', image.height);
-          console.log('Export format:', format);
-          
-          // Use multi-layer export
-          await exportMultiLayerAnimation(
-            image,
-            animatedEffectLayers,
-            {
-              duration: 3000, // 3 seconds for video
-              frameRate: format === 'webm' ? 30 : 24, // Higher framerate for video
-              width: image.width,
-              height: image.height,
-              exportFormat: format,
-              exportQuality: 8, // High quality (1-10 scale)
-              onProgress: (stage, progress) => {
-                if (exportCancelled) return;
-                console.log(`Export progress: ${stage} - ${Math.round(progress * 100)}%`);
-                progressBar.style.width = `${progress * 100}%`;
-                progressText.textContent = `${stage}... ${Math.round(progress * 100)}%`;
-                if (stage === 'Rendering frames') {
-                  const estimatedFrames = Math.ceil((3000 / 1000) * (format === 'webm' ? 30 : 24));
-                  progressDetails.textContent = `Processing ${animatedLayers.length} animated effects - Frame ${Math.ceil(progress * estimatedFrames)} of ${estimatedFrames}`;
-                } else {
-                  progressDetails.textContent = `Encoding ${format.toUpperCase()} with quality ${8}/10`;
-                }
-              },
-              onComplete: (blob, exportedFormat) => {
-                if (exportCancelled) return;
-                const finalSizeMB = (blob.size / 1024 / 1024).toFixed(2);
-                console.log(`${exportedFormat.toUpperCase()} export completed: ${finalSizeMB}MB`);
-                
-                // Show completion message
-                progressText.textContent = `Export completed! File size: ${finalSizeMB}MB`;
-                progressDetails.textContent = 'Starting download...';
-                
-                setTimeout(() => {
-                  downloadVideo(blob, exportedFormat as 'webm' | 'mp4', 'animated-effect');
-                  if (document.body.contains(progressDialog)) {
-                    document.body.removeChild(progressDialog);
-                  }
-                }, 1000);
-              },
-              onError: (error) => {
-                console.error('Video export error:', error);
-                if (document.body.contains(progressDialog)) {
-                  document.body.removeChild(progressDialog);
-                }
-                if (!exportCancelled) {
-                  alert('Failed to export video: ' + error.message);
-                }
-              }
-            }
-          );
-        }
-        
-      } else {
-        // Static image export with overlay compositing
-        await exportStaticImageWithOverlay(format as 'png' | 'jpeg');
-      }
-    } catch (error) {
-      console.error("Export error:", error);
-      alert('Failed to export image: ' + (error as Error).message);
-    }
-    exportHaptic(true)
-  };
-
-  // Helper function to export static image with overlay compositing
-  const exportStaticImageWithOverlay = async (format: 'png' | 'jpeg') => {
-    // Create a clean container div with no styling
-    const tempContainer = document.createElement('div');
-    tempContainer.style.position = 'absolute';
-    tempContainer.style.top = '-9999px';
-    tempContainer.style.left = '-9999px';
-    tempContainer.style.background = 'transparent';
-    tempContainer.style.border = 'none';
-    tempContainer.style.padding = '0';
-    tempContainer.style.margin = '0';
-    document.body.appendChild(tempContainer);
-    
-    try {
-      // Create a temporary stage with the exact image dimensions
-      const tempStage = new Konva.Stage({
-        container: tempContainer,
-        width: image.width,
-        height: image.height,
-        listening: false
-      });
-      
-      // Ensure stage has transparent background
-      tempStage.container().style.backgroundColor = 'transparent';
-      
-      const tempLayer = new Konva.Layer();
-      tempStage.add(tempLayer);
-      
-      // Create image node
-      const tempImage = new Konva.Image({
-        image: image,
-        x: 0,
-        y: 0,
-        width: image.width,
-        height: image.height
-      });
-      
-      // Copy filters from the original image node
-      const originalImageNode = stageRef.current.findOne('Image');
-      if (originalImageNode) {
-        tempImage.filters(originalImageNode.filters());
-        // Copy all filter parameters
-        const filterParams = ['brightness', 'contrast', 'saturation', 'hue', 'blurRadius', 'enhance', 'pixelSize', 'noise', 'threshold', 'levels'];
-        filterParams.forEach(param => {
-          if (typeof originalImageNode[param] === 'function' && typeof tempImage[param] === 'function') {
-            tempImage[param](originalImageNode[param]());
-          }
-        });
-      }
-      
-      tempLayer.add(tempImage);
-      tempImage.cache();
-      tempLayer.batchDraw();
-      
-      // Create final composite canvas
-      const finalCanvas = document.createElement('canvas');
-      finalCanvas.width = image.width;
-      finalCanvas.height = image.height;
-      const finalCtx = finalCanvas.getContext('2d');
-      
-      if (!finalCtx) {
-        throw new Error('Failed to get canvas context');
-      }
-      
-      // Draw the processed image to final canvas
-      const imageDataURL = tempStage.toDataURL({
-        pixelRatio: 1,
-        mimeType: 'image/png', // Always use PNG for intermediate to preserve quality
-        quality: 1,
-      });
-      
-      // Load the image data and draw it
-      const processedImage = new Image();
-      processedImage.onload = async () => {
-        finalCtx.drawImage(processedImage, 0, 0);
-        
-        // Note: Overlay composition removed since generative overlays are disabled
-        
-        // Export the final composite
-        const uri = finalCanvas.toDataURL(
-          format === 'jpeg' ? 'image/jpeg' : 'image/png',
-          format === 'jpeg' ? 0.9 : 1
-        );
-        
-        const link = document.createElement('a');
-        link.download = `edited-image-${Date.now()}.${format}`;
-        link.href = uri;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Cleanup
-        tempStage.destroy();
-        document.body.removeChild(tempContainer);
-      };
-      
-      processedImage.src = imageDataURL;
-      
-    } catch (error) {
-      // Cleanup on error
-      document.body.removeChild(tempContainer);
-      throw error;
-    }
-  };
-
-  // Helper function to composite overlay on canvas
-  const compositeOverlayOnCanvas = async (finalCanvas: HTMLCanvasElement, finalCtx: CanvasRenderingContext2D) => {
-    try {
-      // Find the overlay canvas element
-      const overlayElement = document.querySelector('#canvas-overlay canvas') as HTMLCanvasElement;
-      
-      if (overlayElement) {
-        // Get the current container dimensions to calculate scale
-        const containerRect = containerRef.current?.getBoundingClientRect();
-        if (containerRect) {
-          // Calculate scale factors
-          const scaleX = finalCanvas.width / containerRect.width;
-          const scaleY = finalCanvas.height / containerRect.height;
-          
-          // Create a temporary canvas for scaling the overlay
-          const tempOverlayCanvas = document.createElement('canvas');
-          tempOverlayCanvas.width = finalCanvas.width;
-          tempOverlayCanvas.height = finalCanvas.height;
-          const tempOverlayCtx = tempOverlayCanvas.getContext('2d');
-          
-          if (tempOverlayCtx) {
-            // Scale and draw the overlay
-            tempOverlayCtx.globalAlpha = effectiveOverlayProps.overlayOpacity;
-            tempOverlayCtx.drawImage(
-              overlayElement,
-              0, 0, overlayElement.width, overlayElement.height,
-              0, 0, finalCanvas.width, finalCanvas.height
-            );
-            
-            // Composite the scaled overlay onto the final canvas
-            finalCtx.globalCompositeOperation = 'source-over';
-            finalCtx.drawImage(tempOverlayCanvas, 0, 0);
-          }
-        }
-      } else {
-        console.warn('Overlay canvas not found for export');
-      }
-    } catch (error) {
-      console.error('Error compositing overlay:', error);
-      // Continue with export even if overlay fails
-    }
-  };
-  
-  // Handle export trigger from parent
-  useEffect(() => {
-    if (exportTrigger && exportTrigger > 0 && stageRef.current && image) {
-      console.log("Export triggered via prop");
-      
-      // Reset the trigger immediately to prevent re-showing on effect changes
-      onExportComplete?.();
-      
-      // Check if we have animated effects
-      const animatedLayers = effectLayers?.filter(layer => 
-        layer.visible && supportsAnimation(layer.effectId)
-      ) || [];
-      
-      // Show export dialog
-      const dialog = document.createElement('div');
-      dialog.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
-      dialog.innerHTML = `
-        <div class="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
-          <h3 class="text-sm font-semibold mb-4">Export Options</h3>
-          <div class="space-y-3">
-            <button class="export-option w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-format="png">
-              Export as PNG
-            </button>
-            <button class="export-option w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-format="jpeg">
-              Export as JPEG
-            </button>
-            ${animatedLayers.length > 0 ? `
-              <button class="export-option w-full py-3 px-4 bg-primary-accent hover:bg-primary-accent/90 text-white rounded-lg text-sm font-medium transition-colors" data-format="gif">
-                Export as GIF (Animated)
-              </button>
-              <button class="export-option w-full py-3 px-4 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors" data-format="webm">
-                Export as WebM (Video)
-              </button>
-              <button class="export-option w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors" data-format="mp4">
-                Export as MP4 (Video)
-              </button>
-            ` : ''}
-          </div>
-          <button class="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700" id="cancel-export">
-            Cancel
-          </button>
-        </div>
-      `;
-      
-      document.body.appendChild(dialog);
-      
-      // Handle clicks
-      const handleClick = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (target.classList.contains('export-option')) {
-          const selectedFormat = target.getAttribute('data-format') as 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4';
-          document.body.removeChild(dialog);
-          exportWithFormat(selectedFormat);
-        } else if (target.id === 'cancel-export' || target === dialog) {
-          document.body.removeChild(dialog);
-        }
-      };
-      
-      dialog.addEventListener('click', handleClick);
-    }
-  }, [exportTrigger, effectLayers, image, exportWithFormat, onExportComplete]);
-  
-  // Expose the export method via ref
-  useImperativeHandle(ref, () => {
-    console.log("useImperativeHandle called, creating ref object");
-    return {
-      exportImage: async (format?: 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4') => {
-        console.log("Export method called on ImageEditor ref");
-        console.log("Current effect layers:", effectLayers);
-        
         if (!stageRef.current || !image) {
-          console.error("Cannot export: Stage or image not ready");
+          console.error('❌ Missing stage or image for export');
+          alert('Cannot export: Image or stage not ready');
           return;
         }
 
-        // Check if we have animated effects
-        const animatedLayers = effectLayers?.filter(layer => 
-          layer.visible && supportsAnimation(layer.effectId)
-        ) || [];
-        
-        console.log("Animated layers found:", animatedLayers);
-        console.log("Effect layer IDs:", effectLayers?.map(l => l.effectId));
-        console.log("Which ones support animation:", effectLayers?.map(l => ({
-          id: l.effectId,
-          supportsAnimation: supportsAnimation(l.effectId)
-        })));
-        
-        // If format is not specified, show export dialog
-        if (!format) {
-          // Create and show export dialog
-          const showExportDialog = () => {
-            const dialog = document.createElement('div');
-            dialog.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
-            dialog.innerHTML = `
-              <div class="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
-                <h3 class="text-sm font-semibold mb-4">Export Options</h3>
-                <div class="space-y-3">
-                  <button class="export-option w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-format="png">
-                    Export as PNG
-                  </button>
-                  <button class="export-option w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors" data-format="jpeg">
-                    Export as JPEG
-                  </button>
-                  ${animatedLayers.length > 0 ? `
-                    <button class="export-option w-full py-3 px-4 bg-primary-accent hover:bg-primary-accent/90 text-white rounded-lg text-sm font-medium transition-colors" data-format="gif">
-                      Export as GIF (Animated)
-                    </button>
-                    <button class="export-option w-full py-3 px-4 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors" data-format="webm">
-                      Export as WebM (Video)
-                    </button>
-                    <button class="export-option w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors" data-format="mp4">
-                      Export as MP4 (Video)
-                    </button>
-                  ` : ''}
-                </div>
-                <button class="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700" id="cancel-export">
-                  Cancel
-                </button>
-              </div>
-            `;
-            
-            document.body.appendChild(dialog);
-
-            // Handle clicks
-            const handleClick = (e: MouseEvent) => {
-              const target = e.target as HTMLElement;
-              if (target.classList.contains('export-option')) {
-                const selectedFormat = target.getAttribute('data-format') as 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4';
-                document.body.removeChild(dialog);
-                exportWithFormat(selectedFormat);
-              } else if (target.id === 'cancel-export' || target === dialog) {
-                document.body.removeChild(dialog);
-              }
-            };
-            
-            dialog.addEventListener('click', handleClick);
-          };
-          
-          showExportDialog();
-          return;
-        }
-        
-        // Export with specified format
-        exportWithFormat(format);
-      },
-      
-      // Add function to get current canvas data URL
-      getCanvasDataURL: () => {
-        if (!stageRef.current) return null;
-        return stageRef.current.toDataURL({
-          pixelRatio: window.devicePixelRatio || 1,
-        });
-      },
-      
-      // Add function to get the stage reference
-      getStage: () => stageRef.current
-    };
-  }, [image, stageRef, imageSize, effectLayers, exportWithFormat]);
-
-  // Detect browser environment to avoid SSR issues
-  useEffect(() => {
-    setIsBrowser(true);
-    console.log("Browser detected, component mounted");
-  }, []);
-
-  // Generate effect previews when image is loaded
-  useEffect(() => {
-    if (image && imageStatus.status === 'loaded' && selectedImage && isBrowser) {
-      console.log('Generating effect previews for loaded image');
-      
-      // Generate previews for common effects in the background
-      const previewCache = getEffectPreviewCache();
-      const commonEffects = [
-        'brightness', 'contrast', 'saturation', 'hue', 'blur', 'sharpen',
-        'vintage', 'sepia', 'grayscale', 'pixelate', 'edgeDetection',
-        'emboss', 'mandelbrot', 'juliaSet', 'voronoi', 'delaunay'
-      ];
-      
-      // Generate previews with a small delay to not block UI
-      setTimeout(async () => {
         try {
-          await previewCache.generatePreviews(
-            selectedImage,
-            commonEffects.slice(0, 10), // Start with first 10 effects
-            image
-          );
-          console.log('Initial previews generated');
-          
-          // Generate remaining previews with lower priority
-          setTimeout(async () => {
-            await previewCache.generatePreviews(
-              selectedImage,
-              commonEffects.slice(10),
-              image
-            );
-            console.log('All previews generated');
-          }, 1000);
-        } catch (error) {
-          console.error('Failed to generate previews:', error);
-        }
-      }, 500);
-    }
-  }, [image, imageStatus, selectedImage, isBrowser]);
+          console.log('📸 Starting export process...');
 
-  // Debug effect to log state changes
-  useEffect(() => {
-    if (isBrowser) {
-      console.log("ImageEditor state:", { 
-        selectedImage: selectedImage ? `${selectedImage.substring(0, 50)}...` : "No image",
-        imageStatus: imageStatus,
-        imageLoaded: !!image,
-        imageSize,
-        stageSize,
-      });
-    }
-  }, [selectedImage, image, imageStatus, imageSize, stageSize, isBrowser]);
+          // For now, only handle static exports (PNG/JPEG)
+          if (format === 'png' || format === 'jpeg') {
+            console.log('📸 Exporting static image at original resolution...');
 
-  // Handle file upload
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    setError(null);
-    
-    if (file) {
-      console.log("File selected:", file.name, file.type, file.size);
-      
-      // Check file size
-      if (file.size > MAX_FILE_SIZE) {
-        const errorMsg = `File is too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`;
-        console.error(errorMsg);
-        setError(errorMsg);
-        return;
-      }
-      
-      setIsLoading(true);
-      
-      try {
-        const imageDataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            if (event.target?.result) {
-              resolve(event.target.result as string);
-            } else {
-              reject(new Error('Failed to read file'));
-            }
-          };
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(file);
-        });
+            // Create a temporary container for clean export
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.top = '-9999px';
+            tempContainer.style.left = '-9999px';
+            tempContainer.style.background = 'transparent';
+            document.body.appendChild(tempContainer);
 
-        console.log("Image loaded as data URL, length:", imageDataUrl.length);
-        
-        // Pre-load the image to verify it works
-        await new Promise<void>((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => {
-            console.log("Test image loaded successfully:", img.width, "x", img.height);
-            resolve();
-          };
-          img.onerror = () => reject(new Error('Failed to load image'));
-          img.src = imageDataUrl;
-        });
+            // Create a temporary stage with original image dimensions
+            const tempStage = new Konva.Stage({
+              container: tempContainer,
+              width: image.width,
+              height: image.height,
+              listening: false,
+            });
 
-        onImageUpload?.(imageDataUrl);
-      } catch (err) {
-        console.error("Error processing image:", err);
-        setError(err instanceof Error ? err.message : 'Failed to process image');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-  };
+            const tempLayer = new Konva.Layer();
+            tempStage.add(tempLayer);
 
-  // Handle drag and drop functionality
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
+            // Create a clean image node at original size
+            const tempImage = new Konva.Image({
+              image: image,
+              x: 0,
+              y: 0,
+              width: image.width,
+              height: image.height,
+            });
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
+            // Copy filters and settings from the original image node
+            const originalImageNode = stageRef.current.findOne('Image');
+            if (originalImageNode) {
+              // Copy all applied filters
+              tempImage.filters(originalImageNode.filters());
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    setError(null);
+              // Copy all filter parameters
+              const filterParams = [
+                'brightness',
+                'contrast',
+                'saturation',
+                'hue',
+                'blurRadius',
+                'enhance',
+                'pixelSize',
+                'noise',
+                'threshold',
+                'levels',
+              ];
 
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      console.log("File dropped:", file.name, file.type, file.size);
-      
-      if (!file.type.startsWith('image/')) {
-        const errorMsg = 'Please drop an image file.';
-        console.error(errorMsg);
-        setError(errorMsg);
-        return;
-      }
-      
-      if (file.size > MAX_FILE_SIZE) {
-        const errorMsg = `File is too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`;
-        console.error(errorMsg);
-        setError(errorMsg);
-        return;
-      }
-      
-      setIsLoading(true);
-      
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const imageData = event.target.result as string;
-          console.log("Dropped image loaded successfully, data length:", imageData.length);
-          
-          // Validate that the image can be loaded before passing it up
-          const testImage = new Image();
-          testImage.onload = () => {
-            console.log("Test dropped image loaded successfully with dimensions:", testImage.width, "x", testImage.height);
-            onImageUpload?.(imageData);
-            setIsLoading(false);
-          };
-          
-          testImage.onerror = () => {
-            console.error("Failed to load test dropped image");
-            setError('The dropped file is not a valid image. Please try another file.');
-            setIsLoading(false);
-          };
-          
-          testImage.src = imageData;
-        }
-      };
-      
-      reader.onerror = () => {
-        console.error("FileReader error for dropped file:", reader.error);
-        setError('Error reading dropped file. Please try again.');
-        setIsLoading(false);
-      };
-      
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Trigger file input click
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  // Resize the canvas when the container size changes
-  useEffect(() => {
-    const updateSize = () => {
-      if (containerRef.current) {
-        const containerWidth = containerRef.current.offsetWidth;
-        const containerHeight = containerRef.current.offsetHeight;
-        
-        // Add padding for mobile
-        const padding = window.innerWidth < 768 ? 20 : 40;
-        const maxWidth = containerWidth - padding;
-        const maxHeight = containerHeight - padding;
-        
-        setStageSize({
-          width: maxWidth,
-          height: maxHeight
-        });
-        
-        console.log("Container resized to:", maxWidth, maxHeight);
-      }
-    };
-
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    
-    // Also update on orientation change for mobile
-    window.addEventListener('orientationchange', () => {
-      setTimeout(updateSize, 100);
-    });
-    
-    return () => {
-      window.removeEventListener('resize', updateSize);
-      window.removeEventListener('orientationchange', updateSize);
-    };
-  }, []);
-
-  // Update image size when image loads or stage size changes
-  useEffect(() => {
-    if (!isBrowser || !image) return;
-    if (!stageSize.width || !stageSize.height) {
-      // Force stage size if it's not set yet
-      if (containerRef.current) {
-        const { clientWidth, clientHeight } = containerRef.current;
-        if (clientWidth && clientHeight) {
-          setStageSize({
-            width: clientWidth,
-            height: clientHeight,
-          });
-        } else {
-          setStageSize({
-            width: 800, // Default fallback
-            height: 600, // Default fallback
-          });
-        }
-      }
-      return;
-    }
-
-    console.log("Calculating image size for stage:", stageSize);
-    const aspectRatio = image.width / image.height;
-    let newWidth, newHeight;
-
-    if (stageSize.width / stageSize.height > aspectRatio) {
-      // Container is wider than image aspect ratio
-      newHeight = Math.min(stageSize.height * 0.85, image.height);
-      newWidth = newHeight * aspectRatio;
-    } else {
-      // Container is taller than image aspect ratio
-      newWidth = Math.min(stageSize.width * 0.85, image.width);
-      newHeight = newWidth / aspectRatio;
-    }
-
-    console.log("Setting image size to:", newWidth, "x", newHeight);
-    setImageSize({
-      width: Math.round(newWidth),
-      height: Math.round(newHeight),
-    });
-    
-    // Force stage redraw to ensure image displays correctly
-    // Use multiple redraws with different delays to ensure it works
-    [50, 200, 500].forEach(delay => {
-      setTimeout(() => {
-        if (stageRef.current) {
-          const layer = stageRef.current.findOne('Layer');
-          if (layer) {
-            console.log(`Forcing redraw after ${delay}ms`);
-            layer.batchDraw();
-          }
-        }
-      }, delay);
-    });
-  }, [image, stageSize, isBrowser]);
-
-  // Force a reflow and redraw after the image is loaded and sized
-  useEffect(() => {
-    if (!isBrowser || !image || !imageSize.width || !imageSize.height || !stageRef.current) return;
-    
-    console.log("Forcing stage redraw");
-    
-    const initializeAndRedraw = async () => {
-      // Ensure Konva is initialized
-      await ensureKonvaInitialized();
-      
-      // Force a reflow by accessing offset properties
-      const offsetHeight = stageRef.current.container().offsetHeight;
-      const offsetWidth = stageRef.current.container().offsetWidth;
-      console.log("Current stage offset size:", offsetWidth, "x", offsetHeight);
-      
-      // Schedule multiple redraws to ensure rendering happens
-      const redraw = () => {
-        if (stageRef.current) {
-          stageRef.current.batchDraw();
-          const imageNode = stageRef.current.findOne('Image');
-          if (imageNode) {
-            imageNode.cache();
-            imageNode.getLayer().batchDraw();
-          }
-        }
-      };
-      
-      // Redraw multiple times with delays to catch any timing issues
-      redraw();
-      setTimeout(redraw, 50);
-      setTimeout(redraw, 200);
-    };
-    
-    initializeAndRedraw();
-    
-    // Also redraw on window resize
-    const handleResize = () => {
-      setTimeout(() => {
-        if (stageRef.current) {
-          stageRef.current.batchDraw();
-        }
-      }, 10);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [image, imageSize, isBrowser]);
-
-  // Apply filters to the image with performance optimization
-  useEffect(() => {
-    if (!isBrowser || !image || !stageRef.current || !batchProcessor) return;
-    
-    const applyFiltersWithPerformanceOptimization = async () => {
-      startOperation();
-      const operationStart = performance.now();
-      
-      const imageNode = stageRef.current.findOne('Image');
-      if (!imageNode) {
-        console.error("Image node not found in Stage");
-        endOperation();
-        return;
-      }
-      
-      // Always reset filters first
-      imageNode.filters([]);
-      
-      // Clear any previously set filter properties
-      imageNode.brightness(0);
-      imageNode.contrast(0);
-      imageNode.saturation(0);
-      imageNode.hue(0);
-      imageNode.blurRadius(0);
-      imageNode.enhance(0);
-      imageNode.pixelSize(1);
-      imageNode.noise(0);
-      imageNode.threshold(0.5);
-      imageNode.levels(1);
-      
-      if (!effectLayers || effectLayers.length === 0) {
-        console.log("No active effects, clearing filters and resetting properties.");
-        startRender();
-        imageNode.cache();
-        imageNode.getLayer().batchDraw();
-        endRender();
-        endOperation();
-        return;
-      }
-      
-      try {
-        console.log("🎨 Applying effects:", effectLayers.map(layer => `${layer.effectId}(${layer.opacity})`).join(', '));
-        console.log("📊 WorkerManager available:", !!workerManager);
-        console.log("⚡ BatchProcessor available:", !!batchProcessor);
-        
-        // Simpler approach: Use Konva filters with graceful worker fallback for heavy operations
-        const filters: any[] = [];
-        const filterParams: Record<string, any> = {};
-        
-        for (const layer of effectLayers) {
-          if (!layer.visible) continue;
-          
-          console.log(`🔧 Processing effect: ${layer.effectId} with opacity ${layer.opacity}, settings:`, layer.settings);
-          
-          const [filterFunc, params] = await applyEffect(layer.effectId, layer.settings || {});
-          
-          if (!filterFunc) {
-            console.warn(`⚠️ No filter function returned for effect: ${layer.effectId}`);
-            continue;
-          }
-          
-          console.log(`✅ Filter function obtained for ${layer.effectId}:`, typeof filterFunc, params ? 'with params' : 'no params');
-          
-          // Skip generative overlay and 3D effects - they're handled separately
-          if (filterFunc === 'GENERATIVE_OVERLAY' || filterFunc === 'THREE_D_EFFECT') continue;
-          
-          // Check if this is a built-in Konva filter (has parameters)
-          if (params && Object.keys(params).length > 0) {
-            // Built-in Konva filter
-            filters.push(filterFunc);
-            
-            // Apply opacity adjustment to numeric parameters
-            for (const [key, value] of Object.entries(params)) {
-              if (typeof value === 'number') {
-                // Apply layer opacity to effect intensity
-                if (key === 'brightness' || key === 'contrast' || key === 'enhance') {
-                  filterParams[key] = (filterParams[key] || 0) + value * layer.opacity;
-                } else if (key === 'saturation' || key === 'hue') {
-                  filterParams[key] = (filterParams[key] || 0) + value * layer.opacity;
-                } else {
-                  filterParams[key] = value; // For non-additive params like blur radius
+              filterParams.forEach(param => {
+                if (
+                  typeof originalImageNode[param] === 'function' &&
+                  typeof tempImage[param] === 'function'
+                ) {
+                  try {
+                    tempImage[param](originalImageNode[param]());
+                  } catch (error) {
+                    console.warn(`Could not copy filter parameter ${param}:`, error);
+                  }
                 }
-              } else {
-                filterParams[key] = value;
+              });
+            }
+
+            tempLayer.add(tempImage);
+            tempImage.cache();
+            tempLayer.batchDraw();
+
+            // Export the clean image
+            const dataURL = tempStage.toDataURL({
+              mimeType: format === 'jpeg' ? 'image/jpeg' : 'image/png',
+              quality: format === 'jpeg' ? 0.9 : 1,
+              pixelRatio: 1,
+            });
+
+            // Clean up temporary elements
+            document.body.removeChild(tempContainer);
+            tempStage.destroy();
+
+            console.log('📸 Generated clean data URL, creating download...');
+
+            // Create download link
+            const link = document.createElement('a');
+            link.download = `imager-export-${Date.now()}.${format === 'jpeg' ? 'jpg' : 'png'}`;
+            link.href = dataURL;
+            link.style.display = 'none';
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            console.log('✅ Export completed successfully!');
+            console.log(`📊 Exported image: ${image.width}x${image.height}px`);
+          } else {
+            alert('Animated exports (GIF/WebM/MP4) coming soon!');
+          }
+        } catch (error) {
+          console.error('❌ Export error:', error);
+          alert('Failed to export image: ' + (error as Error).message);
+        }
+      },
+      [image, effectLayers]
+    );
+
+    useImperativeHandle(ref, () => {
+      console.log('🔧 useImperativeHandle: Creating ref object with exportImage function');
+      return {
+        exportImage: (format?: string) => {
+          console.log('🚀 exportImage called via ref with format:', format);
+          exportWithFormat((format as 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4') || 'png');
+        },
+        reset: () => {
+          console.log('Reset called');
+        },
+        getStage: () => stageRef.current,
+      };
+    }, [exportWithFormat]);
+
+    // Browser detection and container sizing
+    useEffect(() => {
+      setIsBrowser(true);
+
+      const updateContainerDimensions = () => {
+        if (typeof window !== 'undefined') {
+          // Account for sidebars: 280px left + 320px right + padding
+          const availableWidth = window.innerWidth - 680;
+          const availableHeight = window.innerHeight - 120; // Account for header/footer
+
+          setContainerDimensions({
+            width: Math.max(availableWidth, 400), // Minimum width
+            height: Math.max(availableHeight, 300), // Minimum height
+          });
+        }
+      };
+
+      updateContainerDimensions();
+      window.addEventListener('resize', updateContainerDimensions);
+
+      return () => {
+        window.removeEventListener('resize', updateContainerDimensions);
+      };
+    }, []);
+
+    // Apply effects function
+    const applyEffectsToNode = async (node: any) => {
+      if (!node || !effectLayers || effectLayers.length === 0) {
+        // Clear filters if no effects
+        node?.filters([]);
+        node?.cache();
+        node?.getLayer()?.batchDraw();
+        return;
+      }
+
+      try {
+        const filters = [];
+
+        // Reset all filter properties to default values
+        node.brightness(0);
+        node.contrast(0);
+        node.saturation(0);
+        node.hue(0);
+        node.blurRadius(0);
+        node.noise(0);
+        node.enhance(0);
+
+        for (const layer of effectLayers) {
+          if (layer.visible && layer.effectId) {
+            console.log(`Applying effect: ${layer.effectId}`, layer.settings);
+            const [filter, params] = await applyEffect(layer.effectId, layer.settings || {});
+            if (filter) {
+              filters.push(filter);
+              // Set filter parameters on the node
+              if (params) {
+                Object.entries(params).forEach(([key, value]) => {
+                  console.log(`Setting ${key} = ${value} on node`);
+                  if (typeof node[key] === 'function') {
+                    node[key](value);
+                  } else {
+                    (node as any)[key] = value;
+                  }
+                });
               }
             }
-          } else if (typeof filterFunc === 'function') {
-            // Custom filter function - apply directly
-            filters.push(filterFunc);
           }
         }
-        
-        // Apply all filters
-        console.log(`🎯 Applying ${filters.length} filters to image node`);
-        
-        if (filters.length > 0) {
-          imageNode.filters(filters);
-          
-          // Set filter parameters
-          console.log("🔨 Setting filter params:", filterParams);
-          for (const [key, value] of Object.entries(filterParams)) {
-            if (typeof imageNode[key] === 'function') {
-              console.log(`   Setting ${key} = ${value}`);
-              imageNode[key](value);
-            } else {
-              console.warn(`   ⚠️ Method ${key} not found on image node`);
-            }
-          }
-        } else {
-          console.log("🧹 No filters to apply, clearing all filters");
-          imageNode.filters([]);
-        }
-        
-        // Update the canvas with performance monitoring
-        startRender();
-        imageNode.cache();
-        imageNode.getLayer().batchDraw();
-        endRender();
-        
-        const operationEnd = performance.now();
-        const processingTime = operationEnd - operationStart;
-        setLastProcessingTime(processingTime);
-        setProcessingTime(prev => prev + processingTime);
-        
-        console.log(`Applied effects successfully in ${processingTime.toFixed(2)}ms`);
-        
+
+        console.log(`Applied ${filters.length} filters to node`);
+        node.filters(filters);
+        node.cache();
+        node.getLayer()?.batchDraw();
       } catch (error) {
-        console.error("Error applying filters:", error);
-        imageNode.filters([]);
-        startRender();
-        imageNode.cache();
-        imageNode.getLayer()?.batchDraw();
-        endRender();
+        console.error('Error applying effects:', error);
+        setError('Failed to apply effects. Please try again.');
       }
-      
-      endOperation();
     };
-    
-    applyFiltersWithPerformanceOptimization();
-  }, [effectLayers, image, isBrowser, batchProcessor, workerManager, startOperation, endOperation, startRender, endRender]);
 
-  // Check if current effects support animation
-  const hasAnimatedEffects = effectLayers?.some(layer => 
-    layer.visible && supportsAnimation(layer.effectId)
-  ) || false;
-
-  // Get the first animated effect for settings
-  const firstAnimatedEffect = effectLayers?.find(layer => 
-    layer.visible && supportsAnimation(layer.effectId)
-  );
-  const animationConfig = firstAnimatedEffect ? getAnimationConfig(firstAnimatedEffect.effectId) : null;
-
-  // Note: Generative overlay layers have been removed due to performance issues
-  const overlayLayers: any[] = [];
-
-  // Extract 3D effect layers
-  const threeDLayers = effectLayers?.filter(layer => 
-    layer.visible && layer.effectId.startsWith('threeD')
-  ) || [];
-
-  // No primary overlay since generative overlays are disabled
-  const primaryOverlay = null;
-  
-  // Convert layer settings to 3D props for the first visible 3D effect
-  const primary3DEffect = threeDLayers[0];
-  
-  // Generative overlays are disabled - always return disabled state
-  const derivedOverlayProps = {
-    showOverlay: false,
-    overlayEffect: 'stars' as const,
-    overlayOpacity: 0,
-    overlayParticleCount: 0,
-    overlayColor: '#ffffff',
-    overlaySpeed: 0,
-    overlayInteractive: false,
-  };
-
-  // Create derived 3D props from effect layers
-  const derived3DProps = primary3DEffect ? {
-    show3D: true,
-    threeDEffect: primary3DEffect.effectId.replace('threeD', '3d').toLowerCase() as '3dPlane' | '3dCube' | '3dTilt' | '3dParallax',
-    threeDDepth: primary3DEffect.settings?.depth ?? 1,
-    threeDRotationSpeed: primary3DEffect.settings?.rotationSpeed ?? 1,
-    threeDTiltIntensity: primary3DEffect.settings?.tiltIntensity ?? 0.2,
-    threeDControlsEnabled: (primary3DEffect.settings?.controlsEnabled ?? 1) > 0.5,
-  } : {
-    show3D: false,
-    threeDEffect: '3dPlane' as const,
-    threeDDepth: 1,
-    threeDRotationSpeed: 1,
-    threeDTiltIntensity: 0.2,
-    threeDControlsEnabled: true,
-  };
-
-  // Use derived props if no explicit overlay props are provided
-  const effectiveOverlayProps = {
-    showOverlay: showOverlay ?? derivedOverlayProps.showOverlay,
-    overlayEffect: overlayEffect ?? derivedOverlayProps.overlayEffect,
-    overlayOpacity: overlayOpacity ?? derivedOverlayProps.overlayOpacity,
-    overlayParticleCount: overlayParticleCount ?? derivedOverlayProps.overlayParticleCount,
-    overlayColor: overlayColor ?? derivedOverlayProps.overlayColor,
-    overlaySpeed: overlaySpeed ?? derivedOverlayProps.overlaySpeed,
-    overlayInteractive: overlayInteractive ?? derivedOverlayProps.overlayInteractive,
-  };
-
-  // Effective 3D props from derived values
-  const effective3DProps = derived3DProps;
-
-  // Set up keyboard shortcuts
-  const { getShortcuts } = useKeyboardShortcuts({
-    shortcuts: EDITOR_SHORTCUTS.map(shortcut => ({
-      ...shortcut,
-      action: () => {
-        switch (shortcut.key) {
-          case 'z':
-            if (shortcut.ctrlKey && shortcut.shiftKey) {
-              // Redo
-              console.log('Redo action')
-            } else if (shortcut.ctrlKey) {
-              // Undo
-              console.log('Undo action')
-            }
-            break
-          case 's':
-            if (shortcut.ctrlKey) {
-              // Save
-              console.log('Save action')
-            }
-            break
-          case 'o':
-            if (shortcut.ctrlKey) {
-              // Open
-              handleUploadClick()
-            }
-            break
-          case 'e':
-            if (shortcut.ctrlKey) {
-              // Export
-              console.log('Export action')
-            }
-            break
-          case 'b':
-            if (shortcut.ctrlKey) {
-              // Toggle before/after view (disabled)
-              console.log('Before/after view disabled')
-            }
-            break
-          case 'r':
-            if (shortcut.ctrlKey) {
-              // Reset
-              console.log('Reset action')
-            }
-            break
-          case 'f':
-            if (shortcut.ctrlKey) {
-              // Toggle fullscreen
-              console.log('Toggle fullscreen action')
-            }
-            break
-          case 'h':
-            if (shortcut.ctrlKey) {
-              // Show shortcuts help
-              setShowShortcutsHelp(true)
-            }
-            break
-          case 'Escape':
-            // Close dialogs
-            setShowShortcutsHelp(false)
-            break
-          case 'Delete':
-            // Delete selected effect
-            console.log('Delete selected effect')
-            break
-          case 'ArrowLeft':
-            // Previous effect
-            console.log('Previous effect')
-            break
-          case 'ArrowRight':
-            // Next effect
-            console.log('Next effect')
-            break
-          case 'ArrowUp':
-            // Increase effect value
-            console.log('Increase effect value')
-            break
-          case 'ArrowDown':
-            // Decrease effect value
-            console.log('Decrease effect value')
-            break
+    // Re-apply effects when effectLayers change
+    useEffect(() => {
+      if (image) {
+        const imageNode = stageRef.current?.findOne('Image');
+        if (imageNode) {
+          applyEffectsToNode(imageNode);
         }
       }
-    }))
-  })
+    }, [effectLayers, image]);
 
-  // Render different states
-  if (!selectedImage) {
+    // Handle file upload
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (file.size > MAX_FILE_SIZE) {
+        setError(`File is too large. Max size is ${MAX_FILE_SIZE / 1024 / 1024}MB.`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = event => {
+        const imageDataUrl = event.target?.result as string;
+        onImageUpload?.(imageDataUrl);
+      };
+      reader.onerror = () => {
+        setError('Error reading the file.');
+      };
+      reader.readAsDataURL(file);
+    };
+
+    const handleUploadClick = () => {
+      fileInputRef.current?.click();
+    };
+
     return (
-      <div 
-        className="h-full flex flex-col items-center justify-center p-6"
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        role="region"
-        aria-label={ARIA_LABELS.dropZone}
+      <div
+        ref={containerRef}
+        className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-900 relative"
       >
-        <div className={`w-full max-w-lg mx-auto p-6 ${isDragging ? 'border-2 border-emerald-400 bg-emerald-50' : 'border-2 border-dashed border-gray-300 bg-gray-50'} rounded-lg text-center transition-all`}>
-          <div className="mb-6">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-medium text-gray-800 mb-3">Upload an Image</h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Drag and drop your image here or click the button below
-          </p>
-          <button
-            onClick={handleUploadClick}
-            className={`px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition-colors inline-flex items-center ${focusRingClass}`}
-            aria-label={ARIA_LABELS.uploadImage}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            Select Image
-          </button>
-          <p className="text-xs text-gray-500 mt-6">
-            Supported formats: JPEG, PNG, GIF, WEBP • Max size: 10MB
-          </p>
-        </div>
-        
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          accept="image/*"
-          onChange={handleFileChange}
-        />
-        
-        {error && (
-          <div className="mt-4 px-4 py-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">
-            <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {error}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Only render the Stage component if we're in the browser
-  if (!isBrowser) {
-    return (
-      <div className="h-full w-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-emerald-500 border-gray-200"></div>
-        <span className="ml-3 text-gray-600">Loading editor...</span>
-      </div>
-    );
-  }
-
-  // Show a loading state while image is loading
-  if ((typeof imageStatus === 'object' && imageStatus.status === 'loading') || !image) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-t-emerald-500 border-gray-200 mb-4"></div>
-        <span className="text-gray-600">Loading image...</span>
-        <button 
-          onClick={handleUploadClick}
-          className="mt-4 px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded-md hover:bg-gray-300"
-        >
-          Force Reload
-        </button>
-        {typeof imageStatus === 'object' && imageStatus.error && (
-          <div className="mt-3 text-red-500 text-xs max-w-md text-center">
-            Error: {imageStatus.error}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Show error state if image failed to load
-  if (typeof imageStatus === 'object' && imageStatus.status === 'error') {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center p-6">
-        <div className="bg-red-50 p-6 rounded-lg text-center max-w-md">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-red-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <h3 className="text-lg font-medium text-red-800 mb-2">Failed to load image</h3>
-          <p className="text-sm text-red-600 mb-4">
-            {imageStatus.error || "There was a problem loading the selected image."}
-          </p>
-          <button
-            onClick={handleUploadClick}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-md transition-colors"
-          >
-            Upload New Image
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-screen flex overflow-hidden bg-gray-50 dark:bg-gray-900">
-
-
-      <div className="flex-1 flex flex-col">
-        {/* Mobile Menu */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 20 }}
-              className="fixed inset-0 z-50 lg:hidden"
-            >
-              {/* Mobile menu content */}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Left Panel - Effects (Desktop) */}
-        <motion.div className="hidden lg:flex lg:w-80 lg:flex-col lg:fixed lg:inset-y-0">
-          {/* Effects panel content */}
-        </motion.div>
-
-        {/* Main Canvas Area */}
-        <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-800">
-          {/* Top Toolbar */}
-          <div className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-700 p-3">
-            {/* Toolbar content */}
-          </div>
-
-          {/* Canvas Container */}
-          <div 
-            ref={containerRef}
-            className="flex-1 relative overflow-hidden"
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {isLoading ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-900/80 z-50">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-emerald-500 border-gray-200"></div>
-                <span className="ml-3 text-gray-600 dark:text-gray-400">Processing image...</span>
-              </div>
-            ) : (
-              <TouchGestures
-                onZoom={handleZoom}
-                onRotate={handleRotate}
-                onPan={handlePan}
-                minScale={0.5}
-                maxScale={3}
-                enabled={true}
+        {!selectedImage ? (
+          <div className="text-center">
+            <div className="w-24 h-24 bg-gray-100/80 rounded-3xl flex items-center justify-center mb-6 mx-auto shadow-sm">
+              <svg
+                className="w-12 h-12 text-gray-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
               >
-                <Stage
-                  ref={stageRef}
-                  width={stageSize.width}
-                  height={stageSize.height}
-                  className="bg-white dark:bg-gray-900"
-                >
-                  <Layer>
-                    {image && (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-semibold mb-3 text-gray-900">Welcome to Imager</h2>
+            <p className="text-gray-600 mb-8 max-w-md">
+              Upload an image to start applying beautiful real-time effects
+            </p>
+            <button
+              onClick={handleUploadClick}
+              className="bg-blue-600/90 hover:bg-blue-700/90 px-6 py-3 text-white font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm"
+            >
+              Choose Image
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <p className="text-xs text-gray-500 mt-4">Supports JPG, PNG, GIF, WebP • Max 10MB</p>
+          </div>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center p-4">
+            {image &&
+              (() => {
+                // Calculate available space (accounting for padding and sidebars)
+                const maxWidth = Math.min(800, containerDimensions.width);
+                const maxHeight = Math.min(600, containerDimensions.height);
+
+                // Calculate scale to fit image while maintaining aspect ratio
+                const scaleX = maxWidth / image.width;
+                const scaleY = maxHeight / image.height;
+                const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
+
+                const stageWidth = image.width * scale;
+                const stageHeight = image.height * scale;
+
+                console.log('📐 Image sizing:', {
+                  original: { width: image.width, height: image.height },
+                  maxContainer: { width: maxWidth, height: maxHeight },
+                  scale: scale.toFixed(3),
+                  stage: { width: stageWidth, height: stageHeight },
+                });
+
+                return (
+                  <Stage
+                    ref={stageRef}
+                    width={stageWidth}
+                    height={stageHeight}
+                    className="rounded-2xl shadow-lg"
+                    style={{ backgroundColor: 'transparent' }}
+                  >
+                    <Layer>
                       <KonvaImage
                         image={image}
-                        width={imageSize.width}
-                        height={imageSize.height}
-                        x={(stageSize.width - imageSize.width) / 2}
-                        y={(stageSize.height - imageSize.height) / 2}
+                        width={stageWidth}
+                        height={stageHeight}
+                        filters={[]}
+                        ref={node => {
+                          if (node) {
+                            // Apply effects when node is ready
+                            setTimeout(() => applyEffectsToNode(node), 50);
+                          }
+                        }}
                       />
-                    )}
-                  </Layer>
-                </Stage>
-              </TouchGestures>
-            )}
+                    </Layer>
+                  </Stage>
+                );
+              })()}
           </div>
-        </div>
+        )}
+
+        {error && (
+          <div
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg"
+            role="alert"
+          >
+            <strong className="font-bold">Error: </strong>
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
       </div>
+    );
+  }
+);
 
-      {/* Keyboard Shortcuts Help */}
-      <KeyboardShortcutsHelp
-        isOpen={showShortcutsHelp}
-        onClose={() => setShowShortcutsHelp(false)}
-        shortcuts={getShortcuts()}
-      />
-    </div>
-  );
-});
+ImageEditor.displayName = 'ImageEditor';
 
-export default ImageEditor; 
+export default ImageEditor;
