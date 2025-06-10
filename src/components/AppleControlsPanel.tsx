@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig } from '@/lib/effects';
 
@@ -24,6 +24,74 @@ interface AppleControlsPanelProps {
   onToggleLayerVisibility?: (layerId: string) => void;
   hasImage?: boolean;
 }
+
+// Custom Hex Color Input Component
+const HexColorInput: React.FC<{
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}> = ({ label, value, onChange }) => {
+  // Convert decimal to hex
+  const decimalToHex = (decimal: number): string => {
+    return '#' + decimal.toString(16).padStart(6, '0');
+  };
+
+  // Convert hex to decimal
+  const hexToDecimal = (hex: string): number => {
+    const cleanHex = hex.replace('#', '');
+    return parseInt(cleanHex, 16);
+  };
+
+  const [hexValue, setHexValue] = useState(decimalToHex(value));
+
+  // Sync with prop changes
+  useEffect(() => {
+    setHexValue(decimalToHex(value));
+  }, [value]);
+
+  const handleColorChange = (newHex: string) => {
+    setHexValue(newHex);
+    const decimal = hexToDecimal(newHex);
+    onChange(decimal);
+  };
+
+  const handleTextInputChange = (newValue: string) => {
+    setHexValue(newValue);
+    // Only update the parent if it's a valid hex color
+    if (/^#[0-9A-Fa-f]{6}$/.test(newValue)) {
+      onChange(hexToDecimal(newValue));
+    }
+  };
+
+  return (
+    <div className="glass-card-compact p-3">
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-compact font-medium text-gray-900">{label}</label>
+        <span className="text-compact text-gray-500 font-mono bg-gray-100/50 px-2 py-0.5 rounded">
+          {hexValue.toUpperCase()}
+        </span>
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <input
+          type="color"
+          value={hexValue}
+          onChange={e => handleColorChange(e.target.value)}
+          className="w-12 h-8 rounded-lg border-2 border-gray-200 cursor-pointer overflow-hidden"
+        />
+        <input
+          type="text"
+          value={hexValue}
+          onChange={e => handleTextInputChange(e.target.value)}
+          placeholder="#000000"
+          className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors font-mono"
+        />
+      </div>
+
+      <div className="mt-2 text-compact-sm text-gray-400">Click color box or enter hex code</div>
+    </div>
+  );
+};
 
 const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   activeEffect,
@@ -138,38 +206,57 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
 
                   {/* Settings Controls */}
                   <div className="space-y-4">
-                    {currentEffectSettings.map(setting => (
-                      <div key={setting.id} className="glass-card-compact p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-compact font-medium text-gray-900">
-                            {setting.label}
-                          </label>
-                          <span className="text-compact text-gray-500 font-mono bg-gray-100/50 px-2 py-0.5 rounded">
-                            {setting.currentValue.toFixed(2)}
-                          </span>
-                        </div>
+                    {currentEffectSettings.map(setting => {
+                      // Check if this is a color setting (hex color)
+                      const isColorSetting =
+                        setting.label.toLowerCase().includes('color') &&
+                        setting.label.toLowerCase().includes('hex');
 
-                        <div className="space-y-2">
-                          <input
-                            type="range"
-                            min={setting.min}
-                            max={setting.max}
-                            step={setting.step}
+                      if (isColorSetting) {
+                        return (
+                          <HexColorInput
+                            key={setting.id}
+                            label={setting.label}
                             value={setting.currentValue}
-                            onChange={e =>
-                              onSettingChange?.(setting.id, parseFloat(e.target.value))
-                            }
-                            className="apple-slider-compact w-full"
+                            onChange={value => onSettingChange?.(setting.id, value)}
                           />
+                        );
+                      }
 
-                          {/* Range markers */}
-                          <div className="flex justify-between text-compact-sm text-gray-400">
-                            <span>{setting.min}</span>
-                            <span>{setting.max}</span>
+                      // Regular slider for non-color settings
+                      return (
+                        <div key={setting.id} className="glass-card-compact p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-compact font-medium text-gray-900">
+                              {setting.label}
+                            </label>
+                            <span className="text-compact text-gray-500 font-mono bg-gray-100/50 px-2 py-0.5 rounded">
+                              {setting.currentValue.toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            <input
+                              type="range"
+                              min={setting.min}
+                              max={setting.max}
+                              step={setting.step}
+                              value={setting.currentValue}
+                              onChange={e =>
+                                onSettingChange?.(setting.id, parseFloat(e.target.value))
+                              }
+                              className="apple-slider-compact w-full"
+                            />
+
+                            {/* Range markers */}
+                            <div className="flex justify-between text-compact-sm text-gray-400">
+                              <span>{setting.min}</span>
+                              <span>{setting.max}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
