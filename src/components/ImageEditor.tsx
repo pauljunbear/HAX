@@ -208,7 +208,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
             // Export the clean canvas
             const dataURL = canvas.toDataURL(
               format === 'jpeg' ? 'image/jpeg' : 'image/png',
-              format === 'jpeg' ? 0.9 : 1
+              1 // Use maximum quality for both PNG and JPEG
             );
 
             // Clean up

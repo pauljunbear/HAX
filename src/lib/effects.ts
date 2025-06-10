@@ -401,6 +401,8 @@ export const applyEffect = async (
         return [createPixelExplosionEffect(settings), {}];
       case 'fisheyeWarp':
         return [createFisheyeWarpEffect(settings), {}];
+      case 'procTexture':
+        return [createProcTextureEffect(settings), {}];
 
       // --- MORE UNIQUE EFFECTS END HERE ---
 
