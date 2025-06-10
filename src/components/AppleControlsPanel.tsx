@@ -480,7 +480,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                           </div>
                           <div className="text-left">
                             <h4 className="text-sm font-medium text-gray-900">JPEG Export</h4>
-                            <p className="text-xs text-gray-500">Smaller size, web-ready</p>
+                            <p className="text-xs text-gray-500">High quality, web-optimized</p>
                           </div>
                         </div>
                         <div className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
