@@ -122,13 +122,13 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                       <div className="flex space-x-2">
                         <button
                           onClick={onResetSettings}
-                          className="glass-button-compact text-compact text-blue-600 hover:text-blue-700 font-medium"
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50/80 text-blue-600 hover:bg-blue-100/80 hover:text-blue-700 border border-blue-200/50 transition-all duration-200 hover:shadow-sm"
                         >
                           Reset
                         </button>
                         <button
                           onClick={() => activeLayer && onRemoveEffect?.(activeLayer.id)}
-                          className="glass-button-compact text-compact text-red-600 hover:text-red-700 font-medium"
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50/80 text-red-600 hover:bg-red-100/80 hover:text-red-700 border border-red-200/50 transition-all duration-200 hover:shadow-sm"
                         >
                           Remove
                         </button>
@@ -190,7 +190,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                 <button
                   onClick={onClearAllEffects}
                   disabled={effectLayers.length === 0}
-                  className="glass-button-compact text-compact text-blue-600 hover:text-blue-700 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50/80 text-blue-600 hover:bg-blue-100/80 hover:text-blue-700 border border-blue-200/50 transition-all duration-200 hover:shadow-sm disabled:bg-gray-50/80 disabled:text-gray-400 disabled:border-gray-200/50 disabled:cursor-not-allowed disabled:hover:bg-gray-50/80 disabled:hover:shadow-none"
                 >
                   Clear All
                 </button>
