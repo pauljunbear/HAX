@@ -416,51 +416,38 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               ) : (
                 <div className="space-y-3">
                   {/* Quick Export Buttons */}
-                  <div className="space-y-3 mb-4">
+                  <div className="space-y-2 mb-4">
                     <button
                       onClick={() => {
                         console.log('🖱️ PNG button clicked in AppleControlsPanel');
                         console.log('🖱️ onExport function exists:', !!onExport);
                         onExport?.('png');
                       }}
-                      className="w-full p-4 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                      style={{
-                        background:
-                          'radial-gradient(ellipse 228.79% 417.98% at 45.00% -30.45%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.50) 94%)',
-                        boxShadow: '0px 1.46px 8.75px rgba(0, 0, 0, 0.07)',
-                        borderRadius: '20px',
-                        backdropFilter: 'blur(21.87px)',
-                      }}
+                      className="w-full p-3 bg-white/60 backdrop-blur-sm border border-white/20 rounded-xl hover:bg-white/80 hover:shadow-lg transition-all duration-200 group"
                     >
-                      <div
-                        className="w-full h-16 px-4 py-3 flex items-center justify-between"
-                        style={{
-                          opacity: 0.9,
-                          background: 'white',
-                          boxShadow: '0px 0.73px 1.46px rgba(255, 255, 255, 0.15) inset',
-                          borderRadius: '12px',
-                        }}
-                      >
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div
-                            className="w-8 h-8 rounded-md"
-                            style={{
-                              opacity: 0.7,
-                              background:
-                                'linear-gradient(138deg, #7ADDE1 7%, #1359EC 45%, #A533CC 100%)',
-                            }}
-                          />
-                          <div className="w-1 h-8 bg-purple-400 rounded-full" />
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-900 text-left">
-                              PNG Export
-                            </h4>
-                            <p className="text-xs text-gray-500 text-left">
-                              High quality, lossless
-                            </p>
+                          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                            <svg
+                              className="w-4 h-4 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                          </div>
+                          <div className="text-left">
+                            <h4 className="text-sm font-medium text-gray-900">PNG Export</h4>
+                            <p className="text-xs text-gray-500">High quality, lossless</p>
                           </div>
                         </div>
-                        <div className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        <div className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
                           PNG
                         </div>
                       </div>
@@ -472,44 +459,31 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                         console.log('🖱️ onExport function exists:', !!onExport);
                         onExport?.('jpeg');
                       }}
-                      className="w-full p-4 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                      style={{
-                        background:
-                          'radial-gradient(ellipse 228.79% 417.98% at 45.00% -30.45%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.50) 94%)',
-                        boxShadow: '0px 1.46px 8.75px rgba(0, 0, 0, 0.07)',
-                        borderRadius: '20px',
-                        backdropFilter: 'blur(21.87px)',
-                      }}
+                      className="w-full p-3 bg-white/60 backdrop-blur-sm border border-white/20 rounded-xl hover:bg-white/80 hover:shadow-lg transition-all duration-200 group"
                     >
-                      <div
-                        className="w-full h-16 px-4 py-3 flex items-center justify-between"
-                        style={{
-                          opacity: 0.9,
-                          background: 'white',
-                          boxShadow: '0px 0.73px 1.46px rgba(255, 255, 255, 0.15) inset',
-                          borderRadius: '12px',
-                        }}
-                      >
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div
-                            className="w-8 h-8 rounded-md"
-                            style={{
-                              opacity: 0.7,
-                              background:
-                                'linear-gradient(138deg, #7ADDE1 7%, #1359EC 45%, #A533CC 100%)',
-                            }}
-                          />
-                          <div className="w-1 h-8 bg-purple-400 rounded-full" />
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-900 text-left">
-                              JPEG Export
-                            </h4>
-                            <p className="text-xs text-gray-500 text-left">
-                              Smaller size, web-ready
-                            </p>
+                          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                            <svg
+                              className="w-4 h-4 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                          </div>
+                          <div className="text-left">
+                            <h4 className="text-sm font-medium text-gray-900">JPEG Export</h4>
+                            <p className="text-xs text-gray-500">Smaller size, web-ready</p>
                           </div>
                         </div>
-                        <div className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded">
+                        <div className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
                           JPG
                         </div>
                       </div>
@@ -519,67 +493,58 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                   {/* Animated Export */}
                   <div className="border-t border-gray-200/50 pt-3">
                     <h4 className="text-sm font-medium text-gray-900 mb-3">Animated Export</h4>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {[
                         {
                           format: 'gif',
                           label: 'GIF Export',
                           description: 'Universal animated format',
-                          color: 'purple',
-                          bgColor: 'bg-purple-50',
-                          textColor: 'text-purple-600',
+                          bgColor: 'bg-purple-500',
+                          badgeBgColor: 'bg-purple-50',
+                          badgeTextColor: 'text-purple-600',
                         },
                         {
                           format: 'webm',
                           label: 'WebM Export',
                           description: 'High quality video',
-                          color: 'orange',
-                          bgColor: 'bg-orange-50',
-                          textColor: 'text-orange-600',
+                          bgColor: 'bg-orange-500',
+                          badgeBgColor: 'bg-orange-50',
+                          badgeTextColor: 'text-orange-600',
                         },
                       ].map(option => (
                         <button
                           key={option.format}
                           onClick={() => onExport?.(option.format)}
-                          className="w-full p-4 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-                          style={{
-                            background:
-                              'radial-gradient(ellipse 228.79% 417.98% at 45.00% -30.45%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.50) 94%)',
-                            boxShadow: '0px 1.46px 8.75px rgba(0, 0, 0, 0.07)',
-                            borderRadius: '20px',
-                            backdropFilter: 'blur(21.87px)',
-                          }}
+                          className="w-full p-3 bg-white/60 backdrop-blur-sm border border-white/20 rounded-xl hover:bg-white/80 hover:shadow-lg transition-all duration-200 group"
                         >
-                          <div
-                            className="w-full h-16 px-4 py-3 flex items-center justify-between"
-                            style={{
-                              opacity: 0.9,
-                              background: 'white',
-                              boxShadow: '0px 0.73px 1.46px rgba(255, 255, 255, 0.15) inset',
-                              borderRadius: '12px',
-                            }}
-                          >
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div
-                                className="w-8 h-8 rounded-md"
-                                style={{
-                                  opacity: 0.7,
-                                  background:
-                                    'linear-gradient(138deg, #7ADDE1 7%, #1359EC 45%, #A533CC 100%)',
-                                }}
-                              />
-                              <div className="w-1 h-8 bg-purple-400 rounded-full" />
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-900 text-left">
+                                className={`w-8 h-8 ${option.bgColor} rounded-lg flex items-center justify-center`}
+                              >
+                                <svg
+                                  className="w-4 h-4 text-white"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-7 4h12a2 2 0 002-2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v6a2 2 0 002 2z"
+                                  />
+                                </svg>
+                              </div>
+                              <div className="text-left">
+                                <h4 className="text-sm font-medium text-gray-900">
                                   {option.label}
                                 </h4>
-                                <p className="text-xs text-gray-500 text-left">
-                                  {option.description}
-                                </p>
+                                <p className="text-xs text-gray-500">{option.description}</p>
                               </div>
                             </div>
                             <div
-                              className={`text-xs font-semibold ${option.textColor} ${option.bgColor} px-2 py-1 rounded`}
+                              className={`text-xs font-semibold ${option.badgeTextColor} ${option.badgeBgColor} px-2 py-1 rounded-lg`}
                             >
                               {option.format.toUpperCase()}
                             </div>
