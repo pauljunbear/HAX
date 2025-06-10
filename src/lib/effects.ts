@@ -401,8 +401,6 @@ export const applyEffect = async (
         return [createPixelExplosionEffect(settings), {}];
       case 'fisheyeWarp':
         return [createFisheyeWarpEffect(settings), {}];
-      case 'procTexture':
-        return [createProcTextureEffect(settings), {}];
 
       // --- MORE UNIQUE EFFECTS END HERE ---
 
@@ -3230,23 +3228,6 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
 
-  // 20. Procedural Texture Overlay
-  procTexture: {
-    label: 'Procedural Texture',
-    category: 'Filters',
-    settings: [
-      {
-        id: 'textureType',
-        label: 'Texture (0=Wood, 1=Marble, ...)',
-        min: 0,
-        max: 2,
-        defaultValue: 0,
-        step: 1,
-      }, // Needs mapping
-      { id: 'scale', label: 'Texture Scale', min: 0.01, max: 0.5, defaultValue: 0.05, step: 0.01 },
-      { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.4, step: 0.05 },
-    ],
-  },
   // --- MORE UNIQUE EFFECTS END HERE ---
 
   // --- NEW UNIQUE EFFECTS ---
@@ -3648,41 +3629,6 @@ const createFractalNoiseEffect = (settings: Record<string, number>) => {
       data[i] = lerp(data[i], noiseVal, opacity);
       data[i + 1] = lerp(data[i + 1], noiseVal, opacity);
       data[i + 2] = lerp(data[i + 2], noiseVal, opacity);
-    }
-  };
-};
-
-// 20. Procedural Texture Implementation (Simple Wood Grain Placeholder)
-const createProcTextureEffect = (settings: Record<string, number>) => {
-  return function (imageData: KonvaImageData) {
-    const { data, width, height } = imageData;
-    const scale = settings.scale ?? 0.05;
-    const opacity = settings.opacity ?? 0.4;
-    // textureType setting is ignored for this simple version
-
-    // Basic pseudo-random function (replace with Perlin/Simplex if available)
-    const pseudoRandom = (seed: number) => {
-      let t = seed + 0.5;
-      t = Math.sin(t * 12.9898);
-      return t - Math.floor(t);
-    };
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const index = (y * width + x) * 4;
-
-        // Simulate wood grain: noise influenced strongly by Y coordinate
-        const noiseInput = x * scale * 0.2 + pseudoRandom(y * scale * 5.0) * 0.5; // Distort x based on y noise
-        const noiseVal = (Math.sin(noiseInput * Math.PI * 2) + 1) / 2; // Create bands
-        const woodColor = 100 + noiseVal * 80; // Brownish tones
-
-        // Blend texture (Multiply blend approx)
-        data[index] = data[index] * (1 - opacity) + data[index] * (woodColor / 255) * opacity;
-        data[index + 1] =
-          data[index + 1] * (1 - opacity) + data[index + 1] * (woodColor / 255) * 0.8 * opacity; // Slightly less green
-        data[index + 2] =
-          data[index + 2] * (1 - opacity) + data[index + 2] * (woodColor / 255) * 0.6 * opacity; // Even less blue
-      }
     }
   };
 };
