@@ -1,6 +1,6 @@
-# Imager
+# imHAX
 
-A modern web-based image editing application built with Next.js, React, and Tailwind CSS. Imager provides real-time artistic effects and filters for your images.
+A modern web-based image editing playground built with Next.js, React, and Tailwind CSS. imHAX lets you apply fun, real-time artistic effects and filters to your images.
 
 ## Features
 
@@ -24,12 +24,14 @@ A modern web-based image editing application built with Next.js, React, and Tail
 ### Installation
 
 1. Clone the repository:
+
 ```
-git clone https://github.com/yourusername/imager.git
-cd imager
+git clone https://github.com/yourusername/imhax.git
+cd imhax
 ```
 
 2. Install dependencies:
+
 ```
 npm install
 # or
@@ -37,6 +39,7 @@ yarn install
 ```
 
 3. Start the development server:
+
 ```
 npm run dev
 # or
@@ -74,10 +77,10 @@ If you see errors about missing directories or routing problems:
 ## Project Structure
 
 ```
-imager/
+imhax/
 ├── app/               # Next.js App Router core (root routes)
 ├── src/
-│   ├── app/           # Main application code 
+│   ├── app/           # Main application code
 │   ├── components/    # React components
 │   ├── hooks/         # Custom React hooks
 │   ├── lib/           # Utilities and helper functions

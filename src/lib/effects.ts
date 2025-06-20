@@ -1907,13 +1907,57 @@ const createGlitchArtEffect = (settings: Record<string, number>) => {
   };
 };
 
-// 2. Color Quantization Implementation (Placeholder - Complex)
+// 2. Color Quantization Implementation
 const createColorQuantizationEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
-    // TODO: Implement proper quantization (e.g., k-means) and dithering.
-    // This is complex and potentially slow. Using Posterize as a fallback for now.
-    const levels = Math.max(2, Math.floor(settings.numColors ?? 16));
-    Konva.Filters.Posterize.call({ levels }, imageData);
+    const { data, width, height } = imageData;
+    const numColors = Math.max(2, Math.floor(settings.numColors ?? 16));
+    const dithering = (settings.dithering ?? 0) > 0.5;
+
+    // Calculate quantization step
+    const step = 256 / numColors;
+
+    if (dithering) {
+      // Floyd-Steinberg dithering
+      const tempData = new Uint8ClampedArray(data.length);
+      tempData.set(data);
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const index = (y * width + x) * 4;
+
+          for (let channel = 0; channel < 3; channel++) {
+            const oldPixel = tempData[index + channel];
+            const newPixel = Math.round(oldPixel / step) * step;
+            const error = oldPixel - newPixel;
+
+            data[index + channel] = Math.max(0, Math.min(255, newPixel));
+
+            // Distribute error to neighboring pixels
+            if (x + 1 < width) {
+              tempData[index + 4 + channel] += (error * 7) / 16;
+            }
+            if (y + 1 < height) {
+              if (x > 0) {
+                tempData[index + (width - 1) * 4 + channel] += (error * 3) / 16;
+              }
+              tempData[index + width * 4 + channel] += (error * 5) / 16;
+              if (x + 1 < width) {
+                tempData[index + (width + 1) * 4 + channel] += (error * 1) / 16;
+              }
+            }
+          }
+        }
+      }
+    } else {
+      // Simple quantization without dithering
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.round(data[i] / step) * step; // Red
+        data[i + 1] = Math.round(data[i + 1] / step) * step; // Green
+        data[i + 2] = Math.round(data[i + 2] / step) * step; // Blue
+        // Alpha channel remains unchanged
+      }
+    }
   };
 };
 

@@ -218,7 +218,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
 
             // Create download link
             const link = document.createElement('a');
-            link.download = `imager-export-${Date.now()}.${format === 'jpeg' ? 'jpg' : 'png'}`;
+            link.download = `hax-export-${Date.now()}.${format === 'jpeg' ? 'jpg' : 'png'}`;
             link.href = dataURL;
             link.style.display = 'none';
 
@@ -388,7 +388,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
                 />
               </svg>
             </div>
-            <h2 className="text-2xl font-semibold mb-3 text-gray-900">Welcome to Imager</h2>
+            <h2 className="text-2xl font-semibold mb-3 text-gray-900">Welcome to HAX</h2>
             <p className="text-gray-600 mb-8 max-w-md">
               Upload an image to start applying beautiful real-time effects
             </p>

@@ -255,7 +255,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Imager - Real-time Image Effects</title>
+        <title>HAX - Real-time Image Effects</title>
         <meta
           name="description"
           content="A React-based image editing app with real-time artistic effects."
