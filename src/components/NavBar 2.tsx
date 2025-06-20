@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useAppStore } from '@/lib/store';
+import { ThemeToggle } from './ThemeToggle';
 
 const NavBar: React.FC = () => {
   const sidebarOpen = useAppStore(state => state.sidebarOpen);
@@ -16,7 +17,7 @@ const NavBar: React.FC = () => {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link href="/" className="text-xl font-bold text-gray-800">
-                Imager
+                HAX
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
@@ -34,7 +35,8 @@ const NavBar: React.FC = () => {
               </Link>
             </div>
           </div>
-          <div className="hidden sm:ml-6 sm:flex sm:items-center">
+          <div className="hidden sm:ml-6 sm:flex sm:items-center gap-3">
+            <ThemeToggle />
             {selectedImage && (
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -48,7 +50,12 @@ const NavBar: React.FC = () => {
                   viewBox="0 0 24 24"
                   stroke="currentColor"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </button>
             )}
@@ -68,7 +75,12 @@ const NavBar: React.FC = () => {
                 stroke="currentColor"
                 aria-hidden="true"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             </button>
           </div>
@@ -78,4 +90,4 @@ const NavBar: React.FC = () => {
   );
 };
 
-export default NavBar; 
+export default NavBar;
