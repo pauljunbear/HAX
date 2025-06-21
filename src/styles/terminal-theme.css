@@ -143,24 +143,31 @@
   height: auto !important;
 }
 
-/* Sidebars - Better Spacing */
+/* Sidebars - Better Spacing and Alignment */
 .theme-terminal .left-sidebar,
-.theme-terminal .right-sidebar,
-.theme-terminal [class*='w-[280px]'],
-.theme-terminal [class*='w-[320px]'] {
+.theme-terminal .right-sidebar {
   background: rgb(var(--dark-bg)) !important;
   border: 1px solid rgb(var(--dark-border)) !important;
   padding: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Fix right sidebar width and positioning */
+.theme-terminal [class*='w-[320px]'] {
+  width: 300px !important;
+  max-width: 300px !important;
 }
 
 /* Section Headers with Terminal Prompt */
 .theme-terminal h2 {
   position: relative;
-  padding: 0.75rem 0;
-  margin-bottom: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 0;
   color: rgb(var(--terminal-green));
   font-weight: 400;
   letter-spacing: 0.1em;
+  border-bottom: 1px solid rgb(var(--dark-border));
 }
 
 .theme-terminal h2::before {
@@ -169,15 +176,28 @@
   opacity: 0.6;
 }
 
-/* Effect Categories - Better Organization */
+/* Effect Categories - Better Organization and Alignment */
 .theme-terminal .border-b {
   border-bottom: 1px solid rgb(var(--dark-border)) !important;
-  padding: 0.75rem 1rem !important;
+  padding: 0 !important;
   margin: 0 !important;
 }
 
+/* Category buttons in left nav */
+.theme-terminal button[class*='text-left'][class*='w-full'] {
+  padding: 0.75rem 1rem !important;
+  margin: 0 !important;
+  border: none !important;
+  border-bottom: 1px solid rgb(var(--dark-border)) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  width: 100% !important;
+  text-align: left !important;
+}
+
 .theme-terminal [class*='px-3'][class*='py-2'] {
-  padding: 0.625rem 1rem !important;
+  padding: 0.75rem 1rem !important;
 }
 
 /* Buttons - Clean Terminal Style */
@@ -461,18 +481,70 @@
   box-shadow: none !important;
 }
 
-/* Export section */
+/* Export section - Terminal Style */
 .theme-terminal [class*='hover:shadow-lg'] {
   background: rgb(var(--dark-surface)) !important;
   border: 1px solid rgb(var(--dark-border)) !important;
   padding: 0.875rem !important;
   margin: 0.5rem 0 !important;
   transition: all 0.15s ease;
+  cursor: pointer;
+  position: relative;
 }
 
 .theme-terminal [class*='hover:shadow-lg']:hover {
   background: rgb(var(--dark-surface-elevated)) !important;
-  border-color: rgb(var(--terminal-gray-dark)) !important;
+  border-color: rgb(var(--terminal-green-dim)) !important;
+}
+
+/* Export format badges */
+.theme-terminal .bg-gray-100 {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  color: rgb(var(--terminal-gray)) !important;
+  padding: 0.25rem 0.5rem !important;
+  font-size: 0.625rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Remove all colorful icons and backgrounds */
+.theme-terminal .bg-purple-100,
+.theme-terminal .bg-orange-100,
+.theme-terminal .bg-blue-100,
+.theme-terminal .bg-green-100,
+.theme-terminal .text-purple-600,
+.theme-terminal .text-orange-600,
+.theme-terminal .text-blue-600,
+.theme-terminal .text-green-600 {
+  background: transparent !important;
+  color: rgb(var(--terminal-gray)) !important;
+}
+
+/* Export icons - make them all gray */
+.theme-terminal [class*='w-10'][class*='h-10'] {
+  width: 2rem !important;
+  height: 2rem !important;
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  color: rgb(var(--terminal-gray)) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.875rem !important;
+}
+
+/* Active export option */
+.theme-terminal [class*='hover:shadow-lg'].active,
+.theme-terminal [class*='hover:shadow-lg']:active {
+  border-color: rgb(var(--terminal-green)) !important;
+  background: rgb(var(--dark-surface-elevated)) !important;
+}
+
+.theme-terminal [class*='hover:shadow-lg'].active .bg-gray-100,
+.theme-terminal [class*='hover:shadow-lg']:active .bg-gray-100 {
+  background: rgb(var(--terminal-green)) !important;
+  color: rgb(0, 0, 0) !important;
 }
 
 /* Empty states */
@@ -584,4 +656,35 @@
 
 .theme-terminal .gap-4 {
   gap: 1rem !important;
+}
+
+/* Export options specific styling */
+.theme-terminal .text-xs.font-medium {
+  font-size: 0.6875rem !important;
+  color: rgb(var(--terminal-gray)) !important;
+}
+
+/* Terminal style status indicator */
+.theme-terminal .w-2.h-2.bg-green-500 {
+  width: 6px !important;
+  height: 6px !important;
+  background: transparent !important;
+  border: 1px solid rgb(var(--terminal-green)) !important;
+  box-shadow: none !important;
+}
+
+.theme-terminal .w-2.h-2.bg-green-500.animate-pulse {
+  background: rgb(var(--terminal-green)) !important;
+  animation: terminal-blink 1s infinite;
+}
+
+@keyframes terminal-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0.3;
+  }
 }
