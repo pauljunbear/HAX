@@ -53,6 +53,76 @@ html.theme-apple .h-screen {
   background: var(--background-primary) !important;
 }
 
+/* INTRO SCREEN - Apple Style */
+html.theme-apple .fixed.inset-0.z-50.flex.items-center.justify-center.bg-black {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 50%, #f8f9fa 100%) !important;
+}
+
+/* Intro Screen Title */
+html.theme-apple .text-4xl.md\:text-5xl.font-bold.text-white {
+  color: var(--text-primary) !important;
+  font-size: clamp(2.5rem, 5vw, 4rem) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.04em !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif !important;
+}
+
+/* Intro Screen Tagline */
+html.theme-apple .text-base.md\:text-lg.text-gray-300 {
+  color: var(--text-secondary) !important;
+  font-size: 18px !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.011em !important;
+  line-height: 1.5 !important;
+  max-width: 480px !important;
+  margin: 0 auto !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif !important;
+}
+
+/* Intro Screen CTA Button */
+html.theme-apple .bg-\[#F53001\] {
+  background: var(--accent-primary) !important;
+  border: none !important;
+  border-radius: 16px !important;
+  padding: 16px 24px !important;
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  color: white !important;
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.25) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+html.theme-apple .bg-\[#F53001\]:hover {
+  background: #0056cc !important;
+  box-shadow: 0 6px 24px rgba(0, 122, 255, 0.35) !important;
+  transform: translateY(-2px) scale(1.02) !important;
+}
+
+html.theme-apple .bg-\[#F53001\]:active {
+  background: #004bb5 !important;
+  transform: translateY(0) scale(0.98) !important;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3) !important;
+}
+
+/* Button Icons */
+html.theme-apple .bg-\[#F53001\] svg {
+  width: 18px !important;
+  height: 18px !important;
+  color: white !important;
+}
+
+/* Intro Screen Content Container */
+html.theme-apple .relative.z-10.flex.flex-col.items-center.justify-center.h-full.text-center.px-6 {
+  padding: 32px 24px !important;
+}
+
+/* Intro Screen Gap */
+html.theme-apple .flex.flex-col.items-center.justify-center.gap-8 {
+  gap: 32px !important;
+}
+
 /* Remove ALL Gray Backgrounds */
 html.theme-apple .bg-white,
 html.theme-apple .bg-gray-50,
