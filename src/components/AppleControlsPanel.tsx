@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig } from '@/lib/effects';
+import { ThemeToggle } from './ThemeToggle';
 
 interface EffectLayer {
   id: string;
@@ -130,8 +131,14 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
 
   return (
     <div className="glass-card-compact w-80 h-full flex flex-col">
+      {/* Theme Toggle Header */}
+      <div className="flex items-center justify-between p-3 border-b border-white/20 bg-white/5">
+        <h2 className="text-sm font-semibold text-gray-700">Controls</h2>
+        <ThemeToggle />
+      </div>
+
       {/* Compact Tab Navigation */}
-      <div className="flex border-b border-white/20 bg-white/10 rounded-t-lg">
+      <div className="flex border-b border-white/20 bg-white/10">
         {tabs.map(tab => (
           <button
             key={tab.id}

@@ -4,7 +4,6 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import AnimatedLogo from './AnimatedLogo';
 import { Upload, ChevronRight } from 'lucide-react';
-import { ThemeToggle } from './ThemeToggle';
 
 interface IntroScreenProps {
   onImageSelect: () => void;
@@ -19,11 +18,6 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ onImageSelect }) => {
       transition={{ duration: 0.5 }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black"
     >
-      {/* Theme toggle in top right */}
-      <div className="absolute top-4 right-4 z-20">
-        <ThemeToggle />
-      </div>
-
       {/* Animated Background */}
       <div className="absolute inset-0 flex items-center justify-center z-0">
         <div className="w-[50%] h-[50%] relative overflow-hidden">

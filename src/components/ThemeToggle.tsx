@@ -15,7 +15,7 @@ export const ThemeToggle: React.FC = () => {
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = currentTheme === 'apple' ? 'cyberpunk' : 'apple';
+    const newTheme = currentTheme === 'apple' ? 'terminal' : 'apple';
     setCurrentTheme(newTheme);
     setTheme(newTheme);
   };
@@ -30,12 +30,12 @@ export const ThemeToggle: React.FC = () => {
         ${
           currentTheme === 'apple'
             ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-            : 'bg-red-900/20 hover:bg-red-900/30 text-red-500 border border-red-500/30'
+            : 'bg-gray-900 hover:bg-gray-800 text-green-500 border border-gray-700'
         }
       `}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
-      aria-label={`Switch to ${currentTheme === 'apple' ? 'Cyberpunk' : 'Apple'} theme`}
+      aria-label={`Switch to ${currentTheme === 'apple' ? 'Terminal' : 'Apple'} theme`}
     >
       <div className="flex items-center gap-2">
         {currentTheme === 'apple' ? (
@@ -52,45 +52,18 @@ export const ThemeToggle: React.FC = () => {
           </>
         ) : (
           <>
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              style={{
-                filter: 'drop-shadow(0 0 4px rgba(255, 0, 60, 0.6))',
-              }}
-            >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
-            {isHovered && <span className="text-xs font-bold tracking-wider uppercase">CYBER</span>}
+            {isHovered && <span className="text-xs font-mono">TERMINAL</span>}
           </>
         )}
       </div>
-
-      {/* Cyberpunk glow effect */}
-      {currentTheme === 'cyberpunk' && (
-        <motion.div
-          className="absolute inset-0 rounded-lg pointer-events-none"
-          style={{
-            background: 'radial-gradient(circle at center, rgba(255, 0, 60, 0.2), transparent)',
-            filter: 'blur(8px)',
-          }}
-          animate={{
-            opacity: [0.3, 0.6, 0.3],
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        />
-      )}
     </motion.button>
   );
 };
