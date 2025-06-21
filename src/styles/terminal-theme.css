@@ -1,0 +1,587 @@
+/* Terminal Theme - Clean, Organized, and Elegant */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+.theme-terminal {
+  /* Terminal Color Palette - Clean and Professional */
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+  --canvas-bg: 0, 0, 0;
+
+  /* Terminal Colors */
+  --terminal-green: 0, 255, 0;
+  --terminal-green-dim: 0, 200, 0;
+  --terminal-amber: 255, 170, 0;
+  --terminal-white: 255, 255, 255;
+  --terminal-gray: 160, 160, 160;
+  --terminal-gray-dark: 100, 100, 100;
+  --terminal-border: 40, 40, 40;
+
+  /* UI Surface Colors */
+  --dark-bg: 0, 0, 0;
+  --dark-surface: 10, 10, 10;
+  --dark-surface-elevated: 20, 20, 20;
+  --dark-border: 40, 40, 40;
+  --dark-text: 255, 255, 255;
+  --dark-text-muted: 160, 160, 160;
+
+  /* Override Apple Grays */
+  --apple-gray-50: 10, 10, 10;
+  --apple-gray-100: 20, 20, 20;
+  --apple-gray-200: 40, 40, 40;
+  --apple-gray-300: 60, 60, 60;
+  --apple-gray-400: 80, 80, 80;
+  --apple-gray-500: 120, 120, 120;
+  --apple-gray-600: 160, 160, 160;
+  --apple-gray-700: 200, 200, 200;
+  --apple-gray-800: 220, 220, 220;
+  --apple-gray-900: 240, 240, 240;
+}
+
+/* Global Terminal Font */
+.theme-terminal {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace !important;
+}
+
+.theme-terminal body {
+  background: rgb(0, 0, 0);
+  color: rgb(var(--terminal-white));
+}
+
+/* Main containers */
+.theme-terminal #__next,
+.theme-terminal main,
+.theme-terminal .min-h-screen {
+  background: rgb(0, 0, 0) !important;
+}
+
+/* Subtle scanlines */
+.theme-terminal body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 0, 0.01) 2px,
+    rgba(0, 255, 0, 0.01) 3px
+  );
+  pointer-events: none;
+  z-index: 999999;
+}
+
+/* Canvas area */
+.theme-terminal .canvas-bg,
+.theme-terminal .bg-gray-50 {
+  background-color: rgb(0, 0, 0) !important;
+}
+
+/* Typography - Clean and Hierarchical */
+.theme-terminal h1,
+.theme-terminal h2,
+.theme-terminal h3,
+.theme-terminal h4,
+.theme-terminal h5,
+.theme-terminal h6 {
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(var(--terminal-white));
+  margin: 0;
+  padding: 0;
+}
+
+.theme-terminal h1 {
+  font-size: 1rem;
+}
+.theme-terminal h2 {
+  font-size: 0.875rem;
+}
+.theme-terminal h3 {
+  font-size: 0.8125rem;
+}
+.theme-terminal h4 {
+  font-size: 0.75rem;
+}
+.theme-terminal h5 {
+  font-size: 0.75rem;
+}
+.theme-terminal h6 {
+  font-size: 0.75rem;
+}
+
+/* Panels - Clean Terminal Windows */
+.theme-terminal .glass-panel,
+.theme-terminal .glass-card-compact,
+.theme-terminal .card-apple,
+.theme-terminal aside,
+.theme-terminal .sidebar-content,
+.theme-terminal .apple-surface-primary,
+.theme-terminal .apple-surface-secondary,
+.theme-terminal .apple-surface-tertiary,
+.theme-terminal .apple-surface-elevated {
+  background: rgb(var(--dark-bg)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  padding: 1rem !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* Navigation - Terminal Header */
+.theme-terminal nav,
+.theme-terminal .h-14.apple-surface-elevated {
+  background: rgb(var(--dark-surface)) !important;
+  border-bottom: 1px solid rgb(var(--dark-border)) !important;
+  padding: 0.75rem 1rem !important;
+  box-shadow: none !important;
+  height: auto !important;
+}
+
+/* Sidebars - Better Spacing */
+.theme-terminal .left-sidebar,
+.theme-terminal .right-sidebar,
+.theme-terminal [class*='w-[280px]'],
+.theme-terminal [class*='w-[320px]'] {
+  background: rgb(var(--dark-bg)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  padding: 0 !important;
+}
+
+/* Section Headers with Terminal Prompt */
+.theme-terminal h2 {
+  position: relative;
+  padding: 0.75rem 0;
+  margin-bottom: 0.5rem;
+  color: rgb(var(--terminal-green));
+  font-weight: 400;
+  letter-spacing: 0.1em;
+}
+
+.theme-terminal h2::before {
+  content: '> ';
+  color: rgb(var(--terminal-green));
+  opacity: 0.6;
+}
+
+/* Effect Categories - Better Organization */
+.theme-terminal .border-b {
+  border-bottom: 1px solid rgb(var(--dark-border)) !important;
+  padding: 0.75rem 1rem !important;
+  margin: 0 !important;
+}
+
+.theme-terminal [class*='px-3'][class*='py-2'] {
+  padding: 0.625rem 1rem !important;
+}
+
+/* Buttons - Clean Terminal Style */
+.theme-terminal button {
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  color: rgb(var(--terminal-gray)) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 400;
+  font-size: 0.6875rem !important;
+  padding: 0.5rem 1rem !important;
+  margin: 0.125rem !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  transition: all 0.15s ease;
+  height: auto !important;
+  min-height: 32px !important;
+  line-height: 1.2 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.theme-terminal button:hover {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border-color: rgb(var(--terminal-gray-dark)) !important;
+  color: rgb(var(--terminal-white)) !important;
+}
+
+/* Active/Selected buttons */
+.theme-terminal button[aria-pressed='true'],
+.theme-terminal button.active,
+.theme-terminal [class*='bg-primary'],
+.theme-terminal [class*='bg-blue'] {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border-color: rgb(var(--terminal-green-dim)) !important;
+  color: rgb(var(--terminal-green)) !important;
+  font-weight: 500;
+}
+
+/* Primary Action Buttons (like NEW IMAGE) */
+.theme-terminal .btn-apple-primary,
+.theme-terminal button[class*='bg-primary'] {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border: 1px solid rgb(var(--terminal-green-dim)) !important;
+  color: rgb(var(--terminal-green)) !important;
+  padding: 0.625rem 1.25rem !important;
+  font-weight: 500;
+}
+
+/* Input Fields - Clean Terminal Input */
+.theme-terminal input[type='text'],
+.theme-terminal input[type='search'],
+.theme-terminal textarea {
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  color: rgb(var(--terminal-white)) !important;
+  font-family: inherit;
+  font-size: 0.75rem !important;
+  padding: 0.5rem 0.75rem !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  line-height: 1.4 !important;
+  height: 36px !important;
+}
+
+.theme-terminal input[type='text']:focus,
+.theme-terminal input[type='search']:focus,
+.theme-terminal textarea:focus {
+  border-color: rgb(var(--terminal-green-dim)) !important;
+  background: rgb(var(--dark-surface-elevated)) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Sliders - Terminal Style */
+.theme-terminal input[type='range'] {
+  background: rgb(var(--dark-border)) !important;
+  height: 2px !important;
+  margin: 0.75rem 0 !important;
+  border-radius: 0 !important;
+}
+
+.theme-terminal input[type='range']::-webkit-slider-thumb {
+  background: rgb(var(--terminal-green)) !important;
+  border: none !important;
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+/* Tabs - Clean Terminal Tabs */
+.theme-terminal .tab-apple,
+.theme-terminal [role='tab'] {
+  border: 1px solid transparent !important;
+  color: rgb(var(--terminal-gray)) !important;
+  padding: 0.5rem 1rem !important;
+  font-size: 0.6875rem !important;
+  letter-spacing: 0.05em !important;
+  background: rgb(var(--dark-surface)) !important;
+  text-transform: uppercase;
+  margin: 0 0.125rem !important;
+  min-height: 36px !important;
+}
+
+.theme-terminal .tab-apple:hover,
+.theme-terminal [role='tab']:hover {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border-color: rgb(var(--dark-border)) !important;
+  color: rgb(var(--terminal-white)) !important;
+}
+
+.theme-terminal .tab-apple-active,
+.theme-terminal [role='tab'][aria-selected='true'] {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  color: rgb(var(--terminal-green)) !important;
+  border-color: rgb(var(--terminal-green-dim)) !important;
+  font-weight: 500;
+}
+
+/* Improved spacing throughout */
+.theme-terminal .p-4 {
+  padding: 1rem !important;
+}
+
+.theme-terminal .p-3 {
+  padding: 0.875rem !important;
+}
+
+.theme-terminal .p-2 {
+  padding: 0.625rem !important;
+}
+
+.theme-terminal .space-y-2 > * + * {
+  margin-top: 0.75rem !important;
+}
+
+.theme-terminal .space-y-3 > * + * {
+  margin-top: 1rem !important;
+}
+
+.theme-terminal .space-y-4 > * + * {
+  margin-top: 1.25rem !important;
+}
+
+/* Labels - Clean and Organized */
+.theme-terminal label {
+  font-size: 0.6875rem !important;
+  letter-spacing: 0.05em !important;
+  margin-bottom: 0.375rem !important;
+  display: block;
+  color: rgb(var(--terminal-gray)) !important;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+/* Effect Cards - Better Spacing */
+.theme-terminal .glass-card-compact {
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  padding: 0.75rem !important;
+  margin: 0.5rem !important;
+  border-radius: 0 !important;
+  transition: all 0.15s ease;
+}
+
+.theme-terminal .glass-card-compact:hover {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border-color: rgb(var(--terminal-gray-dark)) !important;
+}
+
+/* Category containers */
+.theme-terminal .overflow-hidden > div {
+  padding: 0.5rem !important;
+}
+
+/* Search Box Container */
+.theme-terminal .sticky.top-0 {
+  background: rgb(var(--dark-bg)) !important;
+  padding: 1rem !important;
+  border-bottom: 1px solid rgb(var(--dark-border)) !important;
+  z-index: 10;
+}
+
+/* Tab containers */
+.theme-terminal [role='tablist'] {
+  background: rgb(var(--dark-bg)) !important;
+  padding: 0.5rem !important;
+  border-bottom: 1px solid rgb(var(--dark-border)) !important;
+  gap: 0.25rem;
+  display: flex;
+}
+
+/* Tab panels */
+.theme-terminal [role='tabpanel'] {
+  padding: 1rem !important;
+}
+
+/* Status indicators */
+.theme-terminal .bg-green-500 {
+  background: rgb(var(--terminal-green)) !important;
+  box-shadow: 0 0 4px rgba(var(--terminal-green), 0.5) !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 0 !important;
+}
+
+/* Toggle switches */
+.theme-terminal [role='switch'],
+.theme-terminal .react-switch-bg {
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  border-radius: 0 !important;
+}
+
+.theme-terminal [role='switch'][aria-checked='true'] {
+  background: rgb(var(--terminal-green-dim)) !important;
+  border-color: rgb(var(--terminal-green)) !important;
+}
+
+/* Text styling */
+.theme-terminal * {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace !important;
+  line-height: 1.5 !important;
+}
+
+.theme-terminal p,
+.theme-terminal span,
+.theme-terminal div {
+  color: rgb(var(--terminal-white));
+}
+
+.theme-terminal [class*='text-gray'],
+.theme-terminal [class*='text-muted'],
+.theme-terminal .text-compact,
+.theme-terminal .text-compact-sm,
+.theme-terminal .text-xs,
+.theme-terminal .text-sm {
+  color: rgb(var(--terminal-gray)) !important;
+  font-size: 0.6875rem !important;
+}
+
+/* Scrollbar */
+.theme-terminal ::-webkit-scrollbar {
+  width: 10px;
+  background: rgb(var(--dark-bg));
+}
+
+.theme-terminal ::-webkit-scrollbar-track {
+  background: rgb(var(--dark-bg));
+  border-left: 1px solid rgb(var(--dark-border));
+}
+
+.theme-terminal ::-webkit-scrollbar-thumb {
+  background: rgb(var(--dark-border));
+  border: none;
+  border-radius: 0;
+}
+
+.theme-terminal ::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--terminal-gray-dark));
+}
+
+/* Terminal cursor */
+.theme-terminal input:focus,
+.theme-terminal textarea:focus {
+  caret-color: rgb(var(--terminal-green));
+}
+
+/* Remove rounded corners everywhere */
+.theme-terminal [class*='rounded'] {
+  border-radius: 0 !important;
+}
+
+/* Remove shadows */
+.theme-terminal [class*='shadow'] {
+  box-shadow: none !important;
+}
+
+/* Export section */
+.theme-terminal [class*='hover:shadow-lg'] {
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  padding: 0.875rem !important;
+  margin: 0.5rem 0 !important;
+  transition: all 0.15s ease;
+}
+
+.theme-terminal [class*='hover:shadow-lg']:hover {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border-color: rgb(var(--terminal-gray-dark)) !important;
+}
+
+/* Empty states */
+.theme-terminal .text-center.py-8 {
+  padding: 2rem !important;
+}
+
+/* Icon containers */
+.theme-terminal .w-12.h-12 {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(var(--dark-border));
+  background: rgb(var(--dark-surface));
+  margin: 0 auto 1rem;
+}
+
+/* Effect count text */
+.theme-terminal .text-xs {
+  font-size: 0.625rem !important;
+  opacity: 0.7;
+}
+
+/* Margins */
+.theme-terminal .mb-1 {
+  margin-bottom: 0.375rem !important;
+}
+.theme-terminal .mb-2 {
+  margin-bottom: 0.75rem !important;
+}
+.theme-terminal .mb-3 {
+  margin-bottom: 1rem !important;
+}
+.theme-terminal .mb-4 {
+  margin-bottom: 1.25rem !important;
+}
+.theme-terminal .mt-1 {
+  margin-top: 0.375rem !important;
+}
+.theme-terminal .mt-2 {
+  margin-top: 0.75rem !important;
+}
+.theme-terminal .mt-3 {
+  margin-top: 1rem !important;
+}
+.theme-terminal .mt-4 {
+  margin-top: 1.25rem !important;
+}
+
+/* Fix any white backgrounds */
+.theme-terminal [class*='bg-white'],
+.theme-terminal [class*='bg-gray'] {
+  background: transparent !important;
+}
+
+/* Apple-specific overrides */
+.theme-terminal .apple-glass {
+  backdrop-filter: none !important;
+  background: rgb(var(--dark-bg)) !important;
+}
+
+.theme-terminal .apple-border {
+  border-color: rgb(var(--dark-border)) !important;
+}
+
+.theme-terminal .apple-text-primary {
+  color: rgb(var(--terminal-white)) !important;
+}
+
+.theme-terminal .apple-text-secondary {
+  color: rgb(var(--terminal-gray)) !important;
+}
+
+.theme-terminal .apple-button {
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  color: rgb(var(--terminal-gray)) !important;
+  padding: 0.5rem 1rem !important;
+  font-size: 0.6875rem !important;
+  border-radius: 0 !important;
+  min-height: 32px !important;
+}
+
+.theme-terminal .apple-button:hover {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border-color: rgb(var(--terminal-gray-dark)) !important;
+  color: rgb(var(--terminal-white)) !important;
+}
+
+/* Grid layouts for better organization */
+.theme-terminal .grid {
+  gap: 0.5rem !important;
+}
+
+/* Flex layouts */
+.theme-terminal .flex {
+  gap: 0.5rem;
+}
+
+.theme-terminal .gap-2 {
+  gap: 0.5rem !important;
+}
+
+.theme-terminal .gap-3 {
+  gap: 0.75rem !important;
+}
+
+.theme-terminal .gap-4 {
+  gap: 1rem !important;
+}

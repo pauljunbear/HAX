@@ -1,14 +1,14 @@
 // Theme definitions and utilities
-export type Theme = 'apple' | 'cyberpunk';
+export type Theme = 'apple' | 'terminal';
 
 export const themes = {
   apple: {
     name: 'Apple',
     class: 'theme-apple',
   },
-  cyberpunk: {
-    name: 'Cyberpunk',
-    class: 'theme-cyberpunk',
+  terminal: {
+    name: 'Terminal',
+    class: 'theme-terminal',
   },
 } as const;
 
@@ -21,7 +21,7 @@ export const setTheme = (theme: Theme) => {
   if (typeof window === 'undefined') return;
 
   localStorage.setItem('app-theme', theme);
-  document.documentElement.classList.remove('theme-apple', 'theme-cyberpunk');
+  document.documentElement.classList.remove('theme-apple', 'theme-terminal');
   document.documentElement.classList.add(themes[theme].class);
 
   // Dispatch event for components that need to react to theme change
