@@ -14,9 +14,9 @@
   --terminal-green-bright: 0, 255, 100;
   --terminal-amber: 255, 170, 0;
   --terminal-white: 255, 255, 255;
-  --terminal-gray: 160, 160, 160;
-  --terminal-gray-dark: 100, 100, 100;
-  --terminal-border: 40, 40, 40;
+  --terminal-gray: 200, 200, 200;
+  --terminal-gray-dark: 140, 140, 140;
+  --terminal-border: 35, 35, 35;
 
   /* UI Surface Colors */
   --dark-bg: 0, 0, 0;
@@ -24,7 +24,7 @@
   --dark-surface-elevated: 16, 16, 16;
   --dark-border: 35, 35, 35;
   --dark-text: 255, 255, 255;
-  --dark-text-muted: 160, 160, 160;
+  --dark-text-muted: 200, 200, 200;
 
   /* Override Apple Grays */
   --apple-gray-50: 8, 8, 8;
@@ -191,7 +191,7 @@
   margin: 0 !important;
 }
 
-/* Category buttons in left nav - Fixed padding and sizing */
+/* Category buttons in left nav - Better contrast */
 .theme-terminal button[class*='text-left'][class*='w-full'] {
   padding: 0.5rem 0.75rem !important;
   margin: 0 !important;
@@ -233,14 +233,14 @@
   background: rgb(var(--dark-surface-elevated)) !important;
 }
 
-/* NEW IMAGE button - proper containment */
-.theme-terminal button:has-text('NEW IMAGE'),
-.theme-terminal .btn-apple-primary {
+/* NEW IMAGE button - completely contained within sidebar */
+.theme-terminal .btn-apple-primary,
+.theme-terminal button[class*='bg-primary'] {
   background: rgb(var(--dark-surface)) !important;
   border: 1px solid rgb(var(--terminal-green-dim)) !important;
   color: rgb(var(--terminal-green)) !important;
-  padding: 0.4rem 0.75rem !important;
-  margin: 0.75rem !important;
+  padding: 0.4rem 0.6rem !important;
+  margin: 0.75rem 0.75rem 0.5rem 0.75rem !important;
   width: calc(100% - 1.5rem) !important;
   font-size: 0.55rem !important;
   font-weight: 500;
@@ -249,10 +249,11 @@
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
+  box-sizing: border-box !important;
 }
 
-.theme-terminal button:has-text('NEW IMAGE'):hover,
-.theme-terminal .btn-apple-primary:hover {
+.theme-terminal .btn-apple-primary:hover,
+.theme-terminal button[class*='bg-primary']:hover {
   background: rgb(var(--dark-surface-elevated)) !important;
   border-color: rgb(var(--terminal-green)) !important;
   box-shadow: 0 0 12px rgba(var(--terminal-green), 0.3) !important;
@@ -291,7 +292,6 @@
 /* Active/Selected buttons with glow */
 .theme-terminal button[aria-pressed='true'],
 .theme-terminal button.active,
-.theme-terminal [class*='bg-primary'],
 .theme-terminal [class*='bg-blue'] {
   background: rgb(var(--dark-surface-elevated)) !important;
   border-color: rgb(var(--terminal-green-dim)) !important;
@@ -445,7 +445,7 @@
   box-shadow: 0 0 8px rgba(var(--terminal-green), 0.3) !important;
 }
 
-/* Text styling - smaller sizes */
+/* Text styling - Better contrast */
 .theme-terminal * {
   font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace !important;
   line-height: 1.4 !important;
@@ -468,18 +468,16 @@
   font-size: 0.5rem !important;
 }
 
-/* Export section - Completely redesigned for consistency */
+/* Export section - Text only, no icons */
 .theme-terminal [class*='hover:shadow-lg'] {
   background: rgb(var(--dark-surface)) !important;
   border: 1px solid rgb(var(--dark-border)) !important;
-  padding: 0.6rem !important;
+  padding: 0.75rem !important;
   margin: 0.4rem 0 !important;
   transition: all 0.2s ease;
   cursor: pointer;
   position: relative;
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.75rem !important;
+  display: block !important;
 }
 
 .theme-terminal [class*='hover:shadow-lg']:hover {
@@ -488,25 +486,9 @@
   box-shadow: 0 0 10px rgba(var(--terminal-green), 0.2) !important;
 }
 
-/* Export format icons - all consistent */
+/* Remove ALL export icons and colored elements */
 .theme-terminal [class*='w-10'][class*='h-10'],
-.theme-terminal .w-10.h-10 {
-  width: 1.75rem !important;
-  height: 1.75rem !important;
-  background: rgb(var(--dark-surface-elevated)) !important;
-  border: 1px solid rgb(var(--dark-border)) !important;
-  color: rgb(var(--terminal-gray)) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 0.5rem !important;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  flex-shrink: 0;
-}
-
-/* Remove all colored backgrounds and make consistent */
+.theme-terminal .w-10.h-10,
 .theme-terminal .bg-purple-100,
 .theme-terminal .bg-orange-100,
 .theme-terminal .bg-blue-100,
@@ -515,12 +497,10 @@
 .theme-terminal .text-orange-600,
 .theme-terminal .text-blue-600,
 .theme-terminal .text-green-600 {
-  background: rgb(var(--dark-surface-elevated)) !important;
-  color: rgb(var(--terminal-gray)) !important;
-  border: 1px solid rgb(var(--dark-border)) !important;
+  display: none !important;
 }
 
-/* Export format badges - consistent styling */
+/* Export format badges - clean text only */
 .theme-terminal .bg-gray-100 {
   background: rgb(var(--dark-surface-elevated)) !important;
   border: 1px solid rgb(var(--dark-border)) !important;
@@ -547,19 +527,21 @@
   box-shadow: 0 0 6px rgba(var(--terminal-green), 0.4) !important;
 }
 
-/* Collapse button - add proper icon */
+/* Collapse button - proper arrows */
 .theme-terminal button[aria-label*='collapse'],
 .theme-terminal button[aria-label*='toggle'] {
   background: rgb(var(--dark-surface)) !important;
   border: 1px solid rgb(var(--dark-border)) !important;
   color: rgb(var(--terminal-gray)) !important;
-  width: 32px !important;
-  height: 32px !important;
+  width: 28px !important;
+  height: 28px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  font-size: 0.75rem !important;
+  font-size: 0.875rem !important;
   transition: all 0.2s ease;
+  padding: 0 !important;
+  margin: 0.25rem !important;
 }
 
 .theme-terminal button[aria-label*='collapse']:hover,
@@ -572,8 +554,14 @@
 .theme-terminal button[aria-label*='collapse']::before,
 .theme-terminal button[aria-label*='toggle']::before {
   content: '‹';
-  font-size: 1rem;
+  font-size: 1.2rem;
   font-weight: bold;
+  line-height: 1;
+}
+
+/* Hide empty collapse buttons without proper labels */
+.theme-terminal button:empty:not([aria-label]) {
+  display: none !important;
 }
 
 /* Theme toggle positioning fix */
