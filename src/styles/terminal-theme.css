@@ -1,4 +1,4 @@
-/* Terminal Theme - Clean, Organized, and Elegant */
+/* Terminal Theme - Clean, Organized, with Subtle Flair */
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 .theme-terminal {
@@ -10,7 +10,8 @@
 
   /* Terminal Colors */
   --terminal-green: 0, 255, 0;
-  --terminal-green-dim: 0, 200, 0;
+  --terminal-green-dim: 0, 180, 0;
+  --terminal-green-bright: 0, 255, 100;
   --terminal-amber: 255, 170, 0;
   --terminal-white: 255, 255, 255;
   --terminal-gray: 160, 160, 160;
@@ -19,23 +20,23 @@
 
   /* UI Surface Colors */
   --dark-bg: 0, 0, 0;
-  --dark-surface: 10, 10, 10;
-  --dark-surface-elevated: 20, 20, 20;
-  --dark-border: 40, 40, 40;
+  --dark-surface: 8, 8, 8;
+  --dark-surface-elevated: 16, 16, 16;
+  --dark-border: 35, 35, 35;
   --dark-text: 255, 255, 255;
   --dark-text-muted: 160, 160, 160;
 
   /* Override Apple Grays */
-  --apple-gray-50: 10, 10, 10;
-  --apple-gray-100: 20, 20, 20;
-  --apple-gray-200: 40, 40, 40;
-  --apple-gray-300: 60, 60, 60;
-  --apple-gray-400: 80, 80, 80;
-  --apple-gray-500: 120, 120, 120;
-  --apple-gray-600: 160, 160, 160;
-  --apple-gray-700: 200, 200, 200;
-  --apple-gray-800: 220, 220, 220;
-  --apple-gray-900: 240, 240, 240;
+  --apple-gray-50: 8, 8, 8;
+  --apple-gray-100: 16, 16, 16;
+  --apple-gray-200: 35, 35, 35;
+  --apple-gray-300: 55, 55, 55;
+  --apple-gray-400: 75, 75, 75;
+  --apple-gray-500: 115, 115, 115;
+  --apple-gray-600: 155, 155, 155;
+  --apple-gray-700: 195, 195, 195;
+  --apple-gray-800: 215, 215, 215;
+  --apple-gray-900: 235, 235, 235;
 }
 
 /* Global Terminal Font */
@@ -55,7 +56,7 @@
   background: rgb(0, 0, 0) !important;
 }
 
-/* Subtle scanlines */
+/* Subtle scanlines with glow effect */
 .theme-terminal body::before {
   content: '';
   position: fixed;
@@ -67,8 +68,8 @@
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 255, 0, 0.01) 2px,
-    rgba(0, 255, 0, 0.01) 3px
+    rgba(0, 255, 0, 0.015) 2px,
+    rgba(0, 255, 0, 0.015) 3px
   );
   pointer-events: none;
   z-index: 999999;
@@ -80,7 +81,7 @@
   background-color: rgb(0, 0, 0) !important;
 }
 
-/* Typography - Clean and Hierarchical */
+/* Typography - Smaller and more compact */
 .theme-terminal h1,
 .theme-terminal h2,
 .theme-terminal h3,
@@ -88,7 +89,7 @@
 .theme-terminal h5,
 .theme-terminal h6 {
   font-weight: 500;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: rgb(var(--terminal-white));
   margin: 0;
@@ -96,22 +97,22 @@
 }
 
 .theme-terminal h1 {
-  font-size: 1rem;
+  font-size: 0.8rem;
 }
 .theme-terminal h2 {
-  font-size: 0.875rem;
+  font-size: 0.7rem;
 }
 .theme-terminal h3 {
-  font-size: 0.8125rem;
+  font-size: 0.65rem;
 }
 .theme-terminal h4 {
-  font-size: 0.75rem;
+  font-size: 0.6rem;
 }
 .theme-terminal h5 {
-  font-size: 0.75rem;
+  font-size: 0.6rem;
 }
 .theme-terminal h6 {
-  font-size: 0.75rem;
+  font-size: 0.6rem;
 }
 
 /* Panels - Clean Terminal Windows */
@@ -128,7 +129,7 @@
   border: 1px solid rgb(var(--dark-border)) !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
-  padding: 1rem !important;
+  padding: 0.75rem !important;
   margin: 0 !important;
   border-radius: 0 !important;
 }
@@ -138,12 +139,12 @@
 .theme-terminal .h-14.apple-surface-elevated {
   background: rgb(var(--dark-surface)) !important;
   border-bottom: 1px solid rgb(var(--dark-border)) !important;
-  padding: 0.75rem 1rem !important;
+  padding: 0.5rem 0.75rem !important;
   box-shadow: none !important;
   height: auto !important;
 }
 
-/* Sidebars - Better Spacing and Alignment */
+/* Sidebars - Proper containment and spacing */
 .theme-terminal .left-sidebar,
 .theme-terminal .right-sidebar {
   background: rgb(var(--dark-bg)) !important;
@@ -155,81 +156,139 @@
 
 /* Fix right sidebar width and positioning */
 .theme-terminal [class*='w-[320px]'] {
-  width: 300px !important;
-  max-width: 300px !important;
+  width: 280px !important;
+  max-width: 280px !important;
 }
 
-/* Section Headers with Terminal Prompt */
+.theme-terminal [class*='w-[280px]'] {
+  width: 280px !important;
+  max-width: 280px !important;
+}
+
+/* Section Headers with Terminal Prompt and Glow */
 .theme-terminal h2 {
   position: relative;
-  padding: 0.75rem 1rem;
+  padding: 0.6rem 0.75rem;
   margin: 0;
   color: rgb(var(--terminal-green));
   font-weight: 400;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   border-bottom: 1px solid rgb(var(--dark-border));
+  text-shadow: 0 0 8px rgba(var(--terminal-green), 0.3);
 }
 
 .theme-terminal h2::before {
   content: '> ';
-  color: rgb(var(--terminal-green));
-  opacity: 0.6;
+  color: rgb(var(--terminal-green-bright));
+  opacity: 0.8;
+  text-shadow: 0 0 6px rgba(var(--terminal-green-bright), 0.5);
 }
 
-/* Effect Categories - Better Organization and Alignment */
+/* Effect Categories - Consistent spacing */
 .theme-terminal .border-b {
   border-bottom: 1px solid rgb(var(--dark-border)) !important;
   padding: 0 !important;
   margin: 0 !important;
 }
 
-/* Category buttons in left nav */
+/* Category buttons in left nav - Fixed padding and sizing */
 .theme-terminal button[class*='text-left'][class*='w-full'] {
-  padding: 0.75rem 1rem !important;
+  padding: 0.5rem 0.75rem !important;
   margin: 0 !important;
   border: none !important;
   border-bottom: 1px solid rgb(var(--dark-border)) !important;
   display: flex !important;
   align-items: center !important;
-  gap: 0.75rem !important;
+  gap: 0.5rem !important;
   width: 100% !important;
   text-align: left !important;
+  font-size: 0.55rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgb(var(--dark-bg)) !important;
+  color: rgb(var(--terminal-gray)) !important;
+  transition: all 0.2s ease;
 }
 
-.theme-terminal [class*='px-3'][class*='py-2'] {
-  padding: 0.75rem 1rem !important;
+.theme-terminal button[class*='text-left'][class*='w-full']:hover {
+  background: rgb(var(--dark-surface)) !important;
+  color: rgb(var(--terminal-white)) !important;
+  box-shadow: inset 2px 0 0 rgba(var(--terminal-green), 0.4);
 }
 
-/* Buttons - Clean Terminal Style */
+/* Search input - proper containment */
+.theme-terminal input[type='search'] {
+  margin: 0.75rem !important;
+  padding: 0.4rem 0.6rem !important;
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  color: rgb(var(--terminal-white)) !important;
+  font-size: 0.55rem !important;
+  width: calc(100% - 1.5rem) !important;
+}
+
+.theme-terminal input[type='search']:focus {
+  border-color: rgb(var(--terminal-green-dim)) !important;
+  box-shadow: 0 0 8px rgba(var(--terminal-green), 0.2) !important;
+  background: rgb(var(--dark-surface-elevated)) !important;
+}
+
+/* NEW IMAGE button - proper containment */
+.theme-terminal button:has-text('NEW IMAGE'),
+.theme-terminal .btn-apple-primary {
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--terminal-green-dim)) !important;
+  color: rgb(var(--terminal-green)) !important;
+  padding: 0.4rem 0.75rem !important;
+  margin: 0.75rem !important;
+  width: calc(100% - 1.5rem) !important;
+  font-size: 0.55rem !important;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-terminal button:has-text('NEW IMAGE'):hover,
+.theme-terminal .btn-apple-primary:hover {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border-color: rgb(var(--terminal-green)) !important;
+  box-shadow: 0 0 12px rgba(var(--terminal-green), 0.3) !important;
+}
+
+/* Buttons - Clean Terminal Style with subtle glow */
 .theme-terminal button {
   background: rgb(var(--dark-surface)) !important;
   border: 1px solid rgb(var(--dark-border)) !important;
   color: rgb(var(--terminal-gray)) !important;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   font-weight: 400;
-  font-size: 0.6875rem !important;
-  padding: 0.5rem 1rem !important;
-  margin: 0.125rem !important;
+  font-size: 0.55rem !important;
+  padding: 0.4rem 0.75rem !important;
+  margin: 0.1rem !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   height: auto !important;
-  min-height: 32px !important;
+  min-height: 28px !important;
   line-height: 1.2 !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .theme-terminal button:hover {
   background: rgb(var(--dark-surface-elevated)) !important;
   border-color: rgb(var(--terminal-gray-dark)) !important;
   color: rgb(var(--terminal-white)) !important;
+  box-shadow: 0 0 6px rgba(var(--terminal-green), 0.15) !important;
 }
 
-/* Active/Selected buttons */
+/* Active/Selected buttons with glow */
 .theme-terminal button[aria-pressed='true'],
 .theme-terminal button.active,
 .theme-terminal [class*='bg-primary'],
@@ -238,73 +297,65 @@
   border-color: rgb(var(--terminal-green-dim)) !important;
   color: rgb(var(--terminal-green)) !important;
   font-weight: 500;
-}
-
-/* Primary Action Buttons (like NEW IMAGE) */
-.theme-terminal .btn-apple-primary,
-.theme-terminal button[class*='bg-primary'] {
-  background: rgb(var(--dark-surface-elevated)) !important;
-  border: 1px solid rgb(var(--terminal-green-dim)) !important;
-  color: rgb(var(--terminal-green)) !important;
-  padding: 0.625rem 1.25rem !important;
-  font-weight: 500;
+  box-shadow: 0 0 10px rgba(var(--terminal-green), 0.25) !important;
+  text-shadow: 0 0 4px rgba(var(--terminal-green), 0.4);
 }
 
 /* Input Fields - Clean Terminal Input */
 .theme-terminal input[type='text'],
-.theme-terminal input[type='search'],
 .theme-terminal textarea {
   background: rgb(var(--dark-surface)) !important;
   border: 1px solid rgb(var(--dark-border)) !important;
   color: rgb(var(--terminal-white)) !important;
   font-family: inherit;
-  font-size: 0.75rem !important;
-  padding: 0.5rem 0.75rem !important;
+  font-size: 0.55rem !important;
+  padding: 0.4rem 0.6rem !important;
   margin: 0 !important;
   border-radius: 0 !important;
-  line-height: 1.4 !important;
-  height: 36px !important;
+  line-height: 1.3 !important;
+  height: 30px !important;
+  transition: all 0.2s ease;
 }
 
 .theme-terminal input[type='text']:focus,
-.theme-terminal input[type='search']:focus,
 .theme-terminal textarea:focus {
   border-color: rgb(var(--terminal-green-dim)) !important;
   background: rgb(var(--dark-surface-elevated)) !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 8px rgba(var(--terminal-green), 0.2) !important;
   outline: none !important;
 }
 
-/* Sliders - Terminal Style */
+/* Sliders - Terminal Style with glow */
 .theme-terminal input[type='range'] {
   background: rgb(var(--dark-border)) !important;
   height: 2px !important;
-  margin: 0.75rem 0 !important;
+  margin: 0.6rem 0 !important;
   border-radius: 0 !important;
 }
 
 .theme-terminal input[type='range']::-webkit-slider-thumb {
   background: rgb(var(--terminal-green)) !important;
   border: none !important;
-  width: 14px !important;
-  height: 14px !important;
+  width: 12px !important;
+  height: 12px !important;
   border-radius: 0 !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 6px rgba(var(--terminal-green), 0.5) !important;
   cursor: pointer;
 }
 
-/* Tabs - Clean Terminal Tabs */
+/* Tabs - Consistent sizing and proper spacing */
 .theme-terminal .tab-apple,
 .theme-terminal [role='tab'] {
   border: 1px solid transparent !important;
   color: rgb(var(--terminal-gray)) !important;
-  padding: 0.5rem 1rem !important;
-  font-size: 0.6875rem !important;
-  letter-spacing: 0.05em !important;
+  padding: 0.4rem 0.75rem !important;
+  font-size: 0.55rem !important;
+  letter-spacing: 0.03em !important;
   background: rgb(var(--dark-surface)) !important;
   text-transform: uppercase;
-  margin: 0 0.125rem !important;
-  min-height: 36px !important;
+  margin: 0 0.1rem !important;
+  min-height: 28px !important;
+  transition: all 0.2s ease;
 }
 
 .theme-terminal .tab-apple:hover,
@@ -312,6 +363,7 @@
   background: rgb(var(--dark-surface-elevated)) !important;
   border-color: rgb(var(--dark-border)) !important;
   color: rgb(var(--terminal-white)) !important;
+  box-shadow: 0 0 6px rgba(var(--terminal-green), 0.1) !important;
 }
 
 .theme-terminal .tab-apple-active,
@@ -320,90 +372,60 @@
   color: rgb(var(--terminal-green)) !important;
   border-color: rgb(var(--terminal-green-dim)) !important;
   font-weight: 500;
+  box-shadow: 0 0 8px rgba(var(--terminal-green), 0.2) !important;
+  text-shadow: 0 0 4px rgba(var(--terminal-green), 0.3);
 }
 
 /* Improved spacing throughout */
 .theme-terminal .p-4 {
-  padding: 1rem !important;
+  padding: 0.75rem !important;
 }
-
 .theme-terminal .p-3 {
-  padding: 0.875rem !important;
+  padding: 0.6rem !important;
 }
-
 .theme-terminal .p-2 {
-  padding: 0.625rem !important;
+  padding: 0.5rem !important;
 }
 
 .theme-terminal .space-y-2 > * + * {
+  margin-top: 0.6rem !important;
+}
+.theme-terminal .space-y-3 > * + * {
   margin-top: 0.75rem !important;
 }
-
-.theme-terminal .space-y-3 > * + * {
+.theme-terminal .space-y-4 > * + * {
   margin-top: 1rem !important;
 }
 
-.theme-terminal .space-y-4 > * + * {
-  margin-top: 1.25rem !important;
-}
-
-/* Labels - Clean and Organized */
+/* Labels - Compact and organized */
 .theme-terminal label {
-  font-size: 0.6875rem !important;
-  letter-spacing: 0.05em !important;
-  margin-bottom: 0.375rem !important;
+  font-size: 0.55rem !important;
+  letter-spacing: 0.03em !important;
+  margin-bottom: 0.3rem !important;
   display: block;
   color: rgb(var(--terminal-gray)) !important;
   text-transform: uppercase;
   font-weight: 400;
 }
 
-/* Effect Cards - Better Spacing */
-.theme-terminal .glass-card-compact {
-  background: rgb(var(--dark-surface)) !important;
-  border: 1px solid rgb(var(--dark-border)) !important;
-  padding: 0.75rem !important;
-  margin: 0.5rem !important;
-  border-radius: 0 !important;
-  transition: all 0.15s ease;
-}
-
-.theme-terminal .glass-card-compact:hover {
-  background: rgb(var(--dark-surface-elevated)) !important;
-  border-color: rgb(var(--terminal-gray-dark)) !important;
-}
-
-/* Category containers */
-.theme-terminal .overflow-hidden > div {
-  padding: 0.5rem !important;
-}
-
-/* Search Box Container */
-.theme-terminal .sticky.top-0 {
-  background: rgb(var(--dark-bg)) !important;
-  padding: 1rem !important;
-  border-bottom: 1px solid rgb(var(--dark-border)) !important;
-  z-index: 10;
-}
-
 /* Tab containers */
 .theme-terminal [role='tablist'] {
   background: rgb(var(--dark-bg)) !important;
-  padding: 0.5rem !important;
+  padding: 0.4rem !important;
   border-bottom: 1px solid rgb(var(--dark-border)) !important;
-  gap: 0.25rem;
+  gap: 0.1rem;
   display: flex;
 }
 
 /* Tab panels */
 .theme-terminal [role='tabpanel'] {
-  padding: 1rem !important;
+  padding: 0.75rem !important;
 }
 
-/* Status indicators */
+/* Status indicators with glow */
 .theme-terminal .bg-green-500 {
   background: rgb(var(--terminal-green)) !important;
-  box-shadow: 0 0 4px rgba(var(--terminal-green), 0.5) !important;
+  box-shadow: 0 0 6px rgba(var(--terminal-green), 0.6) !important;
   width: 6px !important;
   height: 6px !important;
   border-radius: 0 !important;
@@ -420,18 +442,20 @@
 .theme-terminal [role='switch'][aria-checked='true'] {
   background: rgb(var(--terminal-green-dim)) !important;
   border-color: rgb(var(--terminal-green)) !important;
+  box-shadow: 0 0 8px rgba(var(--terminal-green), 0.3) !important;
 }
 
-/* Text styling */
+/* Text styling - smaller sizes */
 .theme-terminal * {
   font-family: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace !important;
-  line-height: 1.5 !important;
+  line-height: 1.4 !important;
 }
 
 .theme-terminal p,
 .theme-terminal span,
 .theme-terminal div {
   color: rgb(var(--terminal-white));
+  font-size: 0.55rem !important;
 }
 
 .theme-terminal [class*='text-gray'],
@@ -441,12 +465,128 @@
 .theme-terminal .text-xs,
 .theme-terminal .text-sm {
   color: rgb(var(--terminal-gray)) !important;
-  font-size: 0.6875rem !important;
+  font-size: 0.5rem !important;
+}
+
+/* Export section - Completely redesigned for consistency */
+.theme-terminal [class*='hover:shadow-lg'] {
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  padding: 0.6rem !important;
+  margin: 0.4rem 0 !important;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+}
+
+.theme-terminal [class*='hover:shadow-lg']:hover {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border-color: rgb(var(--terminal-green-dim)) !important;
+  box-shadow: 0 0 10px rgba(var(--terminal-green), 0.2) !important;
+}
+
+/* Export format icons - all consistent */
+.theme-terminal [class*='w-10'][class*='h-10'],
+.theme-terminal .w-10.h-10 {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  color: rgb(var(--terminal-gray)) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.5rem !important;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+/* Remove all colored backgrounds and make consistent */
+.theme-terminal .bg-purple-100,
+.theme-terminal .bg-orange-100,
+.theme-terminal .bg-blue-100,
+.theme-terminal .bg-green-100,
+.theme-terminal .text-purple-600,
+.theme-terminal .text-orange-600,
+.theme-terminal .text-blue-600,
+.theme-terminal .text-green-600 {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  color: rgb(var(--terminal-gray)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+}
+
+/* Export format badges - consistent styling */
+.theme-terminal .bg-gray-100 {
+  background: rgb(var(--dark-surface-elevated)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  color: rgb(var(--terminal-gray)) !important;
+  padding: 0.2rem 0.4rem !important;
+  font-size: 0.5rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+
+/* Active export option */
+.theme-terminal [class*='hover:shadow-lg'].active,
+.theme-terminal [class*='hover:shadow-lg']:active {
+  border-color: rgb(var(--terminal-green)) !important;
+  background: rgb(var(--dark-surface-elevated)) !important;
+  box-shadow: 0 0 12px rgba(var(--terminal-green), 0.3) !important;
+}
+
+.theme-terminal [class*='hover:shadow-lg'].active .bg-gray-100,
+.theme-terminal [class*='hover:shadow-lg']:active .bg-gray-100 {
+  background: rgb(var(--terminal-green)) !important;
+  color: rgb(0, 0, 0) !important;
+  box-shadow: 0 0 6px rgba(var(--terminal-green), 0.4) !important;
+}
+
+/* Collapse button - add proper icon */
+.theme-terminal button[aria-label*='collapse'],
+.theme-terminal button[aria-label*='toggle'] {
+  background: rgb(var(--dark-surface)) !important;
+  border: 1px solid rgb(var(--dark-border)) !important;
+  color: rgb(var(--terminal-gray)) !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s ease;
+}
+
+.theme-terminal button[aria-label*='collapse']:hover,
+.theme-terminal button[aria-label*='toggle']:hover {
+  border-color: rgb(var(--terminal-green-dim)) !important;
+  color: rgb(var(--terminal-green)) !important;
+  box-shadow: 0 0 8px rgba(var(--terminal-green), 0.2) !important;
+}
+
+.theme-terminal button[aria-label*='collapse']::before,
+.theme-terminal button[aria-label*='toggle']::before {
+  content: '‹';
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+/* Theme toggle positioning fix */
+.theme-terminal [data-theme-toggle] {
+  position: relative !important;
+  right: auto !important;
+  max-width: none !important;
+  margin: 0.25rem !important;
 }
 
 /* Scrollbar */
 .theme-terminal ::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
   background: rgb(var(--dark-bg));
 }
 
@@ -459,10 +599,12 @@
   background: rgb(var(--dark-border));
   border: none;
   border-radius: 0;
+  transition: all 0.2s ease;
 }
 
 .theme-terminal ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--terminal-gray-dark));
+  box-shadow: 0 0 4px rgba(var(--terminal-green), 0.3);
 }
 
 /* Terminal cursor */
@@ -476,124 +618,58 @@
   border-radius: 0 !important;
 }
 
-/* Remove shadows */
-.theme-terminal [class*='shadow'] {
+/* Remove shadows except our intentional ones */
+.theme-terminal [class*='shadow']:not([class*='hover:shadow-lg']) {
   box-shadow: none !important;
-}
-
-/* Export section - Terminal Style */
-.theme-terminal [class*='hover:shadow-lg'] {
-  background: rgb(var(--dark-surface)) !important;
-  border: 1px solid rgb(var(--dark-border)) !important;
-  padding: 0.875rem !important;
-  margin: 0.5rem 0 !important;
-  transition: all 0.15s ease;
-  cursor: pointer;
-  position: relative;
-}
-
-.theme-terminal [class*='hover:shadow-lg']:hover {
-  background: rgb(var(--dark-surface-elevated)) !important;
-  border-color: rgb(var(--terminal-green-dim)) !important;
-}
-
-/* Export format badges */
-.theme-terminal .bg-gray-100 {
-  background: rgb(var(--dark-surface-elevated)) !important;
-  border: 1px solid rgb(var(--dark-border)) !important;
-  color: rgb(var(--terminal-gray)) !important;
-  padding: 0.25rem 0.5rem !important;
-  font-size: 0.625rem !important;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* Remove all colorful icons and backgrounds */
-.theme-terminal .bg-purple-100,
-.theme-terminal .bg-orange-100,
-.theme-terminal .bg-blue-100,
-.theme-terminal .bg-green-100,
-.theme-terminal .text-purple-600,
-.theme-terminal .text-orange-600,
-.theme-terminal .text-blue-600,
-.theme-terminal .text-green-600 {
-  background: transparent !important;
-  color: rgb(var(--terminal-gray)) !important;
-}
-
-/* Export icons - make them all gray */
-.theme-terminal [class*='w-10'][class*='h-10'] {
-  width: 2rem !important;
-  height: 2rem !important;
-  background: rgb(var(--dark-surface)) !important;
-  border: 1px solid rgb(var(--dark-border)) !important;
-  color: rgb(var(--terminal-gray)) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 0.875rem !important;
-}
-
-/* Active export option */
-.theme-terminal [class*='hover:shadow-lg'].active,
-.theme-terminal [class*='hover:shadow-lg']:active {
-  border-color: rgb(var(--terminal-green)) !important;
-  background: rgb(var(--dark-surface-elevated)) !important;
-}
-
-.theme-terminal [class*='hover:shadow-lg'].active .bg-gray-100,
-.theme-terminal [class*='hover:shadow-lg']:active .bg-gray-100 {
-  background: rgb(var(--terminal-green)) !important;
-  color: rgb(0, 0, 0) !important;
 }
 
 /* Empty states */
 .theme-terminal .text-center.py-8 {
-  padding: 2rem !important;
+  padding: 1.5rem !important;
 }
 
 /* Icon containers */
 .theme-terminal .w-12.h-12 {
-  width: 2.5rem !important;
-  height: 2.5rem !important;
+  width: 2rem !important;
+  height: 2rem !important;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid rgb(var(--dark-border));
   background: rgb(var(--dark-surface));
-  margin: 0 auto 1rem;
+  margin: 0 auto 0.75rem;
 }
 
 /* Effect count text */
 .theme-terminal .text-xs {
-  font-size: 0.625rem !important;
+  font-size: 0.5rem !important;
   opacity: 0.7;
 }
 
-/* Margins */
+/* Margins - more compact */
 .theme-terminal .mb-1 {
-  margin-bottom: 0.375rem !important;
+  margin-bottom: 0.3rem !important;
 }
 .theme-terminal .mb-2 {
-  margin-bottom: 0.75rem !important;
+  margin-bottom: 0.5rem !important;
 }
 .theme-terminal .mb-3 {
-  margin-bottom: 1rem !important;
+  margin-bottom: 0.75rem !important;
 }
 .theme-terminal .mb-4 {
-  margin-bottom: 1.25rem !important;
+  margin-bottom: 1rem !important;
 }
 .theme-terminal .mt-1 {
-  margin-top: 0.375rem !important;
+  margin-top: 0.3rem !important;
 }
 .theme-terminal .mt-2 {
-  margin-top: 0.75rem !important;
+  margin-top: 0.5rem !important;
 }
 .theme-terminal .mt-3 {
-  margin-top: 1rem !important;
+  margin-top: 0.75rem !important;
 }
 .theme-terminal .mt-4 {
-  margin-top: 1.25rem !important;
+  margin-top: 1rem !important;
 }
 
 /* Fix any white backgrounds */
@@ -624,53 +700,52 @@
   background: rgb(var(--dark-surface)) !important;
   border: 1px solid rgb(var(--dark-border)) !important;
   color: rgb(var(--terminal-gray)) !important;
-  padding: 0.5rem 1rem !important;
-  font-size: 0.6875rem !important;
+  padding: 0.4rem 0.75rem !important;
+  font-size: 0.55rem !important;
   border-radius: 0 !important;
-  min-height: 32px !important;
+  min-height: 28px !important;
 }
 
 .theme-terminal .apple-button:hover {
   background: rgb(var(--dark-surface-elevated)) !important;
   border-color: rgb(var(--terminal-gray-dark)) !important;
   color: rgb(var(--terminal-white)) !important;
+  box-shadow: 0 0 6px rgba(var(--terminal-green), 0.15) !important;
 }
 
 /* Grid layouts for better organization */
 .theme-terminal .grid {
-  gap: 0.5rem !important;
+  gap: 0.4rem !important;
 }
 
 /* Flex layouts */
 .theme-terminal .flex {
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .theme-terminal .gap-2 {
-  gap: 0.5rem !important;
+  gap: 0.4rem !important;
 }
-
 .theme-terminal .gap-3 {
-  gap: 0.75rem !important;
+  gap: 0.6rem !important;
 }
-
 .theme-terminal .gap-4 {
-  gap: 1rem !important;
+  gap: 0.75rem !important;
 }
 
 /* Export options specific styling */
 .theme-terminal .text-xs.font-medium {
-  font-size: 0.6875rem !important;
+  font-size: 0.55rem !important;
   color: rgb(var(--terminal-gray)) !important;
 }
 
-/* Terminal style status indicator */
+/* Terminal style status indicator with blink animation */
 .theme-terminal .w-2.h-2.bg-green-500 {
   width: 6px !important;
   height: 6px !important;
   background: transparent !important;
   border: 1px solid rgb(var(--terminal-green)) !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 4px rgba(var(--terminal-green), 0.5) !important;
 }
 
 .theme-terminal .w-2.h-2.bg-green-500.animate-pulse {
@@ -682,9 +757,46 @@
   0%,
   50% {
     opacity: 1;
+    box-shadow: 0 0 8px rgba(var(--terminal-green), 0.8);
   }
   51%,
   100% {
     opacity: 0.3;
+    box-shadow: 0 0 4px rgba(var(--terminal-green), 0.3);
   }
+}
+
+/* Special hover effects for buttons */
+.theme-terminal button:hover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(var(--terminal-green), 0.1), transparent);
+  animation: scan 0.8s ease-in-out;
+}
+
+@keyframes scan {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Subtle power-on glow for main containers */
+.theme-terminal .left-sidebar,
+.theme-terminal .right-sidebar {
+  box-shadow: inset 0 0 1px rgba(var(--terminal-green), 0.1) !important;
+}
+
+/* Effect name truncation for long names */
+.theme-terminal button[class*='text-left'] span {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
