@@ -627,3 +627,71 @@ html.theme-light .w-2.h-2.bg-green-500 {
     opacity: 0.6;
   }
 }
+
+/* Effects Browser - Apple Design Guidelines */
+html.theme-light .glass-panel h2 {
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+}
+
+/* Category buttons */
+html.theme-light .hover\:bg-white\/5:hover {
+  background: var(--glass-light) !important;
+}
+
+/* Effect buttons */
+html.theme-light button[class*='hover:bg-white/10'] {
+  transition: all var(--duration-fast) var(--ease-default) !important;
+}
+
+html.theme-light button[class*='hover:bg-white/10']:hover {
+  background: var(--glass-light) !important;
+  transform: translateX(2px) !important;
+}
+
+/* Active effect button */
+html.theme-light button[class*='bg-white/20'] {
+  background: var(--system-blue) !important;
+  color: white !important;
+  font-weight: 600 !important;
+  box-shadow:
+    var(--shadow-sm),
+    0 2px 8px rgba(0, 122, 255, 0.25) !important;
+}
+
+/* New Image button */
+html.theme-light .flex.items-center.gap-1\\.5.text-xs {
+  background: var(--system-blue) !important;
+  color: white !important;
+  border: 1px solid rgba(0, 122, 255, 0.3) !important;
+  font-weight: 600 !important;
+  box-shadow:
+    var(--shadow-sm),
+    0 2px 8px rgba(0, 122, 255, 0.25) !important;
+}
+
+html.theme-light .flex.items-center.gap-1\\.5.text-xs:hover {
+  background: #0051d5 !important;
+  transform: scale(1.02) !important;
+  box-shadow:
+    var(--shadow-md),
+    0 4px 16px rgba(0, 122, 255, 0.35) !important;
+}
+
+/* Effect count badges */
+html.theme-light .bg-white\/5 {
+  background: var(--glass-light) !important;
+  border: 1px solid var(--border-subtle) !important;
+}
+
+/* Search input in effects panel */
+html.theme-light .bg-white\/5.border.border-white\/10 {
+  background: var(--glass-ultra) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+/* Category header hover state */
+html.theme-light .group:hover .opacity-40 {
+  opacity: 0.8 !important;
+  color: var(--text-primary) !important;
+}
