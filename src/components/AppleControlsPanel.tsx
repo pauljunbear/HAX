@@ -200,7 +200,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => setActiveTab(tab.id as 'settings' | 'layers' | 'export' | 'history')}
               className={`
                 px-4 py-2 text-sm font-medium transition-all shape-capsule
                 ${
@@ -245,7 +245,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => onResetSettings()}
+                          onClick={() => onResetSettings?.()}
                           className="px-3 py-1.5 text-[11px] font-medium bg-white/20 hover:bg-white/30 text-white rounded transition-all"
                         >
                           Reset
