@@ -70,65 +70,63 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
   return (
     <div className="h-screen flex flex-col">
       {/* Main Content */}
-      <div className="flex-1 flex">
-        {/* Left Panel - Effects Browser */}
-        <AnimatePresence mode="wait">
-          {!leftPanelCollapsed && (
-            <motion.div
-              key="left-panel"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 320, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.4, ease: [0.4, 0.0, 0.2, 1] }}
-              className="h-full overflow-hidden"
-            >
-              <AppleEffectsBrowser
-                onImageSelect={handleImageSelect}
-                activeEffect={activeEffect}
-                onEffectChange={onEffectChange}
-                hasImage={!!selectedImage}
-                onNewImage={() => {
-                  // Reset effects when getting new image
-                  onClearAllEffects?.();
-                }}
-                onHidePanel={() => setLeftPanelCollapsed(true)}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <div className="flex-1 flex relative">
+        {/* Effects Panel - Liquid Glass material with inset */}
+        {!leftPanelCollapsed && (
+          <motion.div
+            initial={{ x: -320 }}
+            animate={{ x: 0 }}
+            exit={{ x: -320 }}
+            transition={{ duration: 0.3, ease: [0.175, 0.885, 0.32, 1.1] }}
+            className="w-80 relative liquid-material shape-fixed-lg"
+            style={{ '--parent-radius': '16px', '--padding': '8px' } as React.CSSProperties}
+          >
+            <AppleEffectsBrowser
+              onImageSelect={handleImageSelect}
+              activeEffect={activeEffect}
+              onEffectChange={onEffectChange}
+              hasImage={!!selectedImage}
+              onNewImage={() => {
+                // Reset effects when getting new image
+                onClearAllEffects?.();
+              }}
+              onHidePanel={() => setLeftPanelCollapsed(true)}
+            />
+          </motion.div>
+        )}
 
-        {/* Center - Canvas */}
-        <div className="flex-1 relative overflow-hidden">{children}</div>
+        {/* Center Canvas */}
+        <div className="flex-1 flex items-center justify-center bg-[var(--bg-canvas)]">
+          {children}
+        </div>
 
-        {/* Right Panel - Controls */}
-        <AnimatePresence mode="wait">
-          {!rightPanelCollapsed && (
-            <motion.div
-              key="right-panel"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 320, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.4, ease: [0.4, 0.0, 0.2, 1] }}
-              className="h-full overflow-hidden"
-            >
-              <AppleControlsPanel
-                isCollapsed={false}
-                onToggle={() => setRightPanelCollapsed(true)}
-                activeEffect={activeEffect}
-                effectLayers={effectLayers}
-                effectSettings={effectSettings}
-                onSettingChange={onSettingChange}
-                onResetSettings={onResetSettings}
-                onClearAllEffects={onClearAllEffects}
-                onRemoveEffect={onRemoveEffect}
-                onSetActiveLayer={onSetActiveLayer}
-                onToggleLayerVisibility={onToggleLayerVisibility}
-                onExport={onExport}
-                hasImage={!!selectedImage}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Controls Panel - Liquid Glass material with inset */}
+        {!rightPanelCollapsed && (
+          <motion.div
+            initial={{ x: 320 }}
+            animate={{ x: 0 }}
+            exit={{ x: 320 }}
+            transition={{ duration: 0.3, ease: [0.175, 0.885, 0.32, 1.1] }}
+            className="w-80 relative liquid-material shape-fixed-lg"
+            style={{ '--parent-radius': '16px', '--padding': '8px' } as React.CSSProperties}
+          >
+            <AppleControlsPanel
+              isCollapsed={false}
+              onToggle={() => setRightPanelCollapsed(true)}
+              activeEffect={activeEffect}
+              effectLayers={effectLayers}
+              effectSettings={effectSettings}
+              onSettingChange={onSettingChange}
+              onResetSettings={onResetSettings}
+              onClearAllEffects={onClearAllEffects}
+              onRemoveEffect={onRemoveEffect}
+              onSetActiveLayer={onSetActiveLayer}
+              onToggleLayerVisibility={onToggleLayerVisibility}
+              onExport={onExport}
+              hasImage={!!selectedImage}
+            />
+          </motion.div>
+        )}
       </div>
 
       {/* Floating Theme Toggle - Bottom Right */}

@@ -197,26 +197,27 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
       {/* Tabs */}
       <div className="border-b border-white/10 px-4 py-2 mb-4">
         <div className="flex gap-2">
-          {tabs.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-all rounded ${
-                  activeTab === tab.id ? 'bg-white/20 border border-white/30' : 'hover:bg-white/10'
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                px-4 py-2 text-sm font-medium transition-all shape-capsule
+                ${
+                  activeTab === tab.id
+                    ? 'text-white bg-white/20 backdrop-blur-sm shadow-sm'
+                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                }
+              `}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Tab Content */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Tab Content - with scroll edge effects */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-edge-top scroll-edge-bottom px-4 pb-4">
         <AnimatePresence mode="wait">
           {activeTab === 'settings' && (
             <motion.div
@@ -244,14 +245,14 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={onResetSettings}
-                          className="px-3 py-1.5 text-[11px] font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 rounded transition-all"
+                          onClick={() => onResetSettings()}
+                          className="px-3 py-1.5 text-[11px] font-medium bg-white/20 hover:bg-white/30 text-white rounded transition-all"
                         >
                           Reset
                         </button>
                         <button
-                          onClick={() => activeLayer && onRemoveEffect?.(activeLayer.id)}
-                          className="px-3 py-1.5 text-[11px] font-medium bg-red-500/10 hover:bg-red-500/20 text-red-600 rounded transition-all"
+                          onClick={() => onRemoveEffect?.(activeLayer.id)}
+                          className="px-3 py-1.5 text-[11px] font-medium bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-all"
                         >
                           Remove
                         </button>
