@@ -369,13 +369,13 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
     return (
       <div
         ref={containerRef}
-        className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-gray-900 relative"
+        className="w-full h-full flex flex-col items-center justify-center bg-black text-white relative"
       >
         {!selectedImage ? (
           <div className="text-center">
-            <div className="w-24 h-24 bg-gray-100/80 rounded-3xl flex items-center justify-center mb-6 mx-auto shadow-sm">
+            <div className="w-24 h-24 bg-black border border-green-400/30 flex items-center justify-center mb-6 mx-auto">
               <svg
-                className="w-12 h-12 text-gray-500"
+                className="w-12 h-12 text-green-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -388,13 +388,15 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
                 />
               </svg>
             </div>
-            <h2 className="text-2xl font-semibold mb-3 text-gray-900">Welcome to HAX</h2>
-            <p className="text-gray-600 mb-8 max-w-md">
-              Upload an image to start applying beautiful real-time effects
+            <h2 className="text-2xl font-semibold mb-3 text-white font-mono uppercase tracking-wide">
+              Welcome to HAX
+            </h2>
+            <p className="text-white/70 mb-8 max-w-md font-mono">
+              Upload an image to start applying tactical effects
             </p>
             <button
               onClick={handleUploadClick}
-              className="bg-blue-600/90 hover:bg-blue-700/90 px-6 py-3 text-white font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm"
+              className="bg-green-600/20 hover:bg-green-600/30 px-6 py-3 text-green-400 font-medium border border-green-400/30 hover:border-green-400/50 transition-all duration-200 font-mono uppercase tracking-wide"
             >
               Choose Image
             </button>
@@ -405,7 +407,9 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
               className="hidden"
               onChange={handleFileChange}
             />
-            <p className="text-xs text-gray-500 mt-4">Supports JPG, PNG, GIF, WebP • Max 10MB</p>
+            <p className="text-xs text-white/50 mt-4 font-mono">
+              Supports JPG, PNG, GIF, WebP • Max 10MB
+            </p>
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center p-4">

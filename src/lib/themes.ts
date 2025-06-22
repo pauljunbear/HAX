@@ -1,10 +1,10 @@
 // Theme definitions and utilities
-export type Theme = 'apple' | 'terminal';
+export type Theme = 'light' | 'terminal';
 
 export const themes = {
-  apple: {
-    name: 'Apple',
-    class: 'theme-apple',
+  light: {
+    name: 'Light',
+    class: 'theme-light',
   },
   terminal: {
     name: 'Terminal',
@@ -13,15 +13,23 @@ export const themes = {
 } as const;
 
 export const getTheme = (): Theme => {
-  if (typeof window === 'undefined') return 'apple';
-  return (localStorage.getItem('app-theme') as Theme) || 'apple';
+  if (typeof window === 'undefined') return 'light';
+
+  // Migration: Convert old 'apple' theme to 'light'
+  const stored = localStorage.getItem('app-theme');
+  if (stored === 'apple') {
+    localStorage.setItem('app-theme', 'light');
+    return 'light';
+  }
+
+  return (stored as Theme) || 'light';
 };
 
 export const setTheme = (theme: Theme) => {
   if (typeof window === 'undefined') return;
 
   localStorage.setItem('app-theme', theme);
-  document.documentElement.classList.remove('theme-apple', 'theme-terminal');
+  document.documentElement.classList.remove('theme-light', 'theme-terminal', 'theme-apple');
   document.documentElement.classList.add(themes[theme].class);
 
   // Dispatch event for components that need to react to theme change

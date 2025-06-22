@@ -5,7 +5,7 @@ import { Theme, getTheme, setTheme } from '@/lib/themes';
 import { motion } from 'framer-motion';
 
 export const ThemeToggle: React.FC = () => {
-  const [currentTheme, setCurrentTheme] = useState<Theme>('apple');
+  const [currentTheme, setCurrentTheme] = useState<Theme>('light');
   const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
@@ -15,7 +15,7 @@ export const ThemeToggle: React.FC = () => {
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = currentTheme === 'apple' ? 'terminal' : 'apple';
+    const newTheme = currentTheme === 'light' ? 'terminal' : 'light';
     setCurrentTheme(newTheme);
     setTheme(newTheme);
   };
@@ -25,20 +25,13 @@ export const ThemeToggle: React.FC = () => {
       onClick={toggleTheme}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`
-        relative p-2 rounded-lg transition-all duration-300
-        ${
-          currentTheme === 'apple'
-            ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-            : 'bg-gray-900 hover:bg-gray-800 text-green-500 border border-gray-700'
-        }
-      `}
+      className="theme-toggle relative p-2 rounded-lg transition-all duration-300"
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
-      aria-label={`Switch to ${currentTheme === 'apple' ? 'Terminal' : 'Apple'} theme`}
+      aria-label={`Switch to ${currentTheme === 'light' ? 'Terminal' : 'Light'} theme`}
     >
       <div className="flex items-center gap-2">
-        {currentTheme === 'apple' ? (
+        {currentTheme === 'light' ? (
           <>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -48,7 +41,7 @@ export const ThemeToggle: React.FC = () => {
                 d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
               />
             </svg>
-            {isHovered && <span className="text-xs font-medium">Apple</span>}
+            {isHovered && <span className="text-xs font-medium">Light</span>}
           </>
         ) : (
           <>

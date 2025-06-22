@@ -1,25 +1,33 @@
 'use client';
 
-import { useState, useEffect, useRef, forwardRef } from 'react';
+import React, { useState, useEffect, useRef, forwardRef } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
+import { useAppStore } from '@/lib/store';
+import ImageEditor from '@/components/ImageEditor';
+import IntroScreen from '@/components/IntroScreen';
+import BootScreen from '@/components/BootScreen';
+import { AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 // Import new components
 import AppleStyleLayout from '@/components/AppleStyleLayout';
 import AppleEffectsBrowser from '@/components/AppleEffectsBrowser';
 import AppleControlsPanel from '@/components/AppleControlsPanel';
-import IntroScreen from '@/components/IntroScreen';
 import SkipToContent from '@/components/SkipToContent';
 import useHistory, { HistoryState } from '@/hooks/useHistory';
 import useEffectLayers from '@/hooks/useEffectLayers';
 import { resetPerformance, usePerformanceMonitor } from '@/lib/performanceUtils';
 import { ARIA_LABELS, focusRingClass } from '@/lib/accessibility';
 
-// Direct import of ImageEditor to fix ref forwarding issue
-import ImageEditor from '@/components/ImageEditor';
-
 export default function Home() {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const selectedImage = useAppStore(state => state.selectedImage);
+  const setSelectedImage = useAppStore(state => state.setSelectedImage);
+  const [booting, setBooting] = useState(true);
+
+  // This prevents the intro screen from flashing on page load if an image is already selected
+  const [isReady, setIsReady] = useState(false);
+
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const imageEditorRef = useRef<any>(null);
@@ -86,6 +94,14 @@ export default function Home() {
   useEffect(() => {
     console.log('Home component mounted');
   }, []);
+
+  useEffect(() => {
+    setIsReady(true);
+  }, []);
+
+  const handleBootComplete = () => {
+    setBooting(false);
+  };
 
   const handleImageUpload = (imageDataUrl: string) => {
     // Reset error state
@@ -252,6 +268,10 @@ export default function Home() {
     return null;
   };
 
+  if (!isReady) {
+    return null; // Or a very minimal loader
+  }
+
   return (
     <>
       <Head>
@@ -265,66 +285,93 @@ export default function Home() {
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
         />
       </Head>
-      <SkipToContent />
-      <AppleStyleLayout
-        hasImage={!!selectedImage}
-        onNewImage={handleNewImage}
-        leftSidebar={
-          <AppleEffectsBrowser
-            activeEffect={activeEffectLayer?.effectId || null}
-            onEffectChange={handleEffectChange}
-            hasImage={!!selectedImage}
-            onNewImage={handleNewImage}
-          />
-        }
-        rightSidebar={
-          <AppleControlsPanel
-            activeEffect={activeEffectLayerId}
-            effectLayers={effectLayers}
-            effectSettings={effectSettings}
-            onSettingChange={handleSettingChange}
-            onResetSettings={handleResetSettings}
-            onClearAllEffects={handleClearAllEffects}
-            onRemoveEffect={handleRemoveEffect}
-            onSetActiveLayer={setActiveEffectLayer}
-            onToggleLayerVisibility={handleToggleLayerVisibility}
-            onExport={format => {
-              console.log('📤 Export handler called in page.tsx with format:', format);
-              console.log('📤 imageEditorRef exists:', !!imageEditorRef);
-              console.log('📤 imageEditorRef.current exists:', !!imageEditorRef.current);
-              console.log('📤 exportImage method exists:', !!imageEditorRef.current?.exportImage);
-
-              // Handle export
-              if (imageEditorRef.current) {
-                try {
-                  console.log('📤 Calling imageEditorRef.current.exportImage with format:', format);
-                  imageEditorRef.current.exportImage(format);
-                  console.log('📤 exportImage call completed');
-                } catch (error) {
-                  console.error('❌ Error calling exportImage:', error);
-                }
-              } else {
-                console.error('❌ imageEditorRef.current is null - cannot export');
+      <AnimatePresence>
+        {booting && <BootScreen onBootComplete={handleBootComplete} />}
+      </AnimatePresence>
+      {!booting && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          {selectedImage ? (
+            <AppleStyleLayout
+              hasImage={!!selectedImage}
+              onNewImage={handleNewImage}
+              leftSidebar={
+                <AppleEffectsBrowser
+                  activeEffect={activeEffectLayer?.effectId || null}
+                  onEffectChange={handleEffectChange}
+                  hasImage={!!selectedImage}
+                  onNewImage={handleNewImage}
+                />
               }
-            }}
-            hasImage={!!selectedImage}
-          />
-        }
-      >
-        <div id="main-content" className="w-full h-full">
-          {imageLoading ? (
-            <div className="h-full w-full flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-emerald-500 border-gray-200"></div>
-              <span className="ml-3 text-gray-600">Loading image...</span>
-            </div>
-          ) : selectedImage ? (
-            <ImageEditor
-              ref={imageEditorRef}
-              selectedImage={selectedImage}
-              effectLayers={effectLayers}
-              onImageUpload={handleImageUpload}
-              exportTrigger={exportTrigger}
-            />
+              rightSidebar={
+                <AppleControlsPanel
+                  activeEffect={activeEffectLayerId}
+                  effectLayers={effectLayers}
+                  effectSettings={effectSettings}
+                  onSettingChange={handleSettingChange}
+                  onResetSettings={handleResetSettings}
+                  onClearAllEffects={handleClearAllEffects}
+                  onRemoveEffect={handleRemoveEffect}
+                  onSetActiveLayer={setActiveEffectLayer}
+                  onToggleLayerVisibility={handleToggleLayerVisibility}
+                  onExport={format => {
+                    console.log('📤 Export handler called in page.tsx with format:', format);
+                    console.log('📤 imageEditorRef exists:', !!imageEditorRef);
+                    console.log('📤 imageEditorRef.current exists:', !!imageEditorRef.current);
+                    console.log(
+                      '📤 exportImage method exists:',
+                      !!imageEditorRef.current?.exportImage
+                    );
+
+                    // Handle export
+                    if (imageEditorRef.current) {
+                      try {
+                        console.log(
+                          '📤 Calling imageEditorRef.current.exportImage with format:',
+                          format
+                        );
+                        imageEditorRef.current.exportImage(format);
+                        console.log('📤 exportImage call completed');
+                      } catch (error) {
+                        console.error('❌ Error calling exportImage:', error);
+                      }
+                    } else {
+                      console.error('❌ imageEditorRef.current is null - cannot export');
+                    }
+                  }}
+                  hasImage={!!selectedImage}
+                />
+              }
+            >
+              <div id="main-content" className="w-full h-full">
+                {imageLoading ? (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-emerald-500 border-gray-200"></div>
+                    <span className="ml-3 text-gray-600">Loading image...</span>
+                  </div>
+                ) : (
+                  <ImageEditor
+                    ref={imageEditorRef}
+                    selectedImage={selectedImage}
+                    effectLayers={effectLayers}
+                    onImageUpload={handleImageUpload}
+                    exportTrigger={exportTrigger}
+                  />
+                )}
+                {imageError && (
+                  <div
+                    className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg"
+                    role="alert"
+                  >
+                    <strong className="font-bold">Error: </strong>
+                    <span className="block sm:inline">{imageError}</span>
+                  </div>
+                )}
+              </div>
+            </AppleStyleLayout>
           ) : (
             <IntroScreen
               onImageSelect={() => {
@@ -347,17 +394,8 @@ export default function Home() {
               }}
             />
           )}
-          {imageError && (
-            <div
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg"
-              role="alert"
-            >
-              <strong className="font-bold">Error: </strong>
-              <span className="block sm:inline">{imageError}</span>
-            </div>
-          )}
-        </div>
-      </AppleStyleLayout>
+        </motion.div>
+      )}
     </>
   );
 }
