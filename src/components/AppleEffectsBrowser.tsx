@@ -187,7 +187,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                     animate={{ rotate: collapsedCategories.has(category) ? 0 : 90 }}
-                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    transition={{ duration: 0.1, ease: 'easeInOut' }}
                   >
                     <path
                       strokeLinecap="round"
@@ -205,7 +205,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      transition={{ duration: 0.12, ease: 'easeInOut' }}
                       className="overflow-hidden"
                     >
                       <div className="grid grid-cols-2 gap-2 px-4 pb-3">
@@ -215,7 +215,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.2 }}
+                            transition={{ duration: 0.08 }}
                             onClick={() => handleEffectClick(effectId)}
                             className={`p-2.5 text-center transition-all duration-200 border ${
                               activeEffect === effectId

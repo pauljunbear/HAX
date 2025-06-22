@@ -1,59 +1,103 @@
-/* Light Theme - Notion-Inspired Design */
+/* Light Theme - Enhanced UX with SF Pro Typography */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 html.theme-light {
-  /* Notion-Style Color Palette */
-  --background-primary: #ffffff;
-  --background-secondary: #fafafa;
-  --background-tertiary: #f7f7f7;
-  --surface-primary: #ffffff;
-  --surface-secondary: #f8f9fa;
-  --surface-elevated: #ffffff;
-  --surface-hover: #f1f3f4;
-  --surface-active: #e8eaed;
+  /* Liquid Glass Design Tokens - Optimized for Performance */
+  --tokens-surface-liquidGlass-background: rgba(255, 255, 255, 0.35);
+  --tokens-surface-liquidGlass-blurRadius: 20px;
+  --tokens-surface-liquidGlass-saturationBoost: 1.4;
+  --tokens-surface-liquidGlass-noiseOpacity: 0.05;
+  --tokens-surface-liquidGlass-cornerRadius: 16px;
+  --tokens-shadow-liquidGlass-default: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --tokens-motion-liquidGlass-hover-highlightDuration: 120ms;
+  --tokens-motion-liquidGlass-hover-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --tokens-state-liquidGlass-activeOverlay: rgba(255, 255, 255, 0.1);
 
-  /* Notion Text Colors */
-  --text-primary: #37352f;
-  --text-secondary: #6f6f6f;
-  --text-tertiary: #9b9a97;
-  --text-quaternary: #c7c7c5;
+  /* Enhanced Color Palette */
+  --background-primary: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  --background-secondary: #ffffff;
+  --background-tertiary: #f7fafc;
+  --surface-primary: rgba(255, 255, 255, 0.95);
+  --surface-secondary: rgba(248, 250, 252, 0.98);
+  --surface-elevated: rgba(255, 255, 255, 0.98);
+  --surface-hover: rgba(255, 255, 255, 0.6);
+  --surface-active: rgba(255, 255, 255, 0.8);
 
-  /* Notion Accent Colors */
-  --accent-primary: #2383e2;
-  --accent-secondary: #0f7b0f;
-  --accent-success: #0f7b0f;
-  --accent-warning: #d9730d;
-  --accent-error: #e03e3e;
+  /* Refined Text Colors */
+  --text-primary: #1a202c;
+  --text-secondary: #4a5568;
+  --text-tertiary: #718096;
+  --text-quaternary: #a0aec0;
 
-  /* Notion Borders */
-  --border-light: #e9e9e7;
-  --border-medium: #d3d1cb;
-  --border-strong: #b8b6b0;
-  --border-accent: rgba(35, 131, 226, 0.3);
+  /* Modern Accent Colors */
+  --accent-primary: #007aff;
+  --accent-secondary: #34c759;
+  --accent-success: #34c759;
+  --accent-warning: #ff9500;
+  --accent-error: #ff3b30;
 
-  /* Notion Shadows */
-  --shadow-light: 0 1px 3px rgba(0, 0, 0, 0.05);
+  /* Liquid Glass Borders */
+  --border-light: rgba(0, 0, 0, 0.08);
+  --border-medium: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --border-accent: rgba(0, 122, 255, 0.3);
+
+  /* Enhanced Shadows */
+  --shadow-light: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-medium: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-strong: 0 4px 16px rgba(0, 0, 0, 0.12);
-  --shadow-hover: 0 2px 4px rgba(0, 0, 0, 0.08);
+  --shadow-strong: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
 
-  /* Notion Animations */
-  --ease-notion: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  /* Fast Motion System */
+  --ease-glass: var(--tokens-motion-liquidGlass-hover-easing);
+  --duration-glass: var(--tokens-motion-liquidGlass-hover-highlightDuration);
+  --duration-fast: 80ms;
+  --duration-medium: 150ms;
+  --duration-slow: 200ms;
 }
 
-/* Smooth Transitions */
+/* Enhanced Liquid Glass Base Class */
+.liquid-glass {
+  backdrop-filter: blur(var(--tokens-surface-liquidGlass-blurRadius))
+    saturate(calc(var(--tokens-surface-liquidGlass-saturationBoost) * 100%));
+  background: var(--tokens-surface-liquidGlass-background);
+  border-radius: var(--tokens-surface-liquidGlass-cornerRadius);
+  box-shadow: var(--tokens-shadow-liquidGlass-default);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-light);
+}
+
+.liquid-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Fast Transitions - No More Laggy Animations */
 html.theme-light * {
-  transition: all 0.15s var(--ease-notion);
+  transition: all var(--duration-fast) var(--ease-glass);
 }
 
-/* Base Layout - Clean White */
+html.theme-light *:hover {
+  transition: all var(--duration-medium) var(--ease-glass);
+}
+
+/* Base Layout - SF Pro Typography */
 html.theme-light body {
   background: var(--background-primary) !important;
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Helvetica, Arial,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.47;
   font-weight: 400;
+  letter-spacing: -0.022em;
 }
 
 /* Main Container */
@@ -64,147 +108,241 @@ html.theme-light .h-screen {
 
 /* KEEP INTRO SCREEN DARK - Don't Change Welcome Section */
 html.theme-light .fixed.inset-0.z-50.flex.items-center.justify-center.bg-black {
-  background: #000000 !important; /* Keep intro screen black */
+  background: #000000 !important;
 }
 
 html.theme-light .text-4xl.md\:text-5xl.font-bold.text-white {
-  color: #ffffff !important; /* Keep intro title white */
+  color: #ffffff !important;
   font-size: clamp(2.5rem, 5vw, 4rem) !important;
   font-weight: 700 !important;
 }
 
 html.theme-light .text-base.md\:text-lg.text-gray-300 {
-  color: #d1d5db !important; /* Keep intro subtitle gray */
+  color: #d1d5db !important;
   font-size: 18px !important;
 }
 
+/* Enhanced CTA Button on Welcome Screen */
 html.theme-light .bg-\[#F53001\] {
-  background: #2383e2 !important; /* Notion blue for CTA */
-  border: none !important;
-  border-radius: 6px !important;
+  backdrop-filter: blur(15px) saturate(140%) !important;
+  background: linear-gradient(135deg, var(--accent-primary), #4299e1) !important;
+  border: 1px solid rgba(0, 122, 255, 0.3) !important;
+  border-radius: 12px !important;
   padding: 12px 24px !important;
   font-size: 14px !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
   color: white !important;
-  transition: all 0.15s var(--ease-notion) !important;
+  transition: all var(--duration-medium) var(--ease-glass) !important;
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.25) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+html.theme-light .bg-\[#F53001\]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 html.theme-light .bg-\[#F53001\]:hover {
-  background: #1a73d1 !important;
-  transform: translateY(-1px) !important;
-  box-shadow: var(--shadow-medium) !important;
+  background: linear-gradient(135deg, #0056d3, var(--accent-primary)) !important;
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 8px 32px rgba(0, 122, 255, 0.4) !important;
 }
 
-/* TOP BAR - Notion Style */
+/* TOP BAR - Enhanced Liquid Glass with Better Spacing */
 html.theme-light .h-14.glass-panel.border-b {
-  background: var(--surface-primary) !important;
+  backdrop-filter: blur(25px) saturate(150%) !important;
+  background: var(--surface-elevated) !important;
   border-bottom: 1px solid var(--border-light) !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  height: 48px !important;
+  box-shadow: var(--shadow-medium) !important;
+  height: 56px !important;
+  position: relative !important;
+  padding: 0 20px !important;
 }
 
-/* Top Bar Buttons - Notion Style */
+html.theme-light .h-14.glass-panel.border-b::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+}
+
+/* Top Bar Left Section - Better Organization */
+html.theme-light .h-14.glass-panel.border-b .flex.items-center:first-child {
+  gap: 12px !important;
+}
+
+/* Top Bar Right Section - Clean Organization */
+html.theme-light .h-14.glass-panel.border-b .flex.items-center.space-x-4:last-child {
+  gap: 16px !important;
+  align-items: center !important;
+}
+
+/* Enhanced Collapse Buttons with Clear Icons */
 html.theme-light .w-8.h-8.hover\:bg-white\/10 {
-  background: transparent !important;
-  border-radius: 4px !important;
+  backdrop-filter: blur(15px) saturate(130%) !important;
+  background: var(--surface-primary) !important;
+  border-radius: 8px !important;
   color: var(--text-secondary) !important;
   width: 32px !important;
   height: 32px !important;
-  transition: all 0.15s var(--ease-notion) !important;
-  border: none !important;
-  backdrop-filter: none !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
+  border: 1px solid var(--border-light) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+html.theme-light .w-8.h-8.hover\:bg-white\/10::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 html.theme-light .w-8.h-8.hover\:bg-white\/10:hover {
   background: var(--surface-hover) !important;
   color: var(--text-primary) !important;
-  transform: none !important;
-  box-shadow: none !important;
+  transform: translateY(-1px) scale(1.05) !important;
+  box-shadow: var(--shadow-medium) !important;
+  border-color: var(--border-medium) !important;
 }
 
-/* Ready Indicator - Notion Style */
+html.theme-light .w-8.h-8.hover\:bg-white\/10 svg {
+  width: 14px !important;
+  height: 14px !important;
+  stroke-width: 2 !important;
+}
+
+/* Ready Indicator - Enhanced Liquid Glass */
 html.theme-light .flex.items-center.space-x-2.text-sm.text-white\/70 {
-  background: var(--surface-secondary) !important;
-  border: 1px solid var(--border-light) !important;
-  border-radius: 16px !important;
-  padding: 4px 8px !important;
+  backdrop-filter: blur(15px) saturate(130%) !important;
+  background: rgba(52, 199, 89, 0.1) !important;
+  border: 1px solid rgba(52, 199, 89, 0.2) !important;
+  border-radius: 20px !important;
+  padding: 6px 12px !important;
   font-size: 12px !important;
   font-weight: 500 !important;
   color: var(--accent-success) !important;
-  backdrop-filter: none !important;
-  animation: none !important;
+  position: relative !important;
+  overflow: hidden !important;
+  gap: 6px !important;
 }
 
-/* Ready Indicator Dot */
+html.theme-light .flex.items-center.space-x-2.text-sm.text-white\/70::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Ready Indicator Dot - Enhanced */
 html.theme-light .w-2.h-2.bg-green-500 {
   width: 6px !important;
   height: 6px !important;
   background: var(--accent-success) !important;
   border-radius: 50% !important;
-  box-shadow: none !important;
-  animation: none !important;
+  box-shadow: 0 0 8px rgba(52, 199, 89, 0.4) !important;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
 }
 
-/* SEARCH INPUT - Notion Style */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* SEARCH INPUT - Smaller Text */
 html.theme-light input[type='search'],
 html.theme-light input[placeholder*='SEARCH'] {
+  backdrop-filter: blur(15px) saturate(130%) !important;
   background: var(--surface-primary) !important;
   border: 1px solid var(--border-light) !important;
-  border-radius: 6px !important;
-  padding: 8px 12px !important;
-  font-size: 14px !important;
+  border-radius: 10px !important;
+  padding: 10px 14px !important;
+  font-size: 12px !important;
   font-weight: 400 !important;
   color: var(--text-primary) !important;
-  transition: all 0.15s var(--ease-notion) !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
+  box-shadow: var(--shadow-light) !important;
+  position: relative !important;
 }
 
 html.theme-light input[type='search']:focus,
 html.theme-light input[placeholder*='SEARCH']:focus {
   outline: none !important;
-  border-color: var(--accent-primary) !important;
-  background: var(--surface-primary) !important;
-  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.1) !important;
-  transform: none !important;
+  border-color: var(--border-accent) !important;
+  background: var(--surface-elevated) !important;
+  box-shadow:
+    0 0 0 3px rgba(0, 122, 255, 0.1),
+    var(--shadow-medium) !important;
+  transform: translateY(-1px) !important;
 }
 
 html.theme-light input[type='search']::placeholder,
 html.theme-light input[placeholder*='SEARCH']::placeholder {
   color: var(--text-tertiary) !important;
-  font-size: 14px !important;
+  font-size: 12px !important;
 }
 
-/* THEME TOGGLE - Notion Style */
+/* THEME TOGGLE - Enhanced Liquid Glass */
 html.theme-light .theme-toggle {
+  backdrop-filter: blur(15px) saturate(130%) !important;
   background: var(--surface-primary) !important;
   border: 1px solid var(--border-light) !important;
   color: var(--text-secondary) !important;
-  border-radius: 6px !important;
-  padding: 6px 8px !important;
-  transition: all 0.15s var(--ease-notion) !important;
-  font-size: 12px !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
+  font-size: 11px !important;
   font-weight: 500 !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
+  box-shadow: var(--shadow-light) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+html.theme-light .theme-toggle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 html.theme-light .theme-toggle:hover {
   background: var(--surface-hover) !important;
   border-color: var(--border-medium) !important;
   color: var(--text-primary) !important;
-  transform: none !important;
-  box-shadow: none !important;
+  transform: translateY(-1px) scale(1.02) !important;
+  box-shadow: var(--shadow-medium) !important;
 }
 
 html.theme-light .theme-toggle svg {
-  width: 14px !important;
-  height: 14px !important;
-  color: var(--text-secondary) !important;
+  width: 12px !important;
+  height: 12px !important;
+  color: currentColor !important;
 }
 
-/* Remove All Dark Backgrounds - Make Everything Light */
+/* Enhanced Liquid Glass Panels */
 html.theme-light .bg-white,
 html.theme-light .bg-gray-50,
 html.theme-light .bg-gray-100,
@@ -218,26 +356,43 @@ html.theme-light .bg-gray-800,
 html.theme-light .bg-gray-900,
 html.theme-light .bg-black,
 html.theme-light .glass-panel {
+  backdrop-filter: blur(var(--tokens-surface-liquidGlass-blurRadius))
+    saturate(calc(var(--tokens-surface-liquidGlass-saturationBoost) * 100%)) !important;
+  background: var(--surface-primary) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--tokens-surface-liquidGlass-cornerRadius) !important;
+  box-shadow: var(--shadow-light) !important;
+  position: relative !important;
+}
+
+/* Enhanced Buttons - Proper Liquid Glass Effects */
+html.theme-light button,
+html.theme-light .cursor-pointer {
+  backdrop-filter: blur(15px) saturate(130%) !important;
   background: var(--surface-primary) !important;
   border: 1px solid var(--border-light) !important;
   border-radius: 8px !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-/* Buttons - Notion Style */
-html.theme-light button,
-html.theme-light .cursor-pointer {
-  background: var(--surface-primary) !important;
-  border: 1px solid var(--border-light) !important;
-  border-radius: 6px !important;
   color: var(--text-primary) !important;
   font-weight: 500 !important;
   font-size: 14px !important;
-  padding: 8px 12px !important;
-  transition: all 0.15s var(--ease-notion) !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
+  padding: 8px 14px !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
+  box-shadow: var(--shadow-light) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+html.theme-light button::before,
+html.theme-light .cursor-pointer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 html.theme-light button:hover,
@@ -245,140 +400,184 @@ html.theme-light .cursor-pointer:hover {
   background: var(--surface-hover) !important;
   border-color: var(--border-medium) !important;
   color: var(--text-primary) !important;
-  transform: none !important;
+  transform: translateY(-1px) scale(1.02) !important;
   box-shadow: var(--shadow-hover) !important;
 }
 
 html.theme-light button:active,
 html.theme-light .cursor-pointer:active {
   background: var(--surface-active) !important;
-  transform: none !important;
-  box-shadow: none !important;
+  transform: translateY(0) scale(0.98) !important;
+  box-shadow: var(--shadow-medium) !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
 }
 
-/* Primary Action Buttons - Notion Blue */
+/* Primary Action Buttons - Enhanced Liquid Glass */
 html.theme-light .bg-blue-500,
 html.theme-light .bg-blue-600,
 html.theme-light .bg-green-500,
 html.theme-light .bg-green-600 {
-  background: var(--accent-primary) !important;
+  backdrop-filter: blur(15px) saturate(130%) !important;
+  background: linear-gradient(135deg, var(--accent-primary), #4299e1) !important;
   color: white !important;
-  border: 1px solid var(--accent-primary) !important;
-  font-weight: 500 !important;
+  border: 1px solid rgba(0, 122, 255, 0.3) !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 12px rgba(0, 122, 255, 0.25) !important;
 }
 
 html.theme-light .bg-blue-500:hover,
 html.theme-light .bg-blue-600:hover,
 html.theme-light .bg-green-500:hover,
 html.theme-light .bg-green-600:hover {
-  background: #1a73d1 !important;
-  border-color: #1a73d1 !important;
-  transform: none !important;
-  box-shadow: var(--shadow-hover) !important;
+  background: linear-gradient(135deg, #0056d3, var(--accent-primary)) !important;
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 6px 24px rgba(0, 122, 255, 0.35) !important;
 }
 
-/* Input Fields - Notion Style */
+/* Input Fields - Enhanced Liquid Glass */
 html.theme-light input,
 html.theme-light select,
 html.theme-light textarea {
+  backdrop-filter: blur(15px) saturate(130%) !important;
   background: var(--surface-primary) !important;
   border: 1px solid var(--border-light) !important;
-  border-radius: 6px !important;
+  border-radius: 8px !important;
   color: var(--text-primary) !important;
   font-size: 14px !important;
   font-weight: 400 !important;
-  padding: 8px 12px !important;
-  transition: all 0.15s var(--ease-notion) !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
+  padding: 10px 14px !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
+  box-shadow: var(--shadow-light) !important;
+  position: relative !important;
 }
 
 html.theme-light input:focus,
 html.theme-light select:focus,
 html.theme-light textarea:focus {
   outline: none !important;
-  border-color: var(--accent-primary) !important;
-  background: var(--surface-primary) !important;
-  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.1) !important;
-  transform: none !important;
+  border-color: var(--border-accent) !important;
+  background: var(--surface-elevated) !important;
+  box-shadow:
+    0 0 0 3px rgba(0, 122, 255, 0.1),
+    var(--shadow-medium) !important;
+  transform: translateY(-1px) !important;
 }
 
-/* LEFT NAV - Effects Browser */
+/* LEFT NAV - Enhanced Liquid Glass Effects Browser */
 html.theme-light .w-full.h-full.flex.flex-col {
+  backdrop-filter: blur(var(--tokens-surface-liquidGlass-blurRadius))
+    saturate(calc(var(--tokens-surface-liquidGlass-saturationBoost) * 100%)) !important;
   background: var(--surface-primary) !important;
   border-right: 1px solid var(--border-light) !important;
   border-radius: 0 !important;
-  backdrop-filter: none !important;
+  box-shadow: var(--shadow-light) !important;
+  position: relative !important;
+  overflow: hidden !important;
 }
 
-/* Left Nav Header */
+/* Left Nav Header - Better Organization */
 html.theme-light .px-4.py-3.border-b {
-  background: var(--surface-primary) !important;
+  backdrop-filter: blur(20px) saturate(140%) !important;
+  background: var(--surface-elevated) !important;
   border-color: var(--border-light) !important;
-  padding: 12px 16px !important;
+  padding: 18px !important;
   border-radius: 0 !important;
-  backdrop-filter: none !important;
+  position: relative !important;
+}
+
+html.theme-light .px-4.py-3.border-b::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
 }
 
 /* Effects Header Text */
 html.theme-light h2.text-sm.font-semibold {
   color: var(--text-primary) !important;
-  font-size: 14px !important;
+  font-size: 17px !important;
   font-weight: 600 !important;
   text-transform: none !important;
-  letter-spacing: normal !important;
+  letter-spacing: -0.022em !important;
   background: none !important;
   -webkit-background-clip: unset !important;
   -webkit-text-fill-color: unset !important;
 }
 
-/* New Image Button - Notion Style */
+/* New Image Button - Smaller Size */
 html.theme-light .text-xs.text-green-400 {
-  background: var(--accent-primary) !important;
+  backdrop-filter: blur(15px) saturate(130%) !important;
+  background: linear-gradient(135deg, var(--accent-primary), #4299e1) !important;
   color: white !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
   font-weight: 500 !important;
   text-transform: none !important;
   letter-spacing: normal !important;
   padding: 6px 12px !important;
-  border-radius: 6px !important;
-  border: none !important;
-  transition: all 0.15s var(--ease-notion) !important;
-  box-shadow: none !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 122, 255, 0.3) !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+html.theme-light .text-xs.text-green-400::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 html.theme-light .text-xs.text-green-400:hover {
-  background: #1a73d1 !important;
-  transform: none !important;
-  box-shadow: var(--shadow-hover) !important;
+  background: linear-gradient(135deg, #0056d3, var(--accent-primary)) !important;
+  transform: translateY(-1px) scale(1.02) !important;
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3) !important;
 }
 
-/* Category Buttons - Notion Style with Proper Spacing */
+/* Category Buttons - Fixed Bleeding Issue */
 html.theme-light .w-full.flex.items-center.justify-between.px-4.py-3 {
-  background: transparent !important;
-  border-radius: 6px !important;
-  margin: 2px 8px !important;
-  padding: 8px 12px !important;
-  border: none !important;
-  transition: all 0.15s var(--ease-notion) !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
+  backdrop-filter: blur(12px) saturate(120%) !important;
+  background: var(--surface-secondary) !important;
+  border-radius: 10px !important;
+  margin: 4px 12px !important;
+  padding: 12px 14px !important;
+  border: 1px solid var(--border-light) !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
+  box-shadow: var(--shadow-light) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  /* Fix bleeding issue */
+  max-width: calc(100% - 24px) !important;
+  box-sizing: border-box !important;
+}
+
+html.theme-light .w-full.flex.items-center.justify-between.px-4.py-3::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 html.theme-light .w-full.flex.items-center.justify-between.px-4.py-3:hover {
   background: var(--surface-hover) !important;
-  border: none !important;
-  transform: none !important;
-  box-shadow: none !important;
+  border-color: var(--border-medium) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: var(--shadow-medium) !important;
 }
 
-/* Category Text - Make Sure It's Visible */
+/* Category Text */
 html.theme-light .text-xs.font-semibold {
   color: var(--text-primary) !important;
-  font-size: 14px !important;
+  font-size: 15px !important;
   font-weight: 500 !important;
   text-transform: none !important;
-  letter-spacing: normal !important;
+  letter-spacing: -0.022em !important;
 }
 
 /* Category Count */
@@ -387,31 +586,45 @@ html.theme-light .text-xs.text-white\/50 {
   font-size: 12px !important;
 }
 
-/* Effect Grid Buttons - Notion Style with Proper Spacing and VISIBLE TEXT */
+/* Effect Grid Buttons - Fixed Styling and Layout */
 html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 {
-  gap: 8px !important;
+  gap: 10px !important;
   padding: 0 12px 12px 12px !important;
 }
 
 html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button {
-  background: var(--surface-primary) !important;
+  backdrop-filter: blur(12px) saturate(120%) !important;
+  background: var(--surface-secondary) !important;
   border: 1px solid var(--border-light) !important;
-  border-radius: 6px !important;
-  padding: 12px 8px !important;
+  border-radius: 10px !important;
+  padding: 14px 10px !important;
   color: var(--text-primary) !important;
   font-size: 13px !important;
   font-weight: 500 !important;
   text-transform: none !important;
-  letter-spacing: normal !important;
-  transition: all 0.15s var(--ease-notion) !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
-  min-height: 44px !important;
+  letter-spacing: -0.022em !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
+  box-shadow: var(--shadow-light) !important;
+  min-height: 48px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   text-align: center !important;
   line-height: 1.3 !important;
+  position: relative !important;
+  overflow: hidden !important;
+  /* Fix bleeding issue */
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 /* Ensure effect button text is always visible */
@@ -420,12 +633,13 @@ html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button h4 {
   font-size: 13px !important;
   font-weight: 500 !important;
   text-transform: none !important;
-  letter-spacing: normal !important;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif !important;
+  letter-spacing: -0.022em !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif !important;
   line-height: 1.3 !important;
   margin: 0 !important;
   padding: 0 !important;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 /* Specific override for effect text in terminal/monospace styling */
@@ -435,17 +649,18 @@ html.theme-light
   font-size: 13px !important;
   font-weight: 500 !important;
   text-transform: none !important;
-  letter-spacing: normal !important;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif !important;
+  letter-spacing: -0.022em !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif !important;
   line-height: 1.3 !important;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button:hover {
   background: var(--surface-hover) !important;
   border-color: var(--border-medium) !important;
   color: var(--text-primary) !important;
-  transform: none !important;
+  transform: translateY(-1px) scale(1.02) !important;
   box-shadow: var(--shadow-hover) !important;
 }
 
@@ -456,108 +671,167 @@ html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button:hover h4 {
 
 /* Active effect button styling */
 html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button.bg-green-600\/20 {
-  background: rgba(35, 131, 226, 0.1) !important;
+  background: rgba(0, 122, 255, 0.12) !important;
   border-color: var(--accent-primary) !important;
   color: var(--text-primary) !important;
+  box-shadow:
+    0 0 0 2px rgba(0, 122, 255, 0.1),
+    var(--shadow-medium) !important;
 }
 
 html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button.bg-green-600\/20 h4 {
   color: var(--text-primary) !important;
 }
 
-/* RIGHT NAV - Controls Panel */
+/* RIGHT NAV - Enhanced Controls Panel Liquid Glass */
 
-/* Tab Navigation - Notion Style with Proper Spacing */
+/* Tab Navigation - Better Spacing and Organization */
 html.theme-light .flex.border-b {
-  background: var(--surface-primary) !important;
+  backdrop-filter: blur(20px) saturate(140%) !important;
+  background: var(--surface-elevated) !important;
   border-color: var(--border-light) !important;
-  padding: 8px 16px 0 16px !important;
+  padding: 16px 18px 0 18px !important;
   border-radius: 0 !important;
-  gap: 4px !important;
-  backdrop-filter: none !important;
+  gap: 8px !important;
+  position: relative !important;
+}
+
+html.theme-light .flex.border-b::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
 }
 
 html.theme-light .flex.border-b button {
-  background: transparent !important;
-  border: none !important;
-  border-radius: 6px !important;
-  padding: 8px 12px !important;
+  backdrop-filter: blur(12px) saturate(120%) !important;
+  background: var(--surface-secondary) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: 8px !important;
+  padding: 8px 14px !important;
   font-size: 14px !important;
   font-weight: 500 !important;
   text-transform: none !important;
-  letter-spacing: normal !important;
+  letter-spacing: -0.022em !important;
   color: var(--text-secondary) !important;
-  transition: all 0.15s var(--ease-notion) !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
   min-width: auto !important;
   position: relative !important;
+  overflow: hidden !important;
+}
+
+html.theme-light .flex.border-b button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 html.theme-light .flex.border-b button:hover {
   background: var(--surface-hover) !important;
   color: var(--text-primary) !important;
-  transform: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
+  transform: translateY(-1px) !important;
+  box-shadow: var(--shadow-light) !important;
 }
 
 html.theme-light .flex.border-b button.text-green-400 {
-  background: var(--surface-secondary) !important;
-  color: var(--accent-primary) !important;
-  border-bottom: 2px solid var(--accent-primary) !important;
-  border-radius: 6px 6px 0 0 !important;
-  box-shadow: none !important;
+  background: linear-gradient(135deg, var(--accent-primary), #4299e1) !important;
+  color: white !important;
+  border-color: rgba(0, 122, 255, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2) !important;
 }
 
-/* Tab Content Areas - Proper Spacing */
+/* Hide History Tab */
+html.theme-light .flex.border-b button:nth-child(4) {
+  display: none !important;
+}
+
+/* Tab Content Areas */
 html.theme-light .p-4 {
-  padding: 16px !important;
+  padding: 18px !important;
 }
 
-/* Export Buttons - Notion Style Cards */
+/* Export Buttons - Enhanced Liquid Glass Cards */
 html.theme-light .w-full.p-3.bg-black\/60 {
+  backdrop-filter: blur(15px) saturate(130%) !important;
   background: var(--surface-primary) !important;
   border: 1px solid var(--border-light) !important;
-  border-radius: 8px !important;
-  padding: 12px !important;
-  margin-bottom: 8px !important;
-  transition: all 0.15s var(--ease-notion) !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
+  border-radius: 12px !important;
+  padding: 14px !important;
+  margin-bottom: 10px !important;
+  transition: all var(--duration-fast) var(--ease-glass) !important;
+  box-shadow: var(--shadow-light) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+html.theme-light .w-full.p-3.bg-black\/60::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 html.theme-light .w-full.p-3.bg-black\/60:hover {
   background: var(--surface-hover) !important;
   border-color: var(--border-medium) !important;
-  transform: none !important;
+  transform: translateY(-1px) !important;
   box-shadow: var(--shadow-hover) !important;
 }
 
 /* Export Button Icons */
 html.theme-light .w-8.h-8 {
-  width: 32px !important;
-  height: 32px !important;
+  width: 36px !important;
+  height: 36px !important;
+  backdrop-filter: blur(12px) saturate(120%) !important;
   background: var(--surface-secondary) !important;
   border: 1px solid var(--border-light) !important;
-  border-radius: 6px !important;
+  border-radius: 8px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   color: var(--text-secondary) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+html.theme-light .w-8.h-8::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 /* Export Button Text */
 html.theme-light .text-sm.font-medium.text-white {
   color: var(--text-primary) !important;
-  font-size: 14px !important;
+  font-size: 15px !important;
   font-weight: 500 !important;
+  letter-spacing: -0.022em !important;
 }
 
 html.theme-light .text-xs.text-white\/70 {
   color: var(--text-secondary) !important;
-  font-size: 12px !important;
+  font-size: 13px !important;
+  letter-spacing: -0.022em !important;
 }
 
-/* Text Colors - Notion Hierarchy */
+/* Canvas Area - Fix Rounded Corners */
+html.theme-light .flex-1.relative.overflow-hidden {
+  border-radius: 0 0 16px 16px !important;
+  overflow: hidden !important;
+  background: var(--background-secondary) !important;
+  position: relative !important;
+}
+
+/* Text Colors - Enhanced Hierarchy */
 html.theme-light .text-white,
 html.theme-light .text-gray-100,
 html.theme-light .text-gray-200,
@@ -576,27 +850,28 @@ html.theme-light .text-green-500 {
   color: var(--accent-success) !important;
 }
 
-/* Scrollbar - Notion Style */
+/* Enhanced Scrollbar */
 html.theme-light ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 html.theme-light ::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
 }
 
 html.theme-light ::-webkit-scrollbar-thumb {
-  background: var(--text-quaternary);
-  border-radius: 4px;
-  transition: background 0.15s var(--ease-notion);
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+  transition: background var(--duration-fast) var(--ease-glass);
 }
 
 html.theme-light ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background: rgba(0, 0, 0, 0.25);
 }
 
-/* Borders - Notion Style */
+/* Borders */
 html.theme-light .border,
 html.theme-light .border-t,
 html.theme-light .border-b,
@@ -613,58 +888,71 @@ html.theme-light .border-gray-800 {
   border-color: var(--border-light) !important;
 }
 
-/* Notion-Style Rounded Corners */
+/* Liquid Glass Rounded Corners */
 html.theme-light .rounded,
 html.theme-light .rounded-md {
-  border-radius: 6px;
-}
-
-html.theme-light .rounded-lg {
   border-radius: 8px;
 }
 
-html.theme-light .rounded-xl {
+html.theme-light .rounded-lg {
   border-radius: 12px;
+}
+
+html.theme-light .rounded-xl {
+  border-radius: var(--tokens-surface-liquidGlass-cornerRadius);
 }
 
 /* Override Any Remaining Dark Backgrounds */
 html.theme-light [class*='bg-gray'],
 html.theme-light [class*='bg-black'] {
+  backdrop-filter: blur(var(--tokens-surface-liquidGlass-blurRadius))
+    saturate(calc(var(--tokens-surface-liquidGlass-saturationBoost) * 100%)) !important;
   background: var(--surface-primary) !important;
-  backdrop-filter: none !important;
 }
 
-/* Range Sliders - Notion Style */
+/* Range Sliders - Enhanced Liquid Glass */
 html.theme-light input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
   height: 4px;
-  background: var(--border-light);
+  background: rgba(0, 0, 0, 0.1);
   border-radius: 2px;
   border: none;
   outline: none;
+  backdrop-filter: blur(10px);
 }
 
 html.theme-light input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--accent-primary);
-  border: 2px solid white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, var(--accent-primary), #4299e1);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
   cursor: pointer;
-  transition: all 0.15s var(--ease-notion);
+  transition: all var(--duration-fast) var(--ease-glass);
+  backdrop-filter: blur(10px);
 }
 
 html.theme-light input[type='range']::-webkit-slider-thumb:hover {
-  background: #1a73d1;
+  background: linear-gradient(135deg, #0056d3, var(--accent-primary));
   transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
 }
 
-/* Focus States - Notion Style */
+/* Focus States - Enhanced Liquid Glass */
 html.theme-light *:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+/* Fast Category Animation Override */
+html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button {
+  animation: none !important;
+}
+
+html.theme-light [data-framer-motion] {
+  transition-duration: var(--duration-fast) !important;
 }
