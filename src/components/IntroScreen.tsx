@@ -33,7 +33,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ onImageSelect }) => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="text-4xl md:text-5xl font-bold text-white"
+            className="text-4xl md:text-5xl font-bold text-white tracking-tight"
           >
             HAX
           </motion.h1>
@@ -46,7 +46,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ onImageSelect }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
-            className="text-base md:text-lg text-gray-300"
+            className="text-base md:text-lg text-gray-300 max-w-md leading-relaxed"
           >
             Add interesting effects to an image. A fun side project by Paul Jun.
           </motion.p>
@@ -60,7 +60,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ onImageSelect }) => {
           >
             <button
               onClick={onImageSelect}
-              className="group relative inline-flex items-center gap-3 px-6 py-3 bg-[#F53001] hover:bg-[#d42801] text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+              className="group relative inline-flex items-center gap-3 px-6 py-3 bg-[#F53001] hover:bg-[#d42801] text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-150 transform hover:scale-105"
             >
               <Upload className="w-4 h-4" />
               <span className="text-sm">Choose Image</span>

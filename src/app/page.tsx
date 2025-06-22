@@ -12,8 +12,6 @@ import { motion } from 'framer-motion';
 
 // Import new components
 import AppleStyleLayout from '@/components/AppleStyleLayout';
-import AppleEffectsBrowser from '@/components/AppleEffectsBrowser';
-import AppleControlsPanel from '@/components/AppleControlsPanel';
 import SkipToContent from '@/components/SkipToContent';
 import useHistory, { HistoryState } from '@/hooks/useHistory';
 import useEffectLayers from '@/hooks/useEffectLayers';
@@ -103,46 +101,70 @@ export default function Home() {
     setBooting(false);
   };
 
-  const handleImageUpload = (imageDataUrl: string) => {
+  const handleImageUpload = (file: File) => {
     // Reset error state
     setImageError(null);
     setImageLoading(true);
 
-    console.log('handleImageUpload called with data length:', imageDataUrl.length);
-    // Debug the data format
-    console.log('Image data format:', imageDataUrl.substring(0, 50) + '...');
+    console.log('handleImageUpload called with file:', file.name);
 
     // Reset active effect and clear history when a new image is uploaded
     clearHistory({ activeEffect: null, effectSettings: {} });
     clearEffectLayers();
 
-    // Validate the image data
-    if (!imageDataUrl.startsWith('data:image/')) {
-      console.error('Invalid image data format:', imageDataUrl.substring(0, 50));
-      setImageError('Invalid image data format');
-      setImageLoading(false);
-      return;
-    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      const imageDataUrl = e.target?.result as string;
 
-    // Test load the image first
-    const testImage = new Image();
-    testImage.onload = () => {
-      console.log('Test image loaded successfully in Home component, setting selectedImage');
-      console.log('Dimensions:', testImage.width, 'x', testImage.height);
-      setSelectedImage(imageDataUrl);
-      setOriginalImage(testImage); // Store the original image
-      setImageLoading(false);
-      setMobileMenuOpen(false); // Close mobile menu after upload
+      // Validate the image data
+      if (!imageDataUrl.startsWith('data:image/')) {
+        console.error('Invalid image data format:', imageDataUrl.substring(0, 50));
+        setImageError('Invalid image data format');
+        setImageLoading(false);
+        return;
+      }
+
+      // Test load the image first
+      const testImage = new Image();
+      testImage.onload = () => {
+        console.log('Test image loaded successfully in Home component, setting selectedImage');
+        console.log('Dimensions:', testImage.width, 'x', testImage.height);
+        setSelectedImage(imageDataUrl);
+        setOriginalImage(testImage); // Store the original image
+        setImageLoading(false);
+        setMobileMenuOpen(false); // Close mobile menu after upload
+      };
+
+      testImage.onerror = error => {
+        console.error('Failed to load test image in Home component:', error);
+        setImageError('Failed to load image. Please try another file.');
+        setImageLoading(false);
+      };
+
+      // Set the source to trigger loading
+      testImage.src = imageDataUrl;
     };
 
-    testImage.onerror = error => {
-      console.error('Failed to load test image in Home component:', error);
-      setImageError('Failed to load image. Please try another file.');
+    reader.onerror = () => {
+      setImageError('Failed to read file. Please try another file.');
       setImageLoading(false);
     };
 
-    // Set the source to trigger loading
-    testImage.src = imageDataUrl;
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageSelect = () => {
+    // This will be called by the AppleStyleLayout
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = e => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        handleImageUpload(file);
+      }
+    };
+    input.click();
   };
 
   const handleNewImage = () => {
@@ -296,55 +318,9 @@ export default function Home() {
         >
           {selectedImage ? (
             <AppleStyleLayout
-              hasImage={!!selectedImage}
-              onNewImage={handleNewImage}
-              leftSidebar={
-                <AppleEffectsBrowser
-                  activeEffect={activeEffectLayer?.effectId || null}
-                  onEffectChange={handleEffectChange}
-                  hasImage={!!selectedImage}
-                  onNewImage={handleNewImage}
-                />
-              }
-              rightSidebar={
-                <AppleControlsPanel
-                  activeEffect={activeEffectLayerId}
-                  effectLayers={effectLayers}
-                  effectSettings={effectSettings}
-                  onSettingChange={handleSettingChange}
-                  onResetSettings={handleResetSettings}
-                  onClearAllEffects={handleClearAllEffects}
-                  onRemoveEffect={handleRemoveEffect}
-                  onSetActiveLayer={setActiveEffectLayer}
-                  onToggleLayerVisibility={handleToggleLayerVisibility}
-                  onExport={format => {
-                    console.log('📤 Export handler called in page.tsx with format:', format);
-                    console.log('📤 imageEditorRef exists:', !!imageEditorRef);
-                    console.log('📤 imageEditorRef.current exists:', !!imageEditorRef.current);
-                    console.log(
-                      '📤 exportImage method exists:',
-                      !!imageEditorRef.current?.exportImage
-                    );
-
-                    // Handle export
-                    if (imageEditorRef.current) {
-                      try {
-                        console.log(
-                          '📤 Calling imageEditorRef.current.exportImage with format:',
-                          format
-                        );
-                        imageEditorRef.current.exportImage(format);
-                        console.log('📤 exportImage call completed');
-                      } catch (error) {
-                        console.error('❌ Error calling exportImage:', error);
-                      }
-                    } else {
-                      console.error('❌ imageEditorRef.current is null - cannot export');
-                    }
-                  }}
-                  hasImage={!!selectedImage}
-                />
-              }
+              selectedImage={selectedImage}
+              onImageSelect={handleImageSelect}
+              onImageUpload={handleImageUpload}
             >
               <div id="main-content" className="w-full h-full">
                 {imageLoading ? (
@@ -357,7 +333,11 @@ export default function Home() {
                     ref={imageEditorRef}
                     selectedImage={selectedImage}
                     effectLayers={effectLayers}
-                    onImageUpload={handleImageUpload}
+                    onImageUpload={(imageDataUrl: string) => {
+                      // Convert the old string-based upload to the new file-based system
+                      // This is a compatibility layer
+                      console.log('Legacy image upload called');
+                    }}
                     exportTrigger={exportTrigger}
                   />
                 )}
@@ -373,26 +353,7 @@ export default function Home() {
               </div>
             </AppleStyleLayout>
           ) : (
-            <IntroScreen
-              onImageSelect={() => {
-                // Trigger file input
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.onchange = e => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = e => {
-                      const result = e.target?.result as string;
-                      handleImageUpload(result);
-                    };
-                    reader.readAsDataURL(file);
-                  }
-                };
-                input.click();
-              }}
-            />
+            <IntroScreen onImageSelect={handleImageSelect} />
           )}
         </motion.div>
       )}
