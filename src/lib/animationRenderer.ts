@@ -2,8 +2,18 @@ import GIF from 'gif.js';
 import { applyEffect } from './effects';
 import { AnimationConfig } from './animationConfig';
 import Konva from 'konva';
-import { VideoExporter, VideoExportOptions, downloadVideoBlob, estimateVideoSize } from './export/videoExporter';
-import { GifOptimizer, GifOptimizationOptions, GIF_QUALITY_PRESETS, GifQualityPreset } from './export/gifOptimizer';
+import {
+  VideoExporter,
+  VideoExportOptions,
+  downloadVideoBlob,
+  estimateVideoSize,
+} from './export/videoExporter';
+import {
+  GifOptimizer,
+  GifOptimizationOptions,
+  GIF_QUALITY_PRESETS,
+  GifQualityPreset,
+} from './export/gifOptimizer';
 
 export interface AnimationOptions {
   duration: number;
@@ -45,53 +55,59 @@ export async function renderAnimationFrames(
 ): Promise<AnimationFrame[]> {
   // Check if this is a generative overlay effect
   const isOverlayEffect = effectId.startsWith('generative');
-  
+
   if (isOverlayEffect) {
-    return renderOverlayAnimationFrames(baseImage, effectId, baseSettings, animationConfig, options);
+    return renderOverlayAnimationFrames(
+      baseImage,
+      effectId,
+      baseSettings,
+      animationConfig,
+      options
+    );
   }
   const frames: AnimationFrame[] = [];
   const frameCount = Math.floor((options.duration / 1000) * options.frameRate);
   const frameDelay = 1000 / options.frameRate;
-  
+
   // Get the preset (use first one for now)
   const preset = animationConfig.animationPresets?.[0];
   if (!preset) {
     throw new Error('No animation preset available');
   }
-  
+
   // Create a Konva stage for rendering
   const container = document.createElement('div');
   container.style.visibility = 'hidden';
   container.style.position = 'absolute';
   document.body.appendChild(container);
-  
+
   const stage = new Konva.Stage({
     container,
     width: options.width,
     height: options.height,
   });
-  
+
   const layer = new Konva.Layer();
   stage.add(layer);
-  
+
   try {
     for (let i = 0; i < frameCount; i++) {
       const progress = i / (frameCount - 1);
-      
+
       // Calculate animated settings
       const animatedSettings = { ...baseSettings };
       for (const [param, curve] of Object.entries(preset.parameterCurves)) {
         animatedSettings[param] = curve(progress);
       }
-      
+
       // Add frame-based seed for effects that need randomness per frame
       if (effectId === 'pixelExplosion') {
         animatedSettings.seed = i + 1; // Different seed for each frame
       }
-      
+
       // Clear the layer
       layer.destroyChildren();
-      
+
       // Create Konva image
       const konvaImage = new Konva.Image({
         image: baseImage,
@@ -100,75 +116,83 @@ export async function renderAnimationFrames(
         width: options.width,
         height: options.height,
       });
-      
+
       layer.add(konvaImage);
-      
+
       // Apply the effect with animated settings
       console.log(`Frame ${i}: Applying effect ${effectId} with settings:`, animatedSettings);
       const [filterFunc, filterParams] = await applyEffect(effectId, animatedSettings);
-      
+
       if (filterFunc) {
         console.log(`Frame ${i}: Filter function created successfully`);
         konvaImage.filters([filterFunc]);
-        
+
         // Set filter parameters if any
         if (filterParams) {
           console.log(`Frame ${i}: Applying filter parameters:`, filterParams);
           for (const [key, value] of Object.entries(filterParams)) {
-            if (typeof konvaImage[key] === 'function') {
-              konvaImage[key](value);
+            if (typeof (konvaImage as any)[key] === 'function') {
+              (konvaImage as any)[key](value);
             }
           }
         }
       } else {
         console.warn(`Frame ${i}: No filter function returned for effect ${effectId}`);
       }
-      
+
       // Cache and draw
       konvaImage.cache();
       layer.batchDraw();
-      
+
       // Get the canvas
       const frameCanvas = document.createElement('canvas');
       frameCanvas.width = options.width;
       frameCanvas.height = options.height;
       const ctx = frameCanvas.getContext('2d');
-      
+
       if (ctx) {
         // Clear canvas to transparent (remove black background)
         ctx.clearRect(0, 0, options.width, options.height);
-        
+
         // Draw the Konva layer to our canvas
         const layerCanvas = layer.getCanvas()._canvas;
         ctx.drawImage(layerCanvas, 0, 0);
-        
+
         // Debug: Check if the frame has content
         const imageData = ctx.getImageData(0, 0, options.width, options.height);
         const hasContent = Array.from(imageData.data).some((value, index) => {
           // Check if any pixel has non-zero RGB values (ignore alpha channel)
           return index % 4 !== 3 && value > 0;
         });
-        
-        console.log(`Frame ${i}: Has content: ${hasContent}, Canvas size: ${frameCanvas.width}x${frameCanvas.height}`);
-        
+
+        console.log(
+          `Frame ${i}: Has content: ${hasContent}, Canvas size: ${frameCanvas.width}x${frameCanvas.height}`
+        );
+
         if (!hasContent) {
           console.warn(`Frame ${i}: Generated frame appears to be empty/black`);
         }
-        
+
         // TODO: Add overlay rendering for animated exports
         // Currently overlays are not captured in animated exports due to complexity
         // of frame-by-frame particle system rendering. Future enhancement needed.
         if (options.overlayProps) {
           // For now, add a simple placeholder overlay effect
-          await renderSimpleOverlayEffect(ctx, options.overlayProps, progress, options.width, options.height);
+          await renderSimpleOverlayEffect(
+            ctx,
+            options.overlayProps,
+            progress,
+            options.width,
+            options.height
+          );
         }
-        
+
         frames.push({
           canvas: frameCanvas,
-          delay: frameDelay
+          delay: frameDelay,
         });
       }
-      
+
       // Report progress
       if (options.onProgress) {
         options.onProgress((i + 1) / frameCount);
@@ -179,7 +203,7 @@ export async function renderAnimationFrames(
     stage.destroy();
     document.body.removeChild(container);
   }
-  
+
   return frames;
 }
 
@@ -203,10 +227,10 @@ export async function exportAsGif(
       }
 
       const canvases = frames.map(frame => frame.canvas);
-      
+
       // Apply GIF optimization
       let optimizationOptions: GifOptimizationOptions;
-      
+
       if (options.qualityPreset) {
         // Use preset
         optimizationOptions = { ...GIF_QUALITY_PRESETS[options.qualityPreset] };
@@ -220,14 +244,14 @@ export async function exportAsGif(
           contentType: 'auto',
           optimizeColors: true,
           dithering: 'floyd-steinberg',
-          frameOptimization: 'minimal'
+          frameOptimization: 'minimal',
         };
       }
 
       // Generate optimization report
       const report = GifOptimizer.generateReport(canvases, optimizationOptions);
       console.log('GIF Optimization Analysis:', report);
-      
+
       // Notify about analysis results
       if (options.onAnalysis) {
         options.onAnalysis(report);
@@ -235,9 +259,11 @@ export async function exportAsGif(
 
       // Get optimized settings
       const optimizedSettings = report.optimizedSettings;
-      
-      console.log(`Creating optimized GIF with quality ${optimizedSettings.quality}, estimated size: ${optimizedSettings.estimatedSizeKB}KB`);
-      
+
+      console.log(
+        `Creating optimized GIF with quality ${optimizedSettings.quality}, estimated size: ${optimizedSettings.estimatedSizeKB}KB`
+      );
+
       // @ts-ignore - gif.js types are not perfect
       const gif = new GIF({
         quality: optimizedSettings.quality,
@@ -247,17 +273,17 @@ export async function exportAsGif(
         height: frames[0]?.canvas.height || 600,
         debug: false, // Disable debug for production
         dithering: optimizedSettings.dithering,
-        transparent: optimizedSettings.transparency,
+        transparent: optimizedSettings.transparency ? 'rgba(0,0,0,0)' : undefined,
         background: '#ffffff',
         globalPalette: optimizationOptions.optimizeColors !== false,
-        repeat: 0 // Loop forever
+        repeat: 0, // Loop forever
       });
-      
+
       // Add frames
       frames.forEach(frame => {
         gif.addFrame(frame.canvas, { delay: frame.delay });
       });
-      
+
       // Set up event handlers
       gif.on('progress', (progress: number) => {
         console.log('GIF progress:', progress);
@@ -265,7 +291,7 @@ export async function exportAsGif(
           options.onProgress(progress);
         }
       });
-      
+
       gif.on('finished', (blob: Blob) => {
         console.log('GIF finished, blob size:', blob.size);
         if (options.onComplete) {
@@ -273,7 +299,7 @@ export async function exportAsGif(
         }
         resolve(blob);
       });
-      
+
       gif.on('error', (error: any) => {
         console.error('GIF error:', error);
         const err = new Error(error.message || 'GIF generation failed');
@@ -282,7 +308,7 @@ export async function exportAsGif(
         }
         reject(err);
       });
-      
+
       // Start rendering
       gif.render();
     } catch (error) {
@@ -325,21 +351,25 @@ export async function exportAsVideo(
   }
 
   const { format, quality, frameRate, onProgress, onComplete, onError } = options;
-  
+
   // Convert AnimationFrame canvases to regular canvas array
   const canvases = frames.map(frame => frame.canvas);
   const width = canvases[0].width;
   const height = canvases[0].height;
 
   console.log(`Exporting ${frames.length} frames as ${format.toUpperCase()} video`);
-  console.log(`Resolution: ${width}x${height}, Quality: ${quality}/10, Frame rate: ${frameRate}fps`);
+  console.log(
+    `Resolution: ${width}x${height}, Quality: ${quality}/10, Frame rate: ${frameRate}fps`
+  );
 
   // Estimate video file size
   const estimate = estimateVideoSize(frames.length, frameRate, quality, format, { width, height });
-  console.log(`Estimated output: ${estimate.estimatedMB}MB, ${estimate.estimatedSeconds}s duration`);
+  console.log(
+    `Estimated output: ${estimate.estimatedMB}MB, ${estimate.estimatedSeconds}s duration`
+  );
 
   const videoExporter = new VideoExporter();
-  
+
   try {
     const videoBlob = await videoExporter.exportVideo({
       frames: canvases,
@@ -348,18 +378,20 @@ export async function exportAsVideo(
       format,
       width,
       height,
-      onProgress: (progress) => {
+      onProgress: progress => {
         console.log(`Video export progress: ${Math.round(progress * 100)}%`);
         onProgress?.(progress);
       },
-      onComplete: (blob) => {
-        console.log(`Video export completed. Final size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+      onComplete: blob => {
+        console.log(
+          `Video export completed. Final size: ${(blob.size / 1024 / 1024).toFixed(2)}MB`
+        );
         onComplete?.(blob);
       },
-      onError: (error) => {
+      onError: error => {
         console.error('Video export error:', error);
         onError?.(error);
-      }
+      },
     });
 
     return videoBlob;
@@ -388,40 +420,34 @@ export async function exportAnimationAs(
   try {
     // Stage 1: Render animation frames
     onProgress?.('Rendering frames', 0);
-    
-    const frames = await renderAnimationFrames(
-      baseImage,
-      effectId,
-      baseSettings,
-      animationConfig,
-      {
-        ...options,
-        onProgress: (progress) => onProgress?.('Rendering frames', progress * 0.5)
-      }
-    );
+
+    const frames = await renderAnimationFrames(baseImage, effectId, baseSettings, animationConfig, {
+      ...options,
+      onProgress: progress => onProgress?.('Rendering frames', progress * 0.5),
+    });
 
     // Stage 2: Export based on format
     if (exportFormat === 'gif') {
       onProgress?.('Creating GIF', 0.5);
-      
+
       const gifBlob = await exportAsGif(frames, {
         quality: exportQuality,
-        onProgress: (progress) => onProgress?.('Creating GIF', 0.5 + progress * 0.5),
-        onComplete: (blob) => onComplete?.(blob, 'gif'),
-        onError
+        onProgress: progress => onProgress?.('Creating GIF', 0.5 + progress * 0.5),
+        onComplete: blob => onComplete?.(blob, 'gif'),
+        onError,
       });
 
       return gifBlob;
     } else {
       onProgress?.('Creating video', 0.5);
-      
+
       const videoBlob = await exportAsVideo(frames, {
         format: exportFormat,
         quality: exportQuality,
         frameRate: options.frameRate,
-        onProgress: (progress) => onProgress?.('Creating video', 0.5 + progress * 0.5),
-        onComplete: (blob) => onComplete?.(blob, exportFormat),
-        onError
+        onProgress: progress => onProgress?.('Creating video', 0.5 + progress * 0.5),
+        onComplete: blob => onComplete?.(blob, exportFormat),
+        onError,
       });
 
       return videoBlob;
@@ -434,7 +460,11 @@ export async function exportAnimationAs(
 }
 
 // Utility to download video with appropriate filename
-export function downloadVideo(blob: Blob, format: 'webm' | 'mp4', prefix: string = 'animation'): void {
+export function downloadVideo(
+  blob: Blob,
+  format: 'webm' | 'mp4',
+  prefix: string = 'animation'
+): void {
   const timestamp = Date.now();
   const filename = `${prefix}-${timestamp}.${format}`;
   downloadVideoBlob(blob, filename);
@@ -450,57 +480,58 @@ async function renderSimpleOverlayEffect(
 ) {
   ctx.save();
   ctx.globalAlpha = overlayProps.opacity;
-  
+
   // Parse color
   const color = overlayProps.color;
   const particleCount = Math.floor(overlayProps.particleCount * 0.3); // Reduced for performance
-  
+
   // Set color and style
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
-  
+
   // Create deterministic but varied particles based on frame progress
   const seed = Math.floor(progress * 1000);
-  
+
   for (let i = 0; i < particleCount; i++) {
     // Pseudo-random values based on particle index and animation progress
     const particleSeed = seed + i * 123;
     const x = (Math.sin(particleSeed * 0.01) * 0.5 + 0.5) * width;
     const y = (Math.cos(particleSeed * 0.007) * 0.5 + 0.5) * height;
-    
+
     // Animation offset based on progress
     const animOffset = progress * overlayProps.speed * 100;
-    
+
     switch (overlayProps.effectType) {
       case 'stars':
         // Draw simple star points
         const starSize = 2 + Math.sin(particleSeed * 0.1 + animOffset * 0.05) * 1;
-        ctx.fillRect(x - starSize/2, y - starSize/2, starSize, starSize);
+        ctx.fillRect(x - starSize / 2, y - starSize / 2, starSize, starSize);
         // Add twinkle effect with cross pattern
         if (Math.sin(animOffset * 0.1 + particleSeed) > 0.5) {
           ctx.fillRect(x - starSize, y - 0.5, starSize * 2, 1);
           ctx.fillRect(x - 0.5, y - starSize, 1, starSize * 2);
         }
         break;
-        
+
       case 'bubbles':
         // Draw circles moving upward
         const bubbleY = (y + animOffset * 2) % height;
         const bubbleSize = 3 + Math.sin(particleSeed * 0.1) * 2;
-        ctx.globalAlpha = overlayProps.opacity * (0.3 + Math.sin(animOffset * 0.1 + particleSeed) * 0.3);
+        ctx.globalAlpha =
+          overlayProps.opacity * (0.3 + Math.sin(animOffset * 0.1 + particleSeed) * 0.3);
         ctx.beginPath();
         ctx.arc(x, bubbleY, bubbleSize, 0, Math.PI * 2);
         ctx.stroke();
         break;
-        
+
       case 'network':
         // Draw connected dots
         const nodeSize = 2;
-        ctx.fillRect(x - nodeSize/2, y - nodeSize/2, nodeSize, nodeSize);
+        ctx.fillRect(x - nodeSize / 2, y - nodeSize / 2, nodeSize, nodeSize);
         // Draw lines to nearby particles (simplified)
         if (i % 3 === 0 && i < particleCount - 1) {
-          const nextX = (Math.sin((seed + (i+1) * 123) * 0.01) * 0.5 + 0.5) * width;
-          const nextY = (Math.cos((seed + (i+1) * 123) * 0.007) * 0.5 + 0.5) * height;
+          const nextX = (Math.sin((seed + (i + 1) * 123) * 0.01) * 0.5 + 0.5) * width;
+          const nextY = (Math.cos((seed + (i + 1) * 123) * 0.007) * 0.5 + 0.5) * height;
           const distance = Math.sqrt((nextX - x) ** 2 + (nextY - y) ** 2);
           if (distance < 100) {
             ctx.globalAlpha = overlayProps.opacity * 0.3;
@@ -511,15 +542,15 @@ async function renderSimpleOverlayEffect(
           }
         }
         break;
-        
+
       case 'snow':
         // Draw falling snowflakes
         const snowY = (y + animOffset * 3) % (height + 20);
         const snowSize = 1 + Math.sin(particleSeed * 0.1) * 1.5;
         const snowX = x + Math.sin(animOffset * 0.02 + particleSeed) * 10; // Wobble
-        ctx.fillRect(snowX - snowSize/2, snowY - snowSize/2, snowSize, snowSize);
+        ctx.fillRect(snowX - snowSize / 2, snowY - snowSize / 2, snowSize, snowSize);
         break;
-        
+
       case 'confetti':
         // Draw colorful falling shapes
         const confettiY = (y + animOffset * 4) % (height + 20);
@@ -542,7 +573,7 @@ async function renderSimpleOverlayEffect(
         }
         ctx.restore();
         break;
-        
+
       case 'fireflies':
         // Draw glowing dots with varying opacity
         const glowIntensity = 0.5 + Math.sin(animOffset * 0.2 + particleSeed * 0.5) * 0.5;
@@ -560,7 +591,7 @@ async function renderSimpleOverlayEffect(
         break;
     }
   }
-  
+
   ctx.restore();
 }
 
@@ -575,7 +606,7 @@ async function renderOverlayAnimationFrames(
   const frames: AnimationFrame[] = [];
   const frameCount = Math.floor((options.duration / 1000) * options.frameRate);
   const frameDelay = 1000 / options.frameRate;
-  
+
   // Get the preset (use first one for now)
   const preset = animationConfig.animationPresets?.[0];
   if (!preset) {
@@ -583,55 +614,63 @@ async function renderOverlayAnimationFrames(
   }
 
   // Extract overlay type from effect ID
-  const overlayType = effectId.replace('generative', '').toLowerCase() as 'stars' | 'bubbles' | 'network' | 'snow' | 'confetti' | 'fireflies';
-  
+  const overlayType = effectId.replace('generative', '').toLowerCase() as
+    | 'stars'
+    | 'bubbles'
+    | 'network'
+    | 'snow'
+    | 'confetti'
+    | 'fireflies';
+
   for (let i = 0; i < frameCount; i++) {
     const progress = i / (frameCount - 1);
-    
+
     // Calculate animated settings
     const animatedSettings = { ...baseSettings };
     for (const [param, curve] of Object.entries(preset.parameterCurves)) {
       animatedSettings[param] = curve(progress);
     }
-    
+
     // Create frame canvas
     const frameCanvas = document.createElement('canvas');
     frameCanvas.width = options.width;
     frameCanvas.height = options.height;
     const ctx = frameCanvas.getContext('2d');
-    
+
     if (ctx) {
       // Clear canvas to transparent (remove black background)
       ctx.clearRect(0, 0, options.width, options.height);
-      
+
       // Draw the base image
       ctx.drawImage(baseImage, 0, 0, options.width, options.height);
-      
-             // Create overlay props from animated settings
-       const overlayProps = {
-         effectType: overlayType,
-         opacity: baseSettings.opacity || 0.6, // Use layer opacity, not animated
-         particleCount: baseSettings.particleCount || 50,
-         color: baseSettings.color ? `#${Math.floor(baseSettings.color).toString(16).padStart(6, '0')}` : '#ffffff',
-         speed: animatedSettings.speed || baseSettings.speed || 1, // Use animated speed
-         interactive: (baseSettings.interactive || 1) > 0.5,
-       };
-      
+
+      // Create overlay props from animated settings
+      const overlayProps = {
+        effectType: overlayType,
+        opacity: baseSettings.opacity || 0.6, // Use layer opacity, not animated
+        particleCount: baseSettings.particleCount || 50,
+        color: baseSettings.color
+          ? `#${Math.floor(baseSettings.color).toString(16).padStart(6, '0')}`
+          : '#ffffff',
+        speed: animatedSettings.speed || baseSettings.speed || 1, // Use animated speed
+        interactive: (baseSettings.interactive || 1) > 0.5,
+      };
+
       // Render the overlay effect
       await renderSimpleOverlayEffect(ctx, overlayProps, progress, options.width, options.height);
-      
+
       frames.push({
         canvas: frameCanvas,
-        delay: frameDelay
+        delay: frameDelay,
       });
     }
-    
+
     // Report progress
     if (options.onProgress) {
       options.onProgress((i + 1) / frameCount);
     }
   }
-  
+
   return frames;
 }
 
@@ -644,29 +683,29 @@ export async function renderMultiLayerAnimationFrames(
   const frames: AnimationFrame[] = [];
   const frameCount = Math.floor((options.duration / 1000) * options.frameRate);
   const frameDelay = 1000 / options.frameRate;
-  
+
   // Create a Konva stage for rendering
   const container = document.createElement('div');
   container.style.visibility = 'hidden';
   container.style.position = 'absolute';
   document.body.appendChild(container);
-  
+
   const stage = new Konva.Stage({
     container,
     width: options.width,
     height: options.height,
   });
-  
+
   const layer = new Konva.Layer();
   stage.add(layer);
-  
+
   try {
     for (let i = 0; i < frameCount; i++) {
       const progress = i / (frameCount - 1);
-      
+
       // Clear the layer
       layer.destroyChildren();
-      
+
       // Create Konva image
       const konvaImage = new Konva.Image({
         image: baseImage,
@@ -675,43 +714,48 @@ export async function renderMultiLayerAnimationFrames(
         width: options.width,
         height: options.height,
       });
-      
+
       layer.add(konvaImage);
-      
+
       // Apply all effect layers in sequence
       const filters: any[] = [];
       const combinedFilterParams: Record<string, any> = {};
-      
+
       for (const effectLayer of effectLayers) {
         const { effectId, settings, animationConfig } = effectLayer;
-        
+
         // Skip non-animated effects
         const preset = animationConfig.animationPresets?.[0];
         if (!preset) continue;
-        
+
         // Calculate animated settings for this effect
         const animatedSettings = { ...settings };
         for (const [param, curve] of Object.entries(preset.parameterCurves)) {
           animatedSettings[param] = curve(progress);
         }
-        
+
         // Add frame-based seed for effects that need randomness per frame
         if (effectId === 'pixelExplosion') {
           animatedSettings.seed = i + 1;
         }
-        
+
         // Apply the effect
         const [filterFunc, filterParams] = await applyEffect(effectId, animatedSettings);
-        
+
         if (filterFunc && typeof filterFunc === 'function') {
           filters.push(filterFunc);
-          
+
           // Merge filter parameters
           if (filterParams) {
             for (const [key, value] of Object.entries(filterParams)) {
               // For additive parameters, sum them up
-              if (key === 'brightness' || key === 'contrast' || key === 'enhance' || 
-                  key === 'saturation' || key === 'hue') {
+              if (
+                key === 'brightness' ||
+                key === 'contrast' ||
+                key === 'enhance' ||
+                key === 'saturation' ||
+                key === 'hue'
+              ) {
                 combinedFilterParams[key] = (combinedFilterParams[key] || 0) + value;
               } else {
                 // For other parameters, use the last value
@@ -721,40 +765,40 @@ export async function renderMultiLayerAnimationFrames(
           }
         }
       }
-      
+
       // Apply all filters at once
       if (filters.length > 0) {
         konvaImage.filters(filters);
-        
+
         // Set combined filter parameters
         for (const [key, value] of Object.entries(combinedFilterParams)) {
-          if (typeof konvaImage[key] === 'function') {
-            konvaImage[key](value);
+          if (typeof (konvaImage as any)[key] === 'function') {
+            (konvaImage as any)[key](value);
           }
         }
       }
-      
+
       // Cache and draw
       konvaImage.cache();
       layer.batchDraw();
-      
+
       // Get the canvas
       const frameCanvas = document.createElement('canvas');
       frameCanvas.width = options.width;
       frameCanvas.height = options.height;
       const ctx = frameCanvas.getContext('2d');
-      
+
       if (ctx) {
         ctx.clearRect(0, 0, options.width, options.height);
         const layerCanvas = layer.getCanvas()._canvas;
         ctx.drawImage(layerCanvas, 0, 0);
-        
+
         frames.push({
           canvas: frameCanvas,
-          delay: frameDelay
+          delay: frameDelay,
         });
       }
-      
+
       // Report progress
       if (options.onProgress) {
         options.onProgress((i + 1) / frameCount);
@@ -765,7 +809,7 @@ export async function renderMultiLayerAnimationFrames(
     stage.destroy();
     document.body.removeChild(container);
   }
-  
+
   return frames;
 }
 
@@ -786,38 +830,34 @@ export async function exportMultiLayerAnimation(
   try {
     // Stage 1: Render animation frames with all layers
     onProgress?.('Rendering frames', 0);
-    
-    const frames = await renderMultiLayerAnimationFrames(
-      baseImage,
-      effectLayers,
-      {
-        ...options,
-        onProgress: (progress) => onProgress?.('Rendering frames', progress * 0.5)
-      }
-    );
+
+    const frames = await renderMultiLayerAnimationFrames(baseImage, effectLayers, {
+      ...options,
+      onProgress: progress => onProgress?.('Rendering frames', progress * 0.5),
+    });
 
     // Stage 2: Export based on format
     if (exportFormat === 'gif') {
       onProgress?.('Creating GIF', 0.5);
-      
+
       const gifBlob = await exportAsGif(frames, {
         quality: exportQuality,
-        onProgress: (progress) => onProgress?.('Creating GIF', 0.5 + progress * 0.5),
-        onComplete: (blob) => onComplete?.(blob, 'gif'),
-        onError
+        onProgress: progress => onProgress?.('Creating GIF', 0.5 + progress * 0.5),
+        onComplete: blob => onComplete?.(blob, 'gif'),
+        onError,
       });
 
       return gifBlob;
     } else {
       onProgress?.('Creating video', 0.5);
-      
+
       const videoBlob = await exportAsVideo(frames, {
         format: exportFormat,
         quality: exportQuality,
         frameRate: options.frameRate,
-        onProgress: (progress) => onProgress?.('Creating video', 0.5 + progress * 0.5),
-        onComplete: (blob) => onComplete?.(blob, exportFormat),
-        onError
+        onProgress: progress => onProgress?.('Creating video', 0.5 + progress * 0.5),
+        onComplete: blob => onComplete?.(blob, exportFormat),
+        onError,
       });
 
       return videoBlob;
@@ -827,4 +867,4 @@ export async function exportMultiLayerAnimation(
     onError?.(exportError);
     throw exportError;
   }
-} 
+}

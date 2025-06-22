@@ -16,9 +16,9 @@ export const useEffectPreview = (
   const [state, setState] = useState<PreviewState>({
     isLoading: false,
     error: null,
-    canvas: null
+    canvas: null,
   });
-  
+
   const imageRef = useRef<HTMLImageElement | null>(null);
   const konvaStageRef = useRef<Konva.Stage | null>(null);
   const konvaLayerRef = useRef<Konva.Layer | null>(null);
@@ -42,7 +42,7 @@ export const useEffectPreview = (
           konvaStageRef.current = new Konva.Stage({
             container: document.createElement('div'),
             width: previewSize.width,
-            height: previewSize.height
+            height: previewSize.height,
           });
         }
 
@@ -57,7 +57,7 @@ export const useEffectPreview = (
           konvaImageRef.current = new Konva.Image({
             image: img,
             width: previewSize.width,
-            height: previewSize.height
+            height: previewSize.height,
           });
           konvaLayerRef.current.add(konvaImageRef.current);
         } else {
@@ -65,15 +65,38 @@ export const useEffectPreview = (
         }
 
         // Apply effect
-        const settings = getEffectSettings(effectId);
-        applyEffect(konvaImageRef.current, effectId, settings)
-          .then(() => {
+        const effectSettings = getEffectSettings(effectId);
+        const defaultSettings: Record<string, number> = {};
+        effectSettings.forEach(setting => {
+          defaultSettings[setting.id] = setting.defaultValue;
+        });
+
+        applyEffect(effectId, defaultSettings)
+          .then(([filterFunc, filterParams]) => {
+            if (filterFunc && konvaImageRef.current) {
+              // Apply the filter
+              konvaImageRef.current.filters([filterFunc]);
+
+              // Apply filter parameters if any
+              if (filterParams) {
+                for (const [key, value] of Object.entries(filterParams)) {
+                  if (typeof (konvaImageRef.current as any)[key] === 'function') {
+                    (konvaImageRef.current as any)[key](value);
+                  }
+                }
+              }
+
+              // Cache and redraw
+              konvaImageRef.current.cache();
+              konvaLayerRef.current?.batchDraw();
+            }
+
             // Get canvas with applied effect
             const canvas = konvaStageRef.current?.toCanvas();
             setState({
               isLoading: false,
               error: null,
-              canvas: canvas || null
+              canvas: canvas || null,
             });
           })
           .catch(error => {
@@ -81,7 +104,7 @@ export const useEffectPreview = (
             setState({
               isLoading: false,
               error: 'Failed to apply effect',
-              canvas: null
+              canvas: null,
             });
           });
       } catch (error) {
@@ -89,7 +112,7 @@ export const useEffectPreview = (
         setState({
           isLoading: false,
           error: 'Failed to set up preview',
-          canvas: null
+          canvas: null,
         });
       }
     };
@@ -98,7 +121,7 @@ export const useEffectPreview = (
       setState({
         isLoading: false,
         error: 'Failed to load image',
-        canvas: null
+        canvas: null,
       });
     };
 
@@ -112,4 +135,4 @@ export const useEffectPreview = (
   }, [effectId, imageUrl, previewSize.width, previewSize.height]);
 
   return state;
-}; 
+};
