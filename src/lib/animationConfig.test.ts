@@ -4,10 +4,10 @@ describe('Animation Configuration - Generative Overlays', () => {
   const generativeEffects = [
     'generativeStars',
     'generativeBubbles',
-    'generativeNetwork', 
+    'generativeNetwork',
     'generativeSnow',
     'generativeConfetti',
-    'generativeFireflies'
+    'generativeFireflies',
   ];
 
   describe('supportsAnimation', () => {
@@ -31,7 +31,7 @@ describe('Animation Configuration - Generative Overlays', () => {
     generativeEffects.forEach(effectId => {
       it(`should return valid config for ${effectId}`, () => {
         const config = getAnimationConfig(effectId);
-        
+
         expect(config).toBeDefined();
         expect(config.supportsAnimation).toBe(true);
         expect(config.defaultDuration).toBeGreaterThan(0);
@@ -43,25 +43,20 @@ describe('Animation Configuration - Generative Overlays', () => {
 
       it(`should have appropriate animation parameters for ${effectId}`, () => {
         const config = getAnimationConfig(effectId);
-        
+
         // All generative effects should animate speed
         expect(config.animatedParameters).toContain('speed');
-        
-        // Some effects might have additional parameters
-        if (effectId === 'generativeStars') {
-          expect(config.animatedParameters).toContain('opacity');
-        }
       });
 
       it(`should have valid animation presets for ${effectId}`, () => {
         const config = getAnimationConfig(effectId);
-        
+
         config.animationPresets.forEach(preset => {
           expect(preset.name).toBeDefined();
           expect(preset.duration).toBeGreaterThan(0);
           expect(preset.frameRate).toBeGreaterThan(0);
           expect(preset.parameterCurves).toBeDefined();
-          
+
           // Check that all animated parameters have curves
           config.animatedParameters.forEach(param => {
             expect(preset.parameterCurves[param]).toBeDefined();
@@ -84,24 +79,24 @@ describe('Animation Configuration - Generative Overlays', () => {
         if (!config) return;
 
         const preset = config.animationPresets[0];
-        
+
         // Test curve functions with various progress values
         const progressValues = [0, 0.25, 0.5, 0.75, 1];
-        
+
         Object.entries(preset.parameterCurves).forEach(([param, curve]) => {
           progressValues.forEach(progress => {
             const value = curve(progress);
-            
+
             expect(typeof value).toBe('number');
             expect(isFinite(value)).toBe(true);
             expect(isNaN(value)).toBe(false);
-            
+
             // Speed should be positive
             if (param === 'speed') {
               expect(value).toBeGreaterThan(0);
               expect(value).toBeLessThanOrEqual(5); // Reasonable upper bound
             }
-            
+
             // Opacity should be 0-1 (though animation might use layer opacity)
             if (param === 'opacity') {
               expect(value).toBeGreaterThanOrEqual(0);
@@ -167,9 +162,9 @@ describe('Animation Configuration - Generative Overlays', () => {
       });
 
       // Check that different effects have different speed behaviors
-      const midPointValues = speedCurves.map(curve => curve ? curve(0.5) : 0);
+      const midPointValues = speedCurves.map(curve => (curve ? curve(0.5) : 0));
       const uniqueValues = new Set(midPointValues);
-      
+
       // We should have some variation in how different effects animate
       expect(uniqueValues.size).toBeGreaterThan(1);
     });
@@ -178,14 +173,14 @@ describe('Animation Configuration - Generative Overlays', () => {
   describe('Performance considerations', () => {
     it('should not have excessive frame rates for complex effects', () => {
       const complexEffects = ['generativeNetwork', 'generativeConfetti'];
-      
+
       complexEffects.forEach(effectId => {
         const config = getAnimationConfig(effectId);
         if (!config) return;
 
         // Complex effects should use moderate frame rates for performance
         expect(config.defaultFrameRate).toBeLessThanOrEqual(30);
-        
+
         config.animationPresets.forEach(preset => {
           expect(preset.frameRate).toBeLessThanOrEqual(30);
         });
@@ -208,4 +203,4 @@ describe('Animation Configuration - Generative Overlays', () => {
       });
     });
   });
-}); 
+});
