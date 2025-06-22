@@ -225,7 +225,7 @@ body.mobile-menu-open {
 
   /* Glass effect components */
   .glass-panel {
-    @apply backdrop-blur-md bg-white/90 dark:bg-black/70 border border-[rgb(var(--apple-gray-200))] dark:border-[rgb(var(--apple-gray-800))];
+    @apply backdrop-blur-md bg-white/90 dark:bg-black/70;
   }
 
   /* Tab styling */
