@@ -1,4 +1,4 @@
-import { animationConfig, supportsAnimation, getAnimationConfig } from './animationConfig';
+import { supportsAnimation, getAnimationConfig } from './animationConfig';
 
 describe('Animation Configuration - Generative Overlays', () => {
   const generativeEffects = [
