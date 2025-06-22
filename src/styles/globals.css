@@ -7,8 +7,18 @@ html,
 body {
   padding: 0;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
-    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    Segoe UI,
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    Fira Sans,
+    Droid Sans,
+    Helvetica Neue,
+    sans-serif;
 }
 
 a {
@@ -18,6 +28,7 @@ a {
 
 * {
   box-sizing: border-box;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Effect Preview Styles */
@@ -27,7 +38,7 @@ a {
   background: rgb(var(--dark-surface));
   padding: 4px;
   border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   pointer-events: none;
   transition: opacity 0.2s ease-in-out;
   border: 1px solid rgb(var(--dark-border));
@@ -41,7 +52,9 @@ a {
 .effect-preview-enter-active {
   opacity: 1;
   transform: scale(1);
-  transition: opacity 200ms ease-in, transform 200ms ease-in;
+  transition:
+    opacity 200ms ease-in,
+    transform 200ms ease-in;
 }
 
 .effect-preview-exit {
@@ -52,5 +65,85 @@ a {
 .effect-preview-exit-active {
   opacity: 0;
   transform: scale(0.95);
-  transition: opacity 200ms ease-out, transform 200ms ease-out;
-} 
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+}
+
+/* Custom Range Slider Styling */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.1);
+  outline: none;
+  opacity: 1;
+  -webkit-transition: 0.2s;
+  transition: opacity 0.2s;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+input[type='range']::-webkit-slider-thumb:hover {
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+  transform: scale(1.1);
+}
+
+input[type='range']::-webkit-slider-thumb:active {
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
+  transform: scale(0.95);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+/* Terminal theme range slider overrides */
+html.theme-terminal input[type='range'] {
+  background: rgba(0, 255, 0, 0.1);
+}
+
+html.theme-terminal input[type='range']::-webkit-slider-thumb {
+  background: #00ff00;
+  border: 1px solid #00ff00;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
+}
+
+html.theme-terminal input[type='range']::-moz-range-thumb {
+  background: #00ff00;
+  border: 1px solid #00ff00;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.5);
+}
+
+/* Smooth transitions for calm interactions */
+button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:active {
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
