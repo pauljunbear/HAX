@@ -387,7 +387,7 @@ html.theme-light .text-xs.text-white\/50 {
   font-size: 12px !important;
 }
 
-/* Effect Grid Buttons - Notion Style with Proper Spacing */
+/* Effect Grid Buttons - Notion Style with Proper Spacing and VISIBLE TEXT */
 html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 {
   gap: 8px !important;
   padding: 0 12px 12px 12px !important;
@@ -410,6 +410,35 @@ html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  text-align: center !important;
+  line-height: 1.3 !important;
+}
+
+/* Ensure effect button text is always visible */
+html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button h4 {
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif !important;
+  line-height: 1.3 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Specific override for effect text in terminal/monospace styling */
+html.theme-light
+  .text-xs.font-medium.text-white\/90.leading-tight.font-mono.uppercase.tracking-wide {
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif !important;
+  line-height: 1.3 !important;
 }
 
 html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button:hover {
@@ -418,6 +447,22 @@ html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button:hover {
   color: var(--text-primary) !important;
   transform: none !important;
   box-shadow: var(--shadow-hover) !important;
+}
+
+/* Ensure hover state keeps text visible */
+html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button:hover h4 {
+  color: var(--text-primary) !important;
+}
+
+/* Active effect button styling */
+html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button.bg-green-600\/20 {
+  background: rgba(35, 131, 226, 0.1) !important;
+  border-color: var(--accent-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button.bg-green-600\/20 h4 {
+  color: var(--text-primary) !important;
 }
 
 /* RIGHT NAV - Controls Panel */
