@@ -100,9 +100,9 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col glass-panel">
+    <div className="w-full h-full flex flex-col glass-panel border-r border-white/10">
       {/* Header */}
-      <div className="px-4 py-3 border-b">
+      <div className="px-4 py-3 border-b border-white/10">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider">Effects</h2>
