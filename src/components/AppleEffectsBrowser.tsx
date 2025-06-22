@@ -97,14 +97,16 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-white/40 backdrop-blur-sm border-r border-gray-200/50">
+    <div className="w-full h-full flex flex-col">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200/50">
+      <div className="px-4 py-3 border-b">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-900">Effects</h2>
+          <h2 className="text-sm font-semibold text-green-400 uppercase tracking-wider font-mono">
+            Effects
+          </h2>
           <button
             onClick={onNewImage}
-            className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded-md hover:bg-blue-50/50 transition-all"
+            className="text-xs text-green-400 hover:text-green-300 font-medium px-2 py-1 hover:bg-green-400/10 transition-all font-mono uppercase tracking-wide"
           >
             New Image
           </button>
@@ -113,25 +115,12 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
         {/* Search */}
         <div className="relative">
           <input
-            type="text"
-            placeholder="Search effects..."
+            type="search"
+            placeholder="SEARCH EFFECTS..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 text-xs text-gray-900 bg-white/60 border border-gray-200/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 backdrop-blur-sm transition-all placeholder-gray-500"
+            className="w-full"
           />
-          <svg
-            className="absolute right-2.5 top-2.5 w-3 h-3 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
         </div>
       </div>
 
@@ -139,9 +128,9 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
       <div className="flex-1 overflow-y-auto">
         {!hasImage ? (
           <div className="text-center py-12 px-4">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center">
+            <div className="w-16 h-16 mx-auto mb-4 bg-black border border-green-400/30 flex items-center justify-center">
               <svg
-                className="w-8 h-8 text-blue-600"
+                className="w-8 h-8 text-green-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -154,13 +143,15 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                 />
               </svg>
             </div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Upload an Image</h3>
-            <p className="text-xs text-gray-600 mb-4 leading-relaxed max-w-xs mx-auto">
+            <h3 className="text-sm font-semibold text-white mb-2 font-mono uppercase tracking-wide">
+              Upload an Image
+            </h3>
+            <p className="text-xs text-white/70 mb-4 leading-relaxed max-w-xs mx-auto font-mono">
               Choose an image to start applying effects
             </p>
             <button
               onClick={onNewImage}
-              className="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-all shadow-md hover:shadow-lg space-x-1.5"
+              className="inline-flex items-center px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 text-xs font-medium border border-green-400/30 hover:border-green-400/50 transition-all space-x-1.5 font-mono uppercase tracking-wide"
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -180,21 +171,18 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                 {/* Category Header */}
                 <button
                   onClick={() => toggleCategory(category)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/40 transition-all duration-200 group"
+                  className="w-full flex items-center justify-between px-4 py-3 text-left transition-all duration-200 group"
                 >
                   <div className="flex items-center space-x-2.5">
-                    <span className="text-sm">{getCategoryIcon(category)}</span>
                     <div>
-                      <h3 className="text-xs font-semibold text-gray-900 group-hover:text-gray-700">
+                      <h3 className="text-xs font-semibold text-white/80 group-hover:text-white font-mono uppercase tracking-wide">
                         {category}
                       </h3>
-                      <p className="text-xs text-gray-500">
-                        {effects.length} effect{effects.length !== 1 ? 's' : ''}
-                      </p>
+                      <p className="text-xs text-white/50 font-mono">[{effects.length}]</p>
                     </div>
                   </div>
                   <motion.svg
-                    className="w-4 h-4 text-gray-400"
+                    className="w-4 h-4 text-green-400/70"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -229,13 +217,13 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                             exit={{ opacity: 0, y: -10 }}
                             transition={{ duration: 0.2 }}
                             onClick={() => handleEffectClick(effectId)}
-                            className={`p-2.5 text-center transition-all duration-200 rounded-lg border ${
+                            className={`p-2.5 text-center transition-all duration-200 border ${
                               activeEffect === effectId
-                                ? 'bg-blue-50/80 border-blue-300/60 shadow-lg ring-2 ring-blue-500/20 scale-105'
-                                : 'bg-white/60 border-gray-200/60 hover:bg-white/80 hover:border-gray-300/60 hover:shadow-md hover:scale-102'
+                                ? 'bg-green-600/20 border-green-400/60 shadow-lg ring-2 ring-green-500/20'
+                                : 'bg-black/60 border-white/20 hover:bg-green-600/10 hover:border-green-400/40'
                             }`}
                           >
-                            <h4 className="text-xs font-medium text-gray-900 leading-tight">
+                            <h4 className="text-xs font-medium text-white/90 leading-tight font-mono uppercase tracking-wide">
                               {effect.label}
                             </h4>
                           </motion.button>
@@ -249,9 +237,9 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
 
             {Object.keys(filteredEffectsByCategory).length === 0 && (
               <div className="text-center py-12 px-4">
-                <div className="w-12 h-12 mx-auto mb-3 bg-gray-100/80 rounded-xl flex items-center justify-center">
+                <div className="w-12 h-12 mx-auto mb-3 bg-black border border-green-400/30 flex items-center justify-center">
                   <svg
-                    className="w-6 h-6 text-gray-500"
+                    className="w-6 h-6 text-green-400"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -264,8 +252,10 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                     />
                   </svg>
                 </div>
-                <h3 className="text-sm font-medium text-gray-900 mb-1">No Effects Found</h3>
-                <p className="text-xs text-gray-500">Try adjusting your search term</p>
+                <h3 className="text-sm font-medium text-white mb-1 font-mono uppercase tracking-wide">
+                  No Effects Found
+                </h3>
+                <p className="text-xs text-white/70 font-mono">Try adjusting your search term</p>
               </div>
             )}
           </div>

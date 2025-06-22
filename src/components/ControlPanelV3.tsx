@@ -72,15 +72,17 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
     const calculateHeight = () => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      
+
       // Reserve space for settings panel if active effect has settings
-      const settingsHeight = activeEffect && currentEffectSettings.length > 0 ? 
-        Math.min(250, 80 + (currentEffectSettings.length * 45)) : 0;
-      
+      const settingsHeight =
+        activeEffect && currentEffectSettings.length > 0
+          ? Math.min(250, 80 + currentEffectSettings.length * 45)
+          : 0;
+
       const availableHeight = window.innerHeight - rect.top - settingsHeight - 40; // Extra padding
       const minHeight = 300; // Minimum height to prevent UI breaking
       const calculatedHeight = Math.max(minHeight, availableHeight);
-      
+
       setContainerHeight(calculatedHeight);
     };
 
@@ -133,17 +135,17 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
   // Filter effects based on search query
   const searchResults = useMemo(() => {
     if (!searchQuery) return null;
-    
+
     const results: { id: string; category: string; score: number }[] = [];
     const query = searchQuery.toLowerCase();
-    
+
     Object.entries(effectCategories).forEach(([category, data]) => {
       data.effects.forEach(effectId => {
         const effect = effectsConfig[effectId];
         if (effect) {
           const label = effect.label.toLowerCase();
           let score = 0;
-          
+
           // Exact match
           if (label === query) score = 100;
           // Starts with
@@ -152,14 +154,14 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
           else if (label.includes(query)) score = 60;
           // Category match
           else if (category.toLowerCase().includes(query)) score = 40;
-          
+
           if (score > 0) {
             results.push({ id: effectId, category, score });
           }
         }
       });
     });
-    
+
     return results.sort((a, b) => b.score - a.score).map(r => r.id);
   }, [searchQuery]);
 
@@ -181,13 +183,13 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
-    
+
     const rect = event.currentTarget.getBoundingClientRect();
-    setHoverPosition({ 
+    setHoverPosition({
       x: Math.min(rect.right + 10, window.innerWidth - 170),
-      y: Math.min(rect.top, window.innerHeight - 200)
+      y: Math.min(rect.top, window.innerHeight - 200),
     });
-    
+
     // Delay showing preview to avoid flashing
     hoverTimeoutRef.current = setTimeout(() => {
       setHoveredEffect(effectId);
@@ -205,11 +207,11 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
   // Touch handler for mobile (press and hold)
   const handleEffectTouchStart = (effectId: string, event: React.TouchEvent) => {
     const touch = event.touches[0];
-    setHoverPosition({ 
+    setHoverPosition({
       x: Math.min(touch.clientX + 10, window.innerWidth - 170),
-      y: Math.min(touch.clientY - 170, window.innerHeight - 200)
+      y: Math.min(touch.clientY - 170, window.innerHeight - 200),
     });
-    
+
     hoverTimeoutRef.current = setTimeout(() => {
       setHoveredEffect(effectId);
       // Haptic feedback if available
@@ -240,8 +242,19 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
     return (
       <div className="p-6 h-full flex flex-col items-center justify-center text-center">
         <div className="w-24 h-24 mb-6 rounded-full bg-dark-surface flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-dark-textMuted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-12 w-12 text-dark-textMuted"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
           </svg>
         </div>
         <h2 className="text-xl font-medium text-dark-text mb-3">No Image Selected</h2>
@@ -259,10 +272,7 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
         {/* Effects Header */}
         <div className="p-4 pb-3">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-dark-text flex items-center">
-              <span className="text-primary-accent mr-2" aria-hidden="true">✨</span>
-              Effects
-            </h2>
+            <h2 className="text-sm font-medium text-dark-text">EFFECTS</h2>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
@@ -271,12 +281,34 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                 aria-pressed={viewMode === 'grid'}
               >
                 {viewMode === 'grid' ? (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
                   </svg>
                 ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                    />
                   </svg>
                 )}
               </button>
@@ -297,23 +329,27 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
 
           {/* Search Bar with keyboard shortcut hint */}
           <div className="relative">
-            <label htmlFor="effect-search" className="sr-only">Search effects</label>
+            <label htmlFor="effect-search" className="sr-only">
+              Search effects
+            </label>
             <input
               id="effect-search"
               ref={searchInputRef}
               type="search"
-              placeholder="Search effects..."
+              placeholder="SEARCH EFFECTS..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full px-3 py-1.5 pl-8 pr-16 text-xs bg-dark-bg border border-dark-border rounded-md
-                       text-dark-text placeholder-dark-textMuted ${focusRingClass}`}
+              onChange={e => setSearchQuery(e.target.value)}
+              className={`w-full px-4 py-2 text-xs bg-dark-bg border border-dark-border
+                       text-dark-text placeholder-dark-textMuted ${focusRingClass}
+                       font-mono tracking-wider uppercase`}
               aria-label="Search effects"
               aria-describedby="search-hint"
             />
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-2 top-2 text-dark-textMuted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <kbd id="search-hint" className="absolute right-2 top-1.5 text-[10px] text-dark-textMuted bg-dark-border px-1.5 py-0.5 rounded" aria-label="Press Command K to focus search">
+            <kbd
+              id="search-hint"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[10px] text-dark-textMuted bg-dark-border px-1.5 py-0.5 font-mono"
+              aria-label="Press Command K to focus search"
+            >
               ⌘K
             </kbd>
           </div>
@@ -321,30 +357,32 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
 
         {/* Quick Access - Recent Effects */}
         {recentEffects.length > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="px-4 mb-3 pb-3 border-b border-dark-border"
           >
-            <h3 className="text-[10px] font-medium text-dark-textMuted uppercase tracking-wider mb-2">Recent</h3>
+            <h3 className="text-[10px] font-medium text-dark-textMuted uppercase tracking-wider mb-2">
+              Recent
+            </h3>
             <div className="flex flex-wrap gap-1.5">
-              {recentEffects.slice(0, 4).map((effectId) => {
+              {recentEffects.slice(0, 4).map(effectId => {
                 const config = effectsConfig[effectId];
                 if (!config) return null;
-                
+
                 return (
                   <motion.button
                     key={effectId}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => {
-                      onEffectChange(effectId);
+                      onEffectChange?.(effectId);
                       // Store in recent
                       addToRecentEffects(effectId);
                     }}
-                    onMouseEnter={(e) => handleEffectHover(effectId, e)}
+                    onMouseEnter={e => handleEffectHover(effectId, e)}
                     onMouseLeave={handleEffectLeave}
-                    onTouchStart={(e) => handleEffectTouchStart(effectId, e)}
+                    onTouchStart={e => handleEffectTouchStart(effectId, e)}
                     onTouchEnd={handleEffectTouchEnd}
                     className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium transition-all ${
                       activeEffect === effectId
@@ -375,17 +413,17 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                 {searchResults.map(effectId => {
                   const effect = effectsConfig[effectId];
                   if (!effect) return null;
-                  
+
                   return (
                     <button
                       key={effectId}
                       onClick={() => handleEffectSelect(effectId)}
-                      onMouseEnter={(e) => handleEffectHover(effectId, e)}
+                      onMouseEnter={e => handleEffectHover(effectId, e)}
                       onMouseLeave={handleEffectLeave}
-                      onTouchStart={(e) => handleEffectTouchStart(effectId, e)}
+                      onTouchStart={e => handleEffectTouchStart(effectId, e)}
                       onTouchEnd={handleEffectTouchEnd}
                       className={`text-xs rounded-lg transition-all text-left ${
-                        viewMode === 'grid' 
+                        viewMode === 'grid'
                           ? 'px-3 py-2.5'
                           : 'w-full px-3 py-2 flex items-center justify-between'
                       } ${
@@ -397,9 +435,11 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                       <div className="font-medium truncate">{effect.label}</div>
                       {viewMode === 'list' && (
                         <div className="text-[10px] opacity-60">
-                          {Object.entries(effectCategories).find(([_, data]) => 
-                            data.effects.includes(effectId)
-                          )?.[0]}
+                          {
+                            Object.entries(effectCategories).find(([_, data]) =>
+                              data.effects.includes(effectId)
+                            )?.[0]
+                          }
                         </div>
                       )}
                     </button>
@@ -413,47 +453,53 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
           <GroupedVirtualScroll
             groups={Object.entries(effectCategories).map(([category, data]) => ({
               label: category,
-              items: expandedCategories.has(category) ? data.effects : []
+              items: expandedCategories.has(category) ? data.effects : [],
             }))}
             itemHeight={viewMode === 'grid' ? 40 : 32}
             groupHeaderHeight={40}
             containerHeight={containerHeight}
-            renderGroupHeader={(category) => {
+            renderGroupHeader={category => {
               const data = effectCategories[category];
               return (
                 <button
                   onClick={() => toggleCategory(category)}
-                  className={`w-full flex items-center px-3 py-2 text-xs rounded-md transition-all hover:bg-dark-bg ${focusRingClass}`}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-xs transition-all hover:bg-dark-bg ${focusRingClass}`}
                   aria-expanded={expandedCategories.has(category)}
                   aria-controls={`category-${category.replace(/\s+/g, '-')}`}
                   aria-label={ARIA_LABELS.effectCategory(category)}
                 >
-                  <svg 
-                    className={`w-3 h-3 mr-2 transition-transform flex-shrink-0 ${expandedCategories.has(category) ? 'rotate-90' : ''}`} 
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                  <span className="mr-2 flex-shrink-0" aria-hidden="true">{data.icon}</span>
-                  <span className="font-medium text-dark-text flex-1 text-left truncate">{category}</span>
-                  <span className="ml-2 text-[10px] text-dark-textMuted flex-shrink-0">
-                    {data.effects.length}
-                  </span>
+                  <div className="flex items-center gap-4 w-full">
+                    <svg
+                      className={`w-3 h-3 transition-transform flex-shrink-0 ${expandedCategories.has(category) ? 'rotate-90' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                    <span className="font-medium text-dark-text flex-1 text-left">{category}</span>
+                    <span className="text-[10px] text-dark-textMuted">{data.effects.length}</span>
+                  </div>
                 </button>
               );
             }}
-            renderItem={(effectId) => {
+            renderItem={effectId => {
               const effect = effectsConfig[effectId as string];
               if (!effect) return null;
-              
+
               return (
                 <div className={`px-3 ${viewMode === 'grid' ? 'w-1/2 float-left' : ''}`}>
                   <button
                     onClick={() => handleEffectSelect(effectId as string)}
-                    onMouseEnter={(e) => handleEffectHover(effectId as string, e)}
+                    onMouseEnter={e => handleEffectHover(effectId as string, e)}
                     onMouseLeave={handleEffectLeave}
-                    onTouchStart={(e) => handleEffectTouchStart(effectId as string, e)}
+                    onTouchStart={e => handleEffectTouchStart(effectId as string, e)}
                     onTouchEnd={handleEffectTouchEnd}
                     className={`text-xs rounded-md transition-all text-left ${focusRingClass} ${
                       viewMode === 'grid'
@@ -478,60 +524,78 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
       </div>
 
       {/* Sticky Effect Settings */}
-      {activeEffect && currentEffectSettings.length > 0 && (
-        <div 
-          ref={settingsRef}
-          className="flex-shrink-0 border-t border-dark-border bg-dark-surface max-h-64 overflow-y-auto"
-        >
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-medium text-dark-text flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                </svg>
-                {effectsConfig[activeEffect]?.label} Settings
-              </h3>
-              <button
-                onClick={() => {
-                  // Reset all settings to default
-                  currentEffectSettings.forEach(setting => {
-                    onSettingChange?.(setting.id, setting.default);
-                  });
-                }}
-                className="text-[10px] text-dark-textMuted hover:text-dark-text transition-colors"
-              >
-                Reset
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              {currentEffectSettings.map(setting => (
-                <div key={setting.id} className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-medium text-dark-text">
-                      {setting.label}
-                    </label>
-                    <span className="text-[10px] text-dark-textMuted">
-                      {setting.currentValue}
-                    </span>
+      <AnimatePresence>
+        {activeEffect && currentEffectSettings.length > 0 && (
+          <motion.div
+            key="effect-settings"
+            ref={settingsRef}
+            className="flex-shrink-0 border-t border-dark-border bg-dark-surface max-h-64 overflow-y-auto relative holographic-enter"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-medium text-dark-text flex items-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-3.5 w-3.5 mr-1.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+                    />
+                  </svg>
+                  {effectsConfig[activeEffect]?.label} Settings
+                </h3>
+                <button
+                  onClick={() => {
+                    // Reset all settings to default
+                    currentEffectSettings.forEach(setting => {
+                      onSettingChange?.(setting.id, setting.default);
+                    });
+                  }}
+                  className="text-[10px] text-dark-textMuted hover:text-dark-text transition-colors"
+                >
+                  Reset
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {currentEffectSettings.map(setting => (
+                  <div key={setting.id} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-medium text-dark-text">
+                        {setting.label}
+                      </label>
+                      <span className="text-[10px] text-dark-textMuted">
+                        {setting.currentValue}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={setting.min}
+                      max={setting.max}
+                      step={setting.step}
+                      value={setting.currentValue}
+                      onChange={e => onSettingChange?.(setting.id, parseFloat(e.target.value))}
+                      className="w-full h-1 bg-dark-border rounded-lg appearance-none cursor-pointer slider"
+                      aria-label={setting.label}
+                    />
                   </div>
-                  <input
-                    type="range"
-                    min={setting.min}
-                    max={setting.max}
-                    step={setting.step}
-                    value={setting.currentValue}
-                    onChange={(e) => onSettingChange?.(setting.id, parseFloat(e.target.value))}
-                    className="w-full h-1 bg-dark-border rounded-lg appearance-none cursor-pointer slider"
-                    aria-label={setting.label}
-                  />
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
-      
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Effect Preview */}
       {hoveredEffect && currentImageId && (
         <EffectHoverPreview
@@ -544,4 +608,4 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
   );
 };
 
-export default ControlPanelV3; 
+export default ControlPanelV3;

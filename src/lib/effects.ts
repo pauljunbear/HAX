@@ -4676,17 +4676,17 @@ const createSelectiveColorEffect = (settings: Record<string, number>) => {
 // Reorganized effects categories for better UX
 export const effectCategories = {
   Adjust: {
-    icon: '⚡',
+    icon: '',
     description: 'Basic image adjustments',
     effects: ['brightness', 'contrast', 'saturation', 'hue', 'colorTemperature'],
   },
   'Blur & Focus': {
-    icon: '🔍',
+    icon: '',
     description: 'Blur and sharpening effects',
     effects: ['blur', 'sharpen', 'temporalEcho', 'bloom', 'tiltShiftMiniature'],
   },
   Style: {
-    icon: '🎨',
+    icon: '',
     description: 'Artistic transformations',
     effects: [
       'pencilSketch',
@@ -4708,7 +4708,7 @@ export const effectCategories = {
     ],
   },
   Color: {
-    icon: '🌈',
+    icon: '',
     description: 'Color grading and effects',
     effects: [
       'grayscale',
@@ -4723,7 +4723,7 @@ export const effectCategories = {
     ],
   },
   Distort: {
-    icon: '🌀',
+    icon: '',
     description: 'Warping and distortion',
     effects: [
       'pixelate',
@@ -4738,7 +4738,7 @@ export const effectCategories = {
     ],
   },
   Simulate: {
-    icon: '✨',
+    icon: '',
     description: 'Real-world simulations',
     effects: [
       'liquidMetal',
@@ -4754,7 +4754,7 @@ export const effectCategories = {
     ],
   },
   Overlay: {
-    icon: '📸',
+    icon: '',
     description: 'Overlays and filters',
     effects: [
       'noise',
@@ -4768,7 +4768,7 @@ export const effectCategories = {
     ],
   },
   Mathematical: {
-    icon: '∑',
+    icon: '',
     description: 'Mathematical and fractal patterns',
     effects: ['mandelbrot', 'juliaSet', 'voronoi'],
   },

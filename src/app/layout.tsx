@@ -1,5 +1,7 @@
 import './globals.css';
 import '../styles/apple-colors.css';
+import '../styles/light-theme.css';
+import '../styles/terminal-theme.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { initializeTheme } from '@/lib/themes';
@@ -39,7 +41,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `
               // Initialize theme before React hydration to prevent flash
               (function() {
-                const theme = localStorage.getItem('app-theme') || 'apple';
+                const stored = localStorage.getItem('app-theme');
+                // Migration: Convert old 'apple' theme to 'light'
+                const theme = stored === 'apple' ? 'light' : (stored || 'light');
+                if (stored === 'apple') {
+                  localStorage.setItem('app-theme', 'light');
+                }
                 document.documentElement.classList.add('theme-' + theme);
               })();
             `,
