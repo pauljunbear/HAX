@@ -729,3 +729,177 @@ html.theme-light .text-white\/80 {
 html.theme-light .backdrop-blur-md {
   backdrop-filter: blur(10px) saturate(1.1) !important;
 }
+
+/* Enhanced Glass Materials */
+.glass-material {
+  backdrop-filter: blur(30px) saturate(1.4) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+}
+
+.glass-header {
+  backdrop-filter: blur(40px) saturate(1.5) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+}
+
+.glass-input {
+  backdrop-filter: blur(20px) saturate(1.2) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+}
+
+.glass-button {
+  backdrop-filter: blur(20px) saturate(1.3) !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+}
+
+.glass-button:hover,
+.hover\:glass-hover:hover {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  transform: translateY(-0.5px);
+}
+
+.glass-active {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+.glass-badge {
+  backdrop-filter: blur(15px) saturate(1.2) !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.glass-effect-button {
+  backdrop-filter: blur(15px) saturate(1.2) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+}
+
+.glass-effect-button:hover {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+}
+
+.glass-scroll {
+  background: rgba(248, 248, 248, 0.5) !important;
+}
+
+/* Button light effect - follows cursor */
+.button-light-effect {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  top: var(--mouse-y);
+  left: var(--mouse-x);
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.2) 40%,
+    transparent 70%
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+button:hover .button-light-effect {
+  opacity: 1;
+}
+
+/* Light theme specific adjustments */
+html.theme-light .glass-material {
+  backdrop-filter: blur(30px) saturate(1.4) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+}
+
+html.theme-light .glass-header {
+  backdrop-filter: blur(40px) saturate(1.5) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+}
+
+html.theme-light .glass-input {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: var(--text-primary) !important;
+}
+
+html.theme-light .glass-input:focus {
+  background: white !important;
+  border-color: var(--system-blue) !important;
+}
+
+html.theme-light .glass-button {
+  color: var(--text-primary) !important;
+}
+
+html.theme-light .glass-effect-button {
+  color: var(--text-primary) !important;
+}
+
+html.theme-light .glass-badge {
+  color: var(--text-secondary) !important;
+}
+
+/* Fix control panel buttons visibility */
+html.theme-light .px-4.py-2.text-sm {
+  background: var(--glass-light) !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-primary) !important;
+}
+
+html.theme-light .shape-capsule {
+  background: var(--glass-light) !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-primary) !important;
+}
+
+html.theme-light .bg-white\/20.backdrop-blur-sm {
+  background: var(--system-blue) !important;
+  color: white !important;
+  border: 1px solid rgba(0, 122, 255, 0.3) !important;
+}
+
+/* Active effect button */
+html.theme-light .active-effect {
+  background: var(--system-blue) !important;
+  color: white !important;
+  border-color: rgba(0, 122, 255, 0.3) !important;
+  font-weight: 600 !important;
+  box-shadow:
+    var(--shadow-sm),
+    0 2px 8px rgba(0, 122, 255, 0.25) !important;
+}
+
+/* Remove old overrides that might conflict */
+html.theme-light .bg-white\/5 {
+  /* Remove this override */
+}
+
+html.theme-light .bg-white\/10 {
+  /* Remove this override */
+}
+
+html.theme-light .bg-black\/20 {
+  /* Remove this override */
+}

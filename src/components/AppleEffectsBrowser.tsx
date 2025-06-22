@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig } from '@/lib/effects';
-import { ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
+import { ChevronRight, Plus, Search } from 'lucide-react';
 
 interface AppleEffectsBrowserProps {
   activeEffect?: string | null;
@@ -21,10 +21,23 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   onHidePanel,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
   // Start with ALL categories collapsed by default
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
     new Set(Object.values(effectsConfig).map(effect => effect.category))
   );
+
+  // Handle mouse move for button light effect
+  const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setMousePosition({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
 
   // Group effects by category
   const effectsByCategory = useMemo(() => {
@@ -100,26 +113,26 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-white/5 backdrop-blur-md">
+    <div className="w-full h-full flex flex-col glass-material">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-white/10 bg-white/5">
+      <div className="px-4 py-3 border-b border-white/10 glass-header">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-white">Effects</h2>
-            <button
-              onClick={onHidePanel}
-              className="w-7 h-7 flex items-center justify-center hover:bg-white/10 rounded-md transition-all"
-              title="Hide Effects Panel"
-            >
-              <ChevronLeft className="w-4 h-4 text-white/60" />
-            </button>
-          </div>
+          <h2 className="text-sm font-semibold text-white">Effects</h2>
           <button
+            ref={buttonRef}
             onClick={onNewImage}
-            className="flex items-center gap-1.5 text-xs font-medium text-white bg-blue-500 hover:bg-blue-600 transition-all px-3 py-1.5 rounded-lg shadow-sm"
+            onMouseMove={handleMouseMove}
+            className="relative flex items-center gap-1.5 text-xs font-medium text-white bg-blue-500 hover:bg-blue-600 transition-all px-3 py-1.5 rounded-lg shadow-sm overflow-hidden"
+            style={
+              {
+                '--mouse-x': `${mousePosition.x}px`,
+                '--mouse-y': `${mousePosition.y}px`,
+              } as React.CSSProperties
+            }
           >
-            <Plus className="w-3.5 h-3.5" />
-            New Image
+            <div className="button-light-effect" />
+            <Plus className="w-3.5 h-3.5 relative z-10" />
+            <span className="relative z-10">New Image</span>
           </button>
         </div>
 
@@ -131,18 +144,18 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
             placeholder="Search effects..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm bg-black/20 border border-white/10 rounded-lg focus:bg-black/30 focus:border-white/20 focus:outline-none transition-all placeholder:text-white/40 text-white"
+            className="w-full pl-9 pr-3 py-2 text-sm glass-input border border-white/10 rounded-lg focus:border-white/20 focus:outline-none transition-all placeholder:text-white/40 text-white"
           />
         </div>
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto glass-scroll">
         <div className="p-3 space-y-1">
           {/* When no image is loaded */}
           {!hasImage && (
             <div className="text-center py-20 px-4">
-              <div className="w-20 h-20 mx-auto mb-4 bg-white/10 rounded-2xl flex items-center justify-center">
+              <div className="w-20 h-20 mx-auto mb-4 glass-material rounded-2xl flex items-center justify-center">
                 <svg
                   className="w-10 h-10 text-white/40"
                   fill="none"
@@ -184,8 +197,8 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                     onClick={() => toggleCategory(category)}
                     className={`
                       w-full flex items-center justify-between px-3 py-2.5 text-left 
-                      transition-all rounded-lg group
-                      ${isExpanded ? 'bg-white/10 mb-1' : 'hover:bg-white/5'}
+                      transition-all rounded-lg group glass-button
+                      ${isExpanded ? 'glass-active mb-1' : 'hover:glass-hover'}
                     `}
                   >
                     <div className="flex items-center gap-2">
@@ -197,7 +210,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                         <ChevronRight className="w-4 h-4" />
                       </motion.div>
                       <h3 className="text-sm font-medium text-white">{category}</h3>
-                      <span className="text-xs text-white/50 bg-white/10 px-2 py-0.5 rounded-full">
+                      <span className="text-xs text-white/50 glass-badge px-2 py-0.5 rounded-full">
                         {effects.length}
                       </span>
                     </div>
@@ -228,12 +241,12 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                               onClick={() => handleEffectClick(effectId)}
                               disabled={!hasImage}
                               className={`
-                                w-full text-left px-3 rounded-md transition-all
+                                w-full text-left px-3 rounded-md transition-all glass-effect-button
                                 ${hasLongList ? 'py-1.5 text-xs' : 'py-2 text-sm'}
                                 ${
                                   activeEffect === effectId
-                                    ? 'bg-blue-500 text-white font-medium shadow-sm'
-                                    : 'hover:bg-white/10 text-white/80 hover:text-white'
+                                    ? 'bg-blue-500 text-white font-medium shadow-sm active-effect'
+                                    : 'hover:glass-hover text-white/80 hover:text-white'
                                 }
                                 ${!hasImage ? 'opacity-40 cursor-not-allowed' : ''}
                               `}
@@ -252,7 +265,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
           {/* No results */}
           {hasImage && Object.keys(filteredEffectsByCategory).length === 0 && (
             <div className="text-center py-12 px-4">
-              <div className="w-14 h-14 mx-auto mb-3 bg-white/10 rounded-xl flex items-center justify-center">
+              <div className="w-14 h-14 mx-auto mb-3 glass-material rounded-xl flex items-center justify-center">
                 <Search className="w-7 h-7 text-white/40" />
               </div>
               <h3 className="text-sm font-medium mb-1 text-white">No Effects Found</h3>
