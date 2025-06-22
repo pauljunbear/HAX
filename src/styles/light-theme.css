@@ -1,138 +1,394 @@
-/* Light Theme - Modern Glass Design */
+/* Light Theme - Apple Liquid Glass Design System */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* SF Pro Font - Use System Font Stack */
-/* No need for @font-face since -apple-system provides SF Pro automatically on Apple devices */
-
+/* Based on Apple's WWDC 2025 Design System */
 html.theme-light {
-  /* Core Colors */
+  /* Core Colors - Refined for Liquid Glass harmony */
   --bg-primary: #f5f5f7;
   --bg-secondary: #ffffff;
-  --bg-glass: rgba(255, 255, 255, 0.72);
-  --bg-glass-heavy: rgba(255, 255, 255, 0.85);
+  --bg-canvas: #fafafa;
 
-  /* Text Colors */
-  --text-primary: #1d1d1f;
-  --text-secondary: #86868b;
-  --text-tertiary: #c7c7cc;
+  /* Liquid Glass Materials */
+  --glass-light: rgba(255, 255, 255, 0.72);
+  --glass-regular: rgba(255, 255, 255, 0.82);
+  --glass-heavy: rgba(255, 255, 255, 0.92);
+  --glass-ultra: rgba(255, 255, 255, 0.98);
 
-  /* Border Colors */
-  --border-primary: rgba(0, 0, 0, 0.1);
-  --border-secondary: rgba(0, 0, 0, 0.05);
-
-  /* Interactive Colors */
-  --accent-primary: #007aff;
-  --accent-hover: #0051d5;
-  --accent-active: #0040a0;
-
-  /* Liquid Glass Design Tokens - Optimized for Performance */
-  --tokens-surface-liquidGlass-background: rgba(255, 255, 255, 0.35);
-  --tokens-surface-liquidGlass-blurRadius: 20px;
-  --tokens-surface-liquidGlass-saturationBoost: 1.4;
-  --tokens-surface-liquidGlass-noiseOpacity: 0.05;
-  --tokens-surface-liquidGlass-cornerRadius: 16px;
-  --tokens-shadow-liquidGlass-default: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --tokens-motion-liquidGlass-hover-highlightDuration: 120ms;
-  --tokens-motion-liquidGlass-hover-easing: cubic-bezier(0.4, 0, 0.2, 1);
-  --tokens-state-liquidGlass-activeOverlay: rgba(255, 255, 255, 0.1);
-
-  /* Enhanced Color Palette */
-  --background-primary: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  --background-secondary: #ffffff;
-  --background-tertiary: #f7fafc;
-  --surface-primary: rgba(255, 255, 255, 0.95);
-  --surface-secondary: rgba(248, 250, 252, 0.98);
-  --surface-elevated: rgba(255, 255, 255, 0.98);
-  --surface-hover: rgba(255, 255, 255, 0.6);
-  --surface-active: rgba(255, 255, 255, 0.8);
-
-  /* Apple-Authentic Text Colors */
+  /* Text Colors - Apple System */
   --text-primary: #1d1d1f;
   --text-secondary: #86868b;
   --text-tertiary: #a1a1a6;
-  --text-quaternary: #d2d2d7;
+  --text-quaternary: #c7c7cc;
 
-  /* Apple System Colors */
-  --accent-primary: #007aff;
-  --accent-secondary: #34c759;
-  --accent-success: #30d158;
-  --accent-warning: #ff9500;
-  --accent-error: #ff3b30;
+  /* Apple System Colors - Refined for harmony */
+  --system-blue: #007aff;
+  --system-green: #34c759;
+  --system-orange: #ff9500;
+  --system-red: #ff3b30;
+  --system-purple: #af52de;
+  --system-teal: #30b0c7;
+  --system-indigo: #5856d6;
+  --system-yellow: #ffcc00;
 
   /* Liquid Glass Borders */
+  --border-subtle: rgba(0, 0, 0, 0.04);
   --border-light: rgba(0, 0, 0, 0.08);
-  --border-medium: rgba(0, 0, 0, 0.12);
+  --border-regular: rgba(0, 0, 0, 0.12);
   --border-strong: rgba(0, 0, 0, 0.16);
-  --border-accent: rgba(0, 122, 255, 0.3);
 
-  /* Enhanced Shadows */
-  --shadow-light: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-medium: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-strong: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
+  /* Liquid Glass Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.16), 0 4px 16px rgba(0, 0, 0, 0.08);
 
-  /* Fast Motion System */
-  --ease-glass: var(--tokens-motion-liquidGlass-hover-easing);
-  --duration-glass: var(--tokens-motion-liquidGlass-hover-highlightDuration);
-  --duration-fast: 80ms;
-  --duration-medium: 150ms;
-  --duration-slow: 200ms;
+  /* Scroll Edge Effect */
+  --scroll-edge-blur: 20px;
+  --scroll-edge-opacity: 0.6;
+
+  /* Shape System - Concentricity */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-capsule: 9999px;
+
+  /* Motion System */
+  --ease-default: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.1);
+  --duration-instant: 100ms;
+  --duration-fast: 200ms;
+  --duration-default: 300ms;
+  --duration-slow: 400ms;
+
+  /* Liquid Glass Design Tokens */
+  --liquid-blur: 30px;
+  --liquid-saturation: 1.3;
+  --liquid-noise: 0.02;
 }
 
-/* Enhanced Liquid Glass Base Class */
-.liquid-glass {
-  backdrop-filter: blur(var(--tokens-surface-liquidGlass-blurRadius))
-    saturate(calc(var(--tokens-surface-liquidGlass-saturationBoost) * 100%));
-  background: var(--tokens-surface-liquidGlass-background);
-  border-radius: var(--tokens-surface-liquidGlass-cornerRadius);
-  box-shadow: var(--tokens-shadow-liquidGlass-default);
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--border-light);
-}
-
-.liquid-glass::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-/* Fast Transitions - No More Laggy Animations */
-html.theme-light * {
-  transition: all var(--duration-fast) var(--ease-glass);
-}
-
-html.theme-light *:hover {
-  transition: all var(--duration-medium) var(--ease-glass);
-}
-
-/* Base Layout - SF Pro Typography */
+/* Base Styles */
 html.theme-light body {
-  background: var(--bg-primary) !important;
+  background: var(--bg-canvas) !important;
   color: var(--text-primary) !important;
   font-family:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif !important;
-  font-size: 17px;
-  line-height: 1.47;
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', system-ui,
+    sans-serif !important;
+  font-size: 15px;
+  line-height: 1.4;
   font-weight: 400;
-  letter-spacing: -0.022em;
-  font-feature-settings:
-    'kern' 1,
-    'liga' 1,
-    'calt' 1;
+  letter-spacing: -0.014em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Main Container */
-html.theme-light .min-h-screen,
-html.theme-light .h-screen {
-  background: var(--background-primary) !important;
+/* Liquid Glass Base Material */
+.liquid-material {
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturation));
+  background: var(--glass-regular);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--duration-fast) var(--ease-default);
 }
+
+.liquid-material::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.4) 40%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  opacity: 0.6;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+/* Concentric Shape System */
+.shape-fixed-sm {
+  border-radius: var(--radius-sm);
+}
+.shape-fixed-md {
+  border-radius: var(--radius-md);
+}
+.shape-fixed-lg {
+  border-radius: var(--radius-lg);
+}
+.shape-capsule {
+  border-radius: var(--radius-capsule);
+}
+.shape-concentric {
+  border-radius: calc(var(--parent-radius, 16px) - var(--padding, 8px));
+}
+
+/* Panel System - Glass Panels float above content */
+html.theme-light .glass-panel {
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturation)) !important;
+  background: var(--glass-regular) !important;
+  box-shadow: var(--shadow-md) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  transition: all var(--duration-default) var(--ease-default) !important;
+}
+
+html.theme-light .glass-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  opacity: 0.5;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+/* Scroll Edge Effects - Replace hard dividers */
+html.theme-light .scroll-edge-top,
+html.theme-light .scroll-edge-bottom {
+  position: relative;
+  overflow: hidden;
+}
+
+html.theme-light .scroll-edge-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  background: linear-gradient(to bottom, var(--bg-canvas) 0%, transparent 100%);
+  backdrop-filter: blur(var(--scroll-edge-blur));
+  pointer-events: none;
+  z-index: 10;
+  opacity: var(--scroll-edge-opacity);
+}
+
+/* Enhanced Buttons - Capsule shapes for touch-friendly layouts */
+html.theme-light button {
+  backdrop-filter: blur(20px) saturate(1.2) !important;
+  background: var(--glass-light) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-capsule) !important;
+  color: var(--text-primary) !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  padding: 10px 20px !important;
+  transition: all var(--duration-instant) var(--ease-default) !important;
+  box-shadow: var(--shadow-sm) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 36px !important;
+}
+
+html.theme-light button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-default);
+  pointer-events: none;
+}
+
+html.theme-light button:hover {
+  background: var(--glass-regular) !important;
+  transform: translateY(-1px) scale(1.02) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+html.theme-light button:hover::before {
+  opacity: 0.4;
+}
+
+html.theme-light button:active {
+  transform: translateY(0) scale(0.98) !important;
+  transition: all var(--duration-instant) var(--ease-default) !important;
+}
+
+/* Primary Actions - System Blue */
+html.theme-light .bg-blue-500,
+html.theme-light .bg-blue-600,
+html.theme-light button[class*='primary'] {
+  background: var(--system-blue) !important;
+  color: white !important;
+  border: 1px solid rgba(0, 122, 255, 0.3) !important;
+  font-weight: 600 !important;
+  box-shadow:
+    var(--shadow-md),
+    0 2px 8px rgba(0, 122, 255, 0.25) !important;
+}
+
+html.theme-light .bg-blue-500:hover,
+html.theme-light .bg-blue-600:hover {
+  background: #0051d5 !important;
+  box-shadow:
+    var(--shadow-lg),
+    0 4px 16px rgba(0, 122, 255, 0.35) !important;
+}
+
+/* Input Fields - Concentric shapes */
+html.theme-light input[type='text'],
+html.theme-light input[type='search'],
+html.theme-light textarea,
+html.theme-light select {
+  backdrop-filter: blur(15px) saturate(1.2) !important;
+  background: var(--glass-ultra) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--text-primary) !important;
+  font-size: 14px !important;
+  padding: 10px 16px !important;
+  transition: all var(--duration-fast) var(--ease-default) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.theme-light input:focus,
+html.theme-light textarea:focus,
+html.theme-light select:focus {
+  outline: none !important;
+  border-color: var(--system-blue) !important;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.05),
+    0 0 0 3px rgba(0, 122, 255, 0.1) !important;
+}
+
+/* Panels with proper spacing and depth */
+html.theme-light .px-4.py-3.border-b {
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturation)) !important;
+  background: var(--glass-regular) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* Tab System - Following Apple's design */
+html.theme-light .flex.border-b button {
+  backdrop-filter: none !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+  transition: all var(--duration-fast) var(--ease-default) !important;
+  box-shadow: none !important;
+  position: relative !important;
+  overflow: hidden !important;
+  margin: 0 2px !important;
+}
+
+html.theme-light .flex.border-b button.text-green-400,
+html.theme-light .flex.border-b button[class*='bg-white/20'] {
+  background: var(--glass-light) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+/* Sidebar with inset and glass material */
+html.theme-light .w-full.h-full.flex.flex-col {
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturation)) !important;
+  background: var(--glass-regular) !important;
+  box-shadow: inset 0 0 0 1px var(--border-subtle) !important;
+  margin: 8px !important;
+  border-radius: var(--radius-lg) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Range Sliders - Capsule geometry */
+html.theme-light input[type='range'] {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 100% !important;
+  height: 4px !important;
+  background: rgba(0, 0, 0, 0.1) !important;
+  border-radius: var(--radius-capsule) !important;
+  outline: none !important;
+  transition: all var(--duration-fast) var(--ease-default) !important;
+}
+
+html.theme-light input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 50% !important;
+  background: white !important;
+  box-shadow:
+    var(--shadow-md),
+    inset 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  cursor: pointer !important;
+  transition: all var(--duration-fast) var(--ease-spring) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+html.theme-light input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.1) !important;
+  box-shadow:
+    var(--shadow-lg),
+    inset 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Export buttons with enhanced glass and proper shapes */
+html.theme-light .w-full.p-3.bg-black\/60 {
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturation)) !important;
+  background: var(--glass-light) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 12px !important;
+  transition: all var(--duration-fast) var(--ease-default) !important;
+  box-shadow: var(--shadow-sm) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+html.theme-light .w-full.p-3.bg-black\/60:hover {
+  background: var(--glass-regular) !important;
+  border-color: var(--system-blue) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* Typography refinements */
+html.theme-light h1,
+html.theme-light h2,
+html.theme-light h3,
+html.theme-light h4 {
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--text-primary) !important;
+}
+
+html.theme-light .text-sm {
+  font-size: 13px !important;
+}
+html.theme-light .text-xs {
+  font-size: 11px !important;
+}
+html.theme-light .text-base {
+  font-size: 15px !important;
+}
+html.theme-light .text-lg {
+  font-size: 17px !important;
+}
+
+/* Keep other existing styles below... */
 
 /* KEEP INTRO SCREEN DARK - Don't Change Welcome Section */
 html.theme-light .fixed.inset-0.z-50.flex.items-center.justify-center.bg-black {
@@ -150,145 +406,213 @@ html.theme-light .text-base.md\:text-lg.text-gray-300 {
   font-size: 18px !important;
 }
 
-/* Enhanced CTA Button on Welcome Screen */
-html.theme-light .bg-\[#F53001\] {
-  backdrop-filter: blur(15px) saturate(140%) !important;
-  background: linear-gradient(135deg, var(--accent-primary), #4299e1) !important;
-  border: 1px solid rgba(0, 122, 255, 0.3) !important;
-  border-radius: 12px !important;
-  padding: 12px 24px !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: white !important;
-  transition: all var(--duration-medium) var(--ease-glass) !important;
-  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.25) !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-html.theme-light .bg-\[#F53001\]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 60%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-html.theme-light .bg-\[#F53001\]:hover {
-  background: linear-gradient(135deg, #0056d3, var(--accent-primary)) !important;
-  transform: translateY(-2px) scale(1.02) !important;
-  box-shadow: 0 8px 32px rgba(0, 122, 255, 0.4) !important;
-}
-
-/* TOP BAR - Enhanced Liquid Glass with Better Spacing */
+/* Top Bar - Enhanced Liquid Glass */
 html.theme-light .h-14.glass-panel.border-b {
-  backdrop-filter: blur(25px) saturate(150%) !important;
-  background: var(--surface-elevated) !important;
-  border-bottom: 1px solid var(--border-light) !important;
-  box-shadow: var(--shadow-medium) !important;
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturation)) !important;
+  background: var(--glass-ultra) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  box-shadow: var(--shadow-sm) !important;
   height: 56px !important;
   position: relative !important;
-  padding: 0 20px !important;
+  z-index: 100 !important;
 }
 
-html.theme-light .h-14.glass-panel.border-b::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 60%);
-  pointer-events: none;
+/* Search Input - Clean glass style */
+html.theme-light input[type='search'],
+html.theme-light input[placeholder*='SEARCH'] {
+  backdrop-filter: blur(15px) saturate(1.2) !important;
+  background: var(--glass-ultra) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 8px 14px !important;
+  font-size: 14px !important;
+  color: var(--text-primary) !important;
+  transition: all var(--duration-fast) var(--ease-default) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* Top Bar Left Section - Better Organization */
-html.theme-light .h-14.glass-panel.border-b .flex.items-center:first-child {
-  gap: 12px !important;
-}
-
-/* Top Bar Right Section - Clean Organization */
-html.theme-light .h-14.glass-panel.border-b .flex.items-center.space-x-4:last-child {
-  gap: 16px !important;
+/* Theme Toggle - Capsule style */
+html.theme-light .theme-toggle {
+  backdrop-filter: blur(15px) saturate(1.2) !important;
+  background: var(--glass-light) !important;
+  border: 1px solid var(--border-light) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-capsule) !important;
+  padding: 6px 12px !important;
+  transition: all var(--duration-fast) var(--ease-default) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  box-shadow: var(--shadow-sm) !important;
+  display: inline-flex !important;
   align-items: center !important;
+  gap: 4px !important;
 }
 
-/* Enhanced Collapse Buttons with Clear Icons */
+/* Export Sections - Enhanced glass cards */
+html.theme-light .w-full.p-3.bg-black\/60 .text-sm.font-medium.text-white {
+  color: var(--text-primary) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+
+html.theme-light .w-full.p-3.bg-black\/60 .text-xs.text-white\/70 {
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
+}
+
+/* Settings sliders - Clean style */
+html.theme-light .bg-black\/20 {
+  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturation)) !important;
+  background: var(--glass-regular) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 20px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-shadow: var(--shadow-md) !important;
+  margin-bottom: 16px !important;
+}
+
+/* Effect layer names */
+html.theme-light .bg-black\/20 .text-white {
+  color: var(--text-primary) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  margin-bottom: 4px !important;
+}
+
+html.theme-light .bg-black\/20 .text-white\/70 {
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
+  margin-bottom: 16px !important;
+}
+
+/* Reset/Remove buttons */
+html.theme-light .bg-black\/20 .bg-blue-600 {
+  background: var(--system-blue) !important;
+  color: white !important;
+  border: 1px solid rgba(0, 122, 255, 0.3) !important;
+  border-radius: var(--radius-capsule) !important;
+  padding: 8px 16px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  transition: all var(--duration-fast) var(--ease-default) !important;
+  box-shadow:
+    var(--shadow-sm),
+    0 2px 8px rgba(0, 122, 255, 0.25) !important;
+}
+
+html.theme-light .bg-black\/20 .bg-red-600 {
+  background: rgba(255, 59, 48, 0.15) !important;
+  color: var(--system-red) !important;
+  border: 1px solid rgba(255, 59, 48, 0.2) !important;
+  border-radius: var(--radius-capsule) !important;
+  padding: 8px 16px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  transition: all var(--duration-fast) var(--ease-default) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* Text colors throughout */
+html.theme-light .text-white {
+  color: var(--text-primary) !important;
+}
+
+html.theme-light .text-white\/70,
+html.theme-light .text-white\/60,
+html.theme-light .text-white\/50 {
+  color: var(--text-secondary) !important;
+}
+
+html.theme-light .text-green-400 {
+  color: var(--system-green) !important;
+}
+
+/* Opacity overrides */
+html.theme-light .opacity-70 {
+  opacity: 1 !important;
+}
+html.theme-light .opacity-60 {
+  opacity: 1 !important;
+}
+html.theme-light .opacity-50 {
+  opacity: 0.8 !important;
+}
+
+/* Keep scrollbar styling */
+html.theme-light ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+html.theme-light ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+  transition: background var(--duration-fast) var(--ease-default);
+}
+
+html.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Collapse Buttons - Clean glass style */
 html.theme-light .w-8.h-8.hover\:bg-white\/10 {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: rgba(255, 255, 255, 0.12) !important;
-  border-radius: 8px !important;
+  backdrop-filter: blur(15px) saturate(1.2) !important;
+  background: var(--glass-light) !important;
+  border-radius: var(--radius-sm) !important;
   color: var(--text-primary) !important;
   width: 32px !important;
   height: 32px !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  transition: all var(--duration-fast) var(--ease-default) !important;
+  border: 1px solid var(--border-light) !important;
   position: relative !important;
   overflow: hidden !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
-}
-
-html.theme-light .w-8.h-8.hover\:bg-white\/10::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.1) 60%);
-  pointer-events: none;
-  border-radius: inherit;
+  box-shadow: var(--shadow-sm) !important;
 }
 
 html.theme-light .w-8.h-8.hover\:bg-white\/10:hover {
-  background: rgba(255, 255, 255, 0.2) !important;
-  color: var(--text-primary) !important;
-  transform: translateY(-1px) scale(1.05) !important;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-  border-color: rgba(0, 0, 0, 0.12) !important;
+  background: var(--glass-regular) !important;
+  transform: translateY(-1px) scale(1.02) !important;
+  box-shadow: var(--shadow-md) !important;
+  border-color: var(--border-regular) !important;
 }
 
 html.theme-light .w-8.h-8.hover\:bg-white\/10 svg {
   width: 16px !important;
   height: 16px !important;
-  stroke-width: 2.5 !important;
+  stroke-width: 2 !important;
   color: var(--text-primary) !important;
-  opacity: 1 !important;
-  stroke: currentColor !important;
-  fill: none !important;
 }
 
-/* Ready Indicator - Enhanced Liquid Glass */
+/* Ready Indicator - Refined glass style */
 html.theme-light .flex.items-center.space-x-2.text-sm.text-white\/70 {
-  backdrop-filter: blur(15px) saturate(130%) !important;
+  backdrop-filter: blur(15px) saturate(1.2) !important;
   background: rgba(52, 199, 89, 0.1) !important;
   border: 1px solid rgba(52, 199, 89, 0.2) !important;
-  border-radius: 20px !important;
+  border-radius: var(--radius-capsule) !important;
   padding: 6px 12px !important;
   font-size: 12px !important;
   font-weight: 500 !important;
-  color: var(--accent-success) !important;
+  color: var(--system-green) !important;
   position: relative !important;
   overflow: hidden !important;
   gap: 6px !important;
+  display: inline-flex !important;
+  align-items: center !important;
 }
 
-html.theme-light .flex.items-center.space-x-2.text-sm.text-white\/70::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 60%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-/* Ready Indicator Dot - Enhanced */
 html.theme-light .w-2.h-2.bg-green-500 {
   width: 6px !important;
   height: 6px !important;
-  background: var(--accent-success) !important;
+  background: var(--system-green) !important;
   border-radius: 50% !important;
   box-shadow: 0 0 8px rgba(52, 199, 89, 0.4) !important;
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
@@ -300,850 +624,6 @@ html.theme-light .w-2.h-2.bg-green-500 {
     opacity: 1;
   }
   50% {
-    opacity: 0.7;
+    opacity: 0.6;
   }
-}
-
-/* SEARCH INPUT - SF Pro Typography */
-html.theme-light input[type='search'],
-html.theme-light input[placeholder*='SEARCH'] {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: var(--surface-primary) !important;
-  border: 1px solid var(--border-light) !important;
-  border-radius: 10px !important;
-  padding: 10px 14px !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif !important;
-  font-size: 15px !important;
-  font-weight: 400 !important;
-  color: var(--text-primary) !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-  box-shadow: var(--shadow-light) !important;
-  position: relative !important;
-}
-
-html.theme-light input[type='search']:focus,
-html.theme-light input[placeholder*='SEARCH']:focus {
-  outline: none !important;
-  border-color: var(--border-accent) !important;
-  background: var(--surface-elevated) !important;
-  box-shadow:
-    0 0 0 3px rgba(0, 122, 255, 0.1),
-    var(--shadow-medium) !important;
-  transform: translateY(-1px) !important;
-}
-
-html.theme-light input[type='search']::placeholder,
-html.theme-light input[placeholder*='SEARCH']::placeholder {
-  color: var(--text-tertiary) !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif !important;
-  font-size: 15px !important;
-}
-
-/* THEME TOGGLE - Enhanced Liquid Glass */
-html.theme-light .theme-toggle {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: var(--surface-primary) !important;
-  border: 1px solid var(--border-light) !important;
-  color: var(--text-secondary) !important;
-  border-radius: 8px !important;
-  padding: 6px 10px !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
-  box-shadow: var(--shadow-light) !important;
-  position: relative !important;
-  overflow: hidden !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 4px !important;
-}
-
-html.theme-light .theme-toggle::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-html.theme-light .theme-toggle:hover {
-  background: var(--surface-hover) !important;
-  border-color: var(--border-medium) !important;
-  color: var(--text-primary) !important;
-  transform: translateY(-1px) scale(1.02) !important;
-  box-shadow: var(--shadow-medium) !important;
-}
-
-html.theme-light .theme-toggle svg {
-  width: 12px !important;
-  height: 12px !important;
-  color: currentColor !important;
-}
-
-/* Enhanced Liquid Glass Panels - Exclude Intro Screen */
-html.theme-light .bg-white,
-html.theme-light .bg-gray-50,
-html.theme-light .bg-gray-100,
-html.theme-light .bg-gray-200,
-html.theme-light .bg-gray-300,
-html.theme-light .bg-gray-400,
-html.theme-light .bg-gray-500,
-html.theme-light .bg-gray-600,
-html.theme-light .bg-gray-700,
-html.theme-light .bg-gray-800,
-html.theme-light .bg-gray-900 {
-  backdrop-filter: blur(var(--tokens-surface-liquidGlass-blurRadius))
-    saturate(calc(var(--tokens-surface-liquidGlass-saturationBoost) * 100%)) !important;
-  background: var(--surface-primary) !important;
-  border: 1px solid var(--border-light) !important;
-  border-radius: var(--tokens-surface-liquidGlass-cornerRadius) !important;
-  box-shadow: var(--shadow-light) !important;
-  position: relative !important;
-}
-
-/* Enhanced Buttons - Proper Liquid Glass Effects */
-html.theme-light button,
-html.theme-light .cursor-pointer {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: var(--surface-primary) !important;
-  border: 1px solid var(--border-light) !important;
-  border-radius: 8px !important;
-  color: var(--text-primary) !important;
-  font-weight: 500 !important;
-  font-size: 14px !important;
-  padding: 8px 14px !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-  box-shadow: var(--shadow-light) !important;
-  position: relative !important;
-  overflow: hidden !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-html.theme-light button::before,
-html.theme-light .cursor-pointer::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-html.theme-light button:hover,
-html.theme-light .cursor-pointer:hover {
-  background: var(--surface-hover) !important;
-  border-color: var(--border-medium) !important;
-  color: var(--text-primary) !important;
-  transform: translateY(-1px) scale(1.02) !important;
-  box-shadow: var(--shadow-hover) !important;
-}
-
-html.theme-light button:active,
-html.theme-light .cursor-pointer:active {
-  background: var(--surface-active) !important;
-  transform: translateY(0) scale(0.98) !important;
-  box-shadow: var(--shadow-medium) !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-}
-
-/* Primary Action Buttons - Enhanced Liquid Glass */
-html.theme-light .bg-blue-500,
-html.theme-light .bg-blue-600,
-html.theme-light .bg-green-500,
-html.theme-light .bg-green-600 {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: linear-gradient(135deg, var(--accent-primary), #4299e1) !important;
-  color: white !important;
-  border: 1px solid rgba(0, 122, 255, 0.3) !important;
-  font-weight: 600 !important;
-  box-shadow: 0 2px 12px rgba(0, 122, 255, 0.25) !important;
-}
-
-html.theme-light .bg-blue-500:hover,
-html.theme-light .bg-blue-600:hover,
-html.theme-light .bg-green-500:hover,
-html.theme-light .bg-green-600:hover {
-  background: linear-gradient(135deg, #0056d3, var(--accent-primary)) !important;
-  transform: translateY(-2px) scale(1.02) !important;
-  box-shadow: 0 6px 24px rgba(0, 122, 255, 0.35) !important;
-}
-
-/* Input Fields - Enhanced Liquid Glass */
-html.theme-light input,
-html.theme-light select,
-html.theme-light textarea {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: var(--surface-primary) !important;
-  border: 1px solid var(--border-light) !important;
-  border-radius: 8px !important;
-  color: var(--text-primary) !important;
-  font-size: 14px !important;
-  font-weight: 400 !important;
-  padding: 10px 14px !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-  box-shadow: var(--shadow-light) !important;
-  position: relative !important;
-}
-
-html.theme-light input:focus,
-html.theme-light select:focus,
-html.theme-light textarea:focus {
-  outline: none !important;
-  border-color: var(--border-accent) !important;
-  background: var(--surface-elevated) !important;
-  box-shadow:
-    0 0 0 3px rgba(0, 122, 255, 0.1),
-    var(--shadow-medium) !important;
-  transform: translateY(-1px) !important;
-}
-
-/* LEFT NAV - Enhanced Liquid Glass Effects Browser */
-html.theme-light .w-full.h-full.flex.flex-col {
-  backdrop-filter: blur(var(--tokens-surface-liquidGlass-blurRadius))
-    saturate(calc(var(--tokens-surface-liquidGlass-saturationBoost) * 100%)) !important;
-  background: var(--surface-primary) !important;
-  border-right: 1px solid var(--border-light) !important;
-  border-radius: 0 !important;
-  box-shadow: var(--shadow-light) !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-/* Left Nav Header - Better Organization */
-html.theme-light .px-4.py-3.border-b {
-  backdrop-filter: blur(20px) saturate(140%) !important;
-  background: var(--surface-elevated) !important;
-  border-color: var(--border-light) !important;
-  padding: 18px !important;
-  border-radius: 0 !important;
-  position: relative !important;
-}
-
-html.theme-light .px-4.py-3.border-b::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 60%);
-  pointer-events: none;
-}
-
-/* Effects Header Text - SF Pro Typography */
-html.theme-light h2.text-sm.font-semibold {
-  color: var(--text-primary) !important;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif !important;
-  font-size: 16px !important;
-  font-weight: 600 !important;
-  text-transform: none !important;
-  letter-spacing: -0.022em !important;
-  background: none !important;
-  -webkit-background-clip: unset !important;
-  -webkit-text-fill-color: unset !important;
-}
-
-/* New Image Button - Smaller Size */
-html.theme-light .text-xs.text-green-400 {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: linear-gradient(135deg, var(--accent-primary), #4299e1) !important;
-  color: white !important;
-  font-size: 11px !important;
-  font-weight: 500 !important;
-  text-transform: none !important;
-  letter-spacing: normal !important;
-  padding: 6px 12px !important;
-  border-radius: 8px !important;
-  border: 1px solid rgba(0, 122, 255, 0.3) !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2) !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-html.theme-light .text-xs.text-green-400::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 60%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-html.theme-light .text-xs.text-green-400:hover {
-  background: linear-gradient(135deg, #0056d3, var(--accent-primary)) !important;
-  transform: translateY(-1px) scale(1.02) !important;
-  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3) !important;
-}
-
-/* Category Buttons - More Prominent */
-html.theme-light .w-full.flex.items-center.justify-between {
-  color: var(--text-primary) !important;
-  border-bottom-color: var(--border-secondary) !important;
-}
-
-html.theme-light .w-full.flex.items-center.justify-between:hover {
-  background: rgba(0, 0, 0, 0.03) !important;
-}
-
-/* Effect Buttons - Smaller and Subtle */
-html.theme-light button[class*='px-2'][class*='py-1'][class*='text-'][class*='10px'] {
-  background: transparent !important;
-  border: none !important;
-  color: var(--text-secondary) !important;
-  font-size: 10px !important;
-  font-weight: 400 !important;
-}
-
-html.theme-light button[class*='px-2'][class*='py-1'][class*='text-'][class*='10px']:hover {
-  background: rgba(0, 0, 0, 0.04) !important;
-  color: var(--text-primary) !important;
-}
-
-/* Active Effect - Subtle */
-html.theme-light button[class*='bg-white/15'] {
-  background: var(--accent-primary) !important;
-  border: 1px solid var(--accent-primary) !important;
-  color: white !important;
-  font-weight: 500 !important;
-}
-
-/* Category Background */
-html.theme-light .bg-black\/5 {
-  background: rgba(0, 0, 0, 0.02) !important;
-  border-top: 1px solid var(--border-secondary) !important;
-}
-
-/* RIGHT NAV - Enhanced Controls Panel Liquid Glass */
-
-/* Tab Navigation - Elegant Glass Design */
-html.theme-light .flex.border-b {
-  backdrop-filter: blur(25px) saturate(150%) !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-  border-color: rgba(0, 0, 0, 0.06) !important;
-  padding: 20px 20px 0 20px !important;
-  border-radius: 0 !important;
-  gap: 12px !important;
-  position: relative !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-}
-
-html.theme-light .flex.border-b::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.2) 100%);
-  pointer-events: none;
-}
-
-html.theme-light .flex.border-b button {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: rgba(255, 255, 255, 0.7) !important;
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
-  border-radius: 10px !important;
-  padding: 10px 16px !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  text-transform: none !important;
-  letter-spacing: -0.022em !important;
-  color: var(--text-secondary) !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-  min-width: auto !important;
-  position: relative !important;
-  overflow: hidden !important;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-}
-
-html.theme-light .flex.border-b button::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.1) 100%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-html.theme-light .flex.border-b button:hover {
-  background: rgba(255, 255, 255, 0.85) !important;
-  color: var(--text-primary) !important;
-  transform: translateY(-1px) !important;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-  border-color: rgba(0, 0, 0, 0.12) !important;
-}
-
-html.theme-light .flex.border-b button.text-green-400 {
-  background: linear-gradient(135deg, rgba(0, 122, 255, 0.9), rgba(66, 153, 225, 0.8)) !important;
-  color: white !important;
-  border-color: rgba(0, 122, 255, 0.3) !important;
-  box-shadow:
-    0 2px 12px rgba(0, 122, 255, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
-}
-
-/* Hide History Tab */
-html.theme-light .flex.border-b button:nth-child(4) {
-  display: none !important;
-}
-
-/* Tab Content Areas */
-html.theme-light .p-4 {
-  padding: 18px !important;
-}
-
-/* Export Buttons - Enhanced Liquid Glass Cards */
-html.theme-light .w-full.p-3.bg-black\/60 {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: var(--surface-primary) !important;
-  border: 1px solid var(--border-light) !important;
-  border-radius: 12px !important;
-  padding: 14px !important;
-  margin-bottom: 10px !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-  box-shadow: var(--shadow-light) !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-html.theme-light .w-full.p-3.bg-black\/60::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-html.theme-light .w-full.p-3.bg-black\/60:hover {
-  background: var(--surface-hover) !important;
-  border-color: var(--border-medium) !important;
-  transform: translateY(-1px) !important;
-  box-shadow: var(--shadow-hover) !important;
-}
-
-/* Export Button Icons */
-html.theme-light .w-8.h-8 {
-  width: 36px !important;
-  height: 36px !important;
-  backdrop-filter: blur(12px) saturate(120%) !important;
-  background: var(--surface-secondary) !important;
-  border: 1px solid var(--border-light) !important;
-  border-radius: 8px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  color: var(--text-secondary) !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-html.theme-light .w-8.h-8::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-/* Export Button Text */
-html.theme-light .text-sm.font-medium.text-white {
-  color: var(--text-primary) !important;
-  font-size: 15px !important;
-  font-weight: 500 !important;
-  letter-spacing: -0.022em !important;
-}
-
-html.theme-light .text-xs.text-white\/70 {
-  color: var(--text-secondary) !important;
-  font-size: 13px !important;
-  letter-spacing: -0.022em !important;
-}
-
-/* Canvas Area - Fix Rounded Corners */
-html.theme-light .flex-1.relative.overflow-hidden {
-  border-radius: 0 0 16px 16px !important;
-  overflow: hidden !important;
-  background: var(--background-secondary) !important;
-  position: relative !important;
-}
-
-/* Text Colors - Enhanced Hierarchy */
-html.theme-light .text-white,
-html.theme-light .text-gray-100,
-html.theme-light .text-gray-200,
-html.theme-light .text-gray-300,
-html.theme-light .text-gray-400,
-html.theme-light .text-gray-500,
-html.theme-light .text-gray-600,
-html.theme-light .text-gray-700,
-html.theme-light .text-gray-800,
-html.theme-light .text-gray-900 {
-  color: var(--text-primary) !important;
-}
-
-html.theme-light .text-green-400,
-html.theme-light .text-green-500 {
-  color: var(--accent-success) !important;
-}
-
-/* Enhanced Scrollbar */
-html.theme-light ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-html.theme-light ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 3px;
-}
-
-html.theme-light ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 3px;
-  transition: background var(--duration-fast) var(--ease-glass);
-}
-
-html.theme-light ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
-}
-
-/* Borders */
-html.theme-light .border,
-html.theme-light .border-t,
-html.theme-light .border-b,
-html.theme-light .border-l,
-html.theme-light .border-r,
-html.theme-light .border-gray-100,
-html.theme-light .border-gray-200,
-html.theme-light .border-gray-300,
-html.theme-light .border-gray-400,
-html.theme-light .border-gray-500,
-html.theme-light .border-gray-600,
-html.theme-light .border-gray-700,
-html.theme-light .border-gray-800 {
-  border-color: var(--border-light) !important;
-}
-
-/* Liquid Glass Rounded Corners */
-html.theme-light .rounded,
-html.theme-light .rounded-md {
-  border-radius: 8px;
-}
-
-html.theme-light .rounded-lg {
-  border-radius: 12px;
-}
-
-html.theme-light .rounded-xl {
-  border-radius: var(--tokens-surface-liquidGlass-cornerRadius);
-}
-
-/* Override Specific Dark Backgrounds - Exclude Intro Screen */
-html.theme-light .glass-panel {
-  backdrop-filter: blur(var(--tokens-surface-liquidGlass-blurRadius))
-    saturate(calc(var(--tokens-surface-liquidGlass-saturationBoost) * 100%)) !important;
-  background: var(--surface-primary) !important;
-}
-
-/* Range Sliders - Enhanced Liquid Glass */
-html.theme-light input[type='range'] {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 4px;
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 2px;
-  border: none;
-  outline: none;
-  backdrop-filter: blur(10px);
-}
-
-html.theme-light input[type='range']::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-primary), #4299e1);
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-glass);
-  backdrop-filter: blur(10px);
-}
-
-html.theme-light input[type='range']::-webkit-slider-thumb:hover {
-  background: linear-gradient(135deg, #0056d3, var(--accent-primary));
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
-}
-
-/* Focus States - Enhanced Liquid Glass */
-html.theme-light *:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
-}
-
-/* Enhanced Animation System */
-html.theme-light .grid.grid-cols-2.gap-2.px-4.pb-3 button {
-  animation: none !important;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-html.theme-light [data-framer-motion] {
-  /* Allow Framer Motion to handle its own timing */
-  transition-duration: unset !important;
-}
-
-/* Elegant Motion Curves */
-html.theme-light * {
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-/* Settings Content - Elegant Glass Container */
-html.theme-light .p-6.space-y-6 {
-  backdrop-filter: blur(25px) saturate(150%) !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-  padding: 28px !important;
-  border-radius: 0 !important;
-  position: relative !important;
-  overflow: hidden !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-}
-
-html.theme-light .p-6.space-y-6::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.3) 100%);
-  pointer-events: none;
-}
-
-/* Effect Layer Card - Sophisticated Glass Design */
-html.theme-light .bg-black\/20 {
-  backdrop-filter: blur(20px) saturate(140%) !important;
-  background: rgba(255, 255, 255, 0.8) !important;
-  border: 1px solid rgba(0, 0, 0, 0.06) !important;
-  border-radius: 16px !important;
-  padding: 24px !important;
-  position: relative !important;
-  overflow: hidden !important;
-  box-shadow:
-    0 2px 12px rgba(0, 0, 0, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
-  margin-bottom: 20px !important;
-}
-
-html.theme-light .bg-black\/20::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.2) 100%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-/* Effect Name and Category - Better Typography */
-html.theme-light .bg-black\/20 .text-white {
-  color: var(--text-primary) !important;
-  font-size: 18px !important;
-  font-weight: 600 !important;
-  text-transform: none !important;
-  letter-spacing: -0.025em !important;
-  margin-bottom: 8px !important;
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-html.theme-light .bg-black\/20 .text-white\/70 {
-  color: var(--text-secondary) !important;
-  font-size: 14px !important;
-  text-transform: none !important;
-  letter-spacing: -0.022em !important;
-  margin-bottom: 20px !important;
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-/* Control Buttons Container - Better Spacing */
-html.theme-light .bg-black\/20 .flex.justify-between {
-  gap: 16px !important;
-  align-items: center !important;
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-/* Reset Button - Refined Glass Style */
-html.theme-light .bg-black\/20 .bg-blue-600 {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: linear-gradient(135deg, rgba(0, 122, 255, 0.85), rgba(66, 153, 225, 0.75)) !important;
-  border: 1px solid rgba(0, 122, 255, 0.25) !important;
-  border-radius: 10px !important;
-  padding: 10px 18px !important;
-  color: white !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-  box-shadow:
-    0 2px 10px rgba(0, 122, 255, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
-  position: relative !important;
-  overflow: hidden !important;
-  margin-right: 0 !important;
-}
-
-html.theme-light .bg-black\/20 .bg-blue-600::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-html.theme-light .bg-black\/20 .bg-blue-600:hover {
-  transform: translateY(-2px) !important;
-  box-shadow:
-    0 4px 16px rgba(0, 122, 255, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
-  background: linear-gradient(135deg, rgba(0, 122, 255, 0.9), rgba(66, 153, 225, 0.8)) !important;
-}
-
-/* Remove Button - Refined Glass Style */
-html.theme-light .bg-black\/20 .bg-red-600 {
-  backdrop-filter: blur(15px) saturate(130%) !important;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.85), rgba(220, 38, 38, 0.75)) !important;
-  border: 1px solid rgba(239, 68, 68, 0.25) !important;
-  border-radius: 10px !important;
-  padding: 10px 18px !important;
-  color: white !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  transition: all var(--duration-fast) var(--ease-glass) !important;
-  box-shadow:
-    0 2px 10px rgba(239, 68, 68, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-html.theme-light .bg-black\/20 .bg-red-600::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%);
-  pointer-events: none;
-  border-radius: inherit;
-}
-
-html.theme-light .bg-black\/20 .bg-red-600:hover {
-  transform: translateY(-2px) !important;
-  box-shadow:
-    0 4px 16px rgba(239, 68, 68, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.8)) !important;
-}
-
-/* Slider Controls - Enhanced Glass Style */
-html.theme-light .bg-black\/20 .space-y-4 > div {
-  position: relative !important;
-  z-index: 1 !important;
-  margin-bottom: 24px !important;
-}
-
-/* Slider Labels */
-html.theme-light .bg-black\/20 .text-white.text-sm {
-  color: var(--text-primary) !important;
-  font-size: 15px !important;
-  font-weight: 500 !important;
-  letter-spacing: -0.022em !important;
-  margin-bottom: 12px !important;
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-}
-
-/* Slider Value Display */
-html.theme-light .bg-black\/20 .bg-blue-600.text-xs {
-  backdrop-filter: blur(12px) saturate(120%) !important;
-  background: rgba(0, 122, 255, 0.15) !important;
-  color: var(--accent-primary) !important;
-  border: 1px solid rgba(0, 122, 255, 0.2) !important;
-  border-radius: 6px !important;
-  padding: 4px 8px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  box-shadow: 0 1px 3px rgba(0, 122, 255, 0.1) !important;
-}
-
-/* Slider Range Labels */
-html.theme-light .bg-black\/20 .flex.justify-between.text-xs {
-  color: var(--text-tertiary) !important;
-  font-size: 11px !important;
-  margin-top: 8px !important;
-}
-
-/* Text Opacity Fixes */
-html.theme-light .opacity-70 {
-  opacity: 0.6 !important;
-}
-
-html.theme-light .opacity-60 {
-  opacity: 0.6 !important;
-}
-
-html.theme-light .opacity-50 {
-  opacity: 0.5 !important;
-}
-
-html.theme-light .opacity-40 {
-  opacity: 0.5 !important;
-}
-
-html.theme-light .opacity-30 {
-  opacity: 0.4 !important;
-}
-
-/* Floating Buttons */
-html.theme-light .fixed button {
-  background: var(--bg-glass-heavy) !important;
-  border: 1px solid var(--border-primary) !important;
-  color: var(--text-primary) !important;
-}
-
-html.theme-light .fixed button:hover {
-  background: white !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-}
-
-/* Chevron Icons */
-html.theme-light svg {
-  color: currentColor !important;
-}
-
-/* Reset and Remove Buttons */
-html.theme-light button[class*='bg-white/20'][class*='hover:bg-white/30'] {
-  background: rgba(0, 122, 255, 0.1) !important;
-  color: var(--accent-primary) !important;
-  border: 1px solid rgba(0, 122, 255, 0.2) !important;
-}
-
-html.theme-light button[class*='bg-white/20'][class*='hover:bg-white/30']:hover {
-  background: rgba(0, 122, 255, 0.15) !important;
-  border-color: rgba(0, 122, 255, 0.3) !important;
-}
-
-html.theme-light button[class*='bg-red-500/20'] {
-  background: rgba(255, 59, 48, 0.1) !important;
-  color: #ff3b30 !important;
-  border: 1px solid rgba(255, 59, 48, 0.2) !important;
-}
-
-html.theme-light button[class*='bg-red-500/20']:hover {
-  background: rgba(255, 59, 48, 0.15) !important;
-  border-color: rgba(255, 59, 48, 0.3) !important;
 }

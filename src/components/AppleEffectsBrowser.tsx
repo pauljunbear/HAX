@@ -116,9 +116,9 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
           </div>
           <button
             onClick={onNewImage}
-            className="text-[10px] px-2 py-0.5 hover:bg-white/10 transition-all rounded"
+            className="text-xs text-green-400 hover:text-green-300 transition-colors shape-capsule px-3 py-1 bg-green-400/10 hover:bg-green-400/20"
           >
-            New
+            New Image
           </button>
         </div>
 
@@ -132,138 +132,101 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
         />
       </div>
 
-      {/* Effects by Category */}
-      <div className="flex-1 overflow-y-auto">
-        {!hasImage ? (
-          <div className="text-center py-12 px-4">
-            <div className="w-12 h-12 mx-auto mb-4 bg-white/5 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-white/30"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-edge-top scroll-edge-bottom">
+        <div className="px-4 pt-4 pb-20">
+          {/* Main Category */}
+          {Object.entries(filteredEffectsByCategory).map(([category, effects]) => (
+            <div key={category}>
+              {/* Category Header */}
+              <button
+                onClick={() => toggleCategory(category)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left transition-all hover:bg-white/5 border-b border-white/10"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-sm font-medium mb-2">Upload an Image</h3>
-            <p className="text-[11px] text-white/50 mb-4 max-w-xs mx-auto">
-              Choose an image to start applying effects
-            </p>
-            <button
-              onClick={onNewImage}
-              className="inline-flex items-center px-3 py-1.5 text-[11px] bg-white/10 hover:bg-white/20 transition-all rounded-md gap-1.5"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              <span>Choose Image</span>
-            </button>
-          </div>
-        ) : (
-          <div>
-            {Object.entries(filteredEffectsByCategory).map(([category, effects]) => (
-              <div key={category}>
-                {/* Category Header */}
-                <button
-                  onClick={() => toggleCategory(category)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left transition-all hover:bg-white/5 border-b border-white/10"
-                >
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-[12px] font-medium">{category}</h3>
-                    <span className="text-[10px] text-white/40 font-mono">{effects.length}</span>
-                  </div>
-                  <motion.div
-                    animate={{ rotate: collapsedCategories.has(category) ? 0 : 90 }}
-                    transition={{
-                      duration: 0.35,
-                      ease: 'easeInOut',
-                    }}
-                  >
-                    <ChevronRight className="w-3.5 h-3.5 text-white/50" />
-                  </motion.div>
-                </button>
-
-                {/* Category Effects */}
-                <AnimatePresence mode="sync">
-                  {!collapsedCategories.has(category) && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{
-                        height: {
-                          duration: 0.35,
-                          ease: 'easeInOut',
-                        },
-                        opacity: {
-                          duration: 0.25,
-                          ease: 'easeInOut',
-                        },
-                      }}
-                      style={{ overflow: 'hidden' }}
-                    >
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <div className="grid grid-cols-2 gap-1.5 px-4 py-2 bg-black/5">
-                          {effects.map(([effectId, effect]) => (
-                            <button
-                              key={effectId}
-                              onClick={() => handleEffectClick(effectId)}
-                              className={`px-2 py-1 text-[10px] text-center transition-all rounded ${
-                                activeEffect === effectId
-                                  ? 'bg-white/15 border border-white/25 font-medium'
-                                  : 'hover:bg-white/5 text-white/70 hover:text-white/90'
-                              }`}
-                            >
-                              {effect.label}
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ))}
-
-            {Object.keys(filteredEffectsByCategory).length === 0 && (
-              <div className="text-center py-12 px-4">
-                <div className="w-10 h-10 mx-auto mb-3 bg-white/5 rounded-lg flex items-center justify-center">
-                  <svg
-                    className="w-5 h-5 text-white/30"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-[12px] font-medium">{category}</h3>
+                  <span className="text-[10px] text-white/40 font-mono">{effects.length}</span>
                 </div>
-                <h3 className="text-sm font-medium mb-1">No Effects Found</h3>
-                <p className="text-[11px] text-white/50">Try adjusting your search</p>
+                <motion.div
+                  animate={{ rotate: collapsedCategories.has(category) ? 0 : 90 }}
+                  transition={{
+                    duration: 0.35,
+                    ease: 'easeInOut',
+                  }}
+                >
+                  <ChevronRight className="w-3.5 h-3.5 text-white/50" />
+                </motion.div>
+              </button>
+
+              {/* Category Effects */}
+              <AnimatePresence mode="sync">
+                {!collapsedCategories.has(category) && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{
+                      height: {
+                        duration: 0.35,
+                        ease: 'easeInOut',
+                      },
+                      opacity: {
+                        duration: 0.25,
+                        ease: 'easeInOut',
+                      },
+                    }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <div className="grid grid-cols-2 gap-1.5 px-4 py-2 bg-black/5">
+                        {effects.map(([effectId, effect]) => (
+                          <button
+                            key={effectId}
+                            onClick={() => handleEffectClick(effectId)}
+                            className={`px-2 py-1 text-[10px] text-center transition-all rounded ${
+                              activeEffect === effectId
+                                ? 'bg-white/15 border border-white/25 font-medium'
+                                : 'hover:bg-white/5 text-white/70 hover:text-white/90'
+                            }`}
+                          >
+                            {effect.label}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ))}
+
+          {Object.keys(filteredEffectsByCategory).length === 0 && (
+            <div className="text-center py-12 px-4">
+              <div className="w-10 h-10 mx-auto mb-3 bg-white/5 rounded-lg flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-white/30"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
               </div>
-            )}
-          </div>
-        )}
+              <h3 className="text-sm font-medium mb-1">No Effects Found</h3>
+              <p className="text-[11px] text-white/50">Try adjusting your search</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
