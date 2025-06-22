@@ -82,14 +82,10 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
             style={{ '--parent-radius': '16px', '--padding': '8px' } as React.CSSProperties}
           >
             <AppleEffectsBrowser
-              onImageSelect={handleImageSelect}
               activeEffect={activeEffect}
               onEffectChange={onEffectChange}
               hasImage={!!selectedImage}
-              onNewImage={() => {
-                // Reset effects when getting new image
-                onClearAllEffects?.();
-              }}
+              onNewImage={handleImageSelect}
               onHidePanel={() => setLeftPanelCollapsed(true)}
             />
           </motion.div>
