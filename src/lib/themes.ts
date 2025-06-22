@@ -1,4 +1,6 @@
 // Theme definitions and utilities
+import { useState, useEffect } from 'react';
+
 export type Theme = 'light' | 'terminal';
 
 export const themes = {
@@ -41,4 +43,32 @@ export const initializeTheme = () => {
 
   const theme = getTheme();
   document.documentElement.classList.add(themes[theme].class);
+};
+
+// useTheme hook for React components
+export const useTheme = () => {
+  const [theme, setThemeState] = useState<Theme>(() => getTheme());
+
+  useEffect(() => {
+    const handleThemeChange = (event: CustomEvent<Theme>) => {
+      setThemeState(event.detail);
+    };
+
+    window.addEventListener('themechange', handleThemeChange as EventListener);
+
+    // Set initial theme
+    const currentTheme = getTheme();
+    setThemeState(currentTheme);
+
+    return () => {
+      window.removeEventListener('themechange', handleThemeChange as EventListener);
+    };
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme: Theme = theme === 'light' ? 'terminal' : 'light';
+    setTheme(newTheme);
+  };
+
+  return { theme, toggleTheme, setTheme };
 };

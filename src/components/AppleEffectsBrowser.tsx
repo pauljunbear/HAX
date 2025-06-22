@@ -3,12 +3,14 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig } from '@/lib/effects';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface AppleEffectsBrowserProps {
   activeEffect?: string | null;
   onEffectChange?: (effectName: string | null) => void;
   hasImage?: boolean;
   onNewImage?: () => void;
+  onHidePanel?: () => void;
 }
 
 const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
@@ -16,6 +18,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   onEffectChange,
   hasImage = false,
   onNewImage,
+  onHidePanel,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   // Start with ALL categories collapsed by default
@@ -97,40 +100,45 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col glass-panel">
       {/* Header */}
       <div className="px-4 py-3 border-b">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-green-400 uppercase tracking-wider font-mono">
-            Effects
-          </h2>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider">Effects</h2>
+            <button
+              onClick={onHidePanel}
+              className="w-5 h-5 flex items-center justify-center hover:bg-white/10 rounded transition-all"
+              title="Hide Effects Panel"
+            >
+              <ChevronLeft className="w-3 h-3 opacity-60" />
+            </button>
+          </div>
           <button
             onClick={onNewImage}
-            className="text-xs text-green-400 hover:text-green-300 font-medium px-2 py-1 hover:bg-green-400/10 transition-all font-mono uppercase tracking-wide"
+            className="text-[10px] px-2 py-0.5 hover:bg-white/10 transition-all rounded"
           >
-            New Image
+            New
           </button>
         </div>
 
         {/* Search */}
-        <div className="relative">
-          <input
-            type="search"
-            placeholder="SEARCH EFFECTS..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full"
-          />
-        </div>
+        <input
+          type="search"
+          placeholder="Search..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          className="w-full px-3 py-1.5 text-[11px] bg-white/5 border border-white/10 rounded focus:bg-white/10 focus:border-white/20 transition-all placeholder:text-white/30"
+        />
       </div>
 
       {/* Effects by Category */}
       <div className="flex-1 overflow-y-auto">
         {!hasImage ? (
           <div className="text-center py-12 px-4">
-            <div className="w-16 h-16 mx-auto mb-4 bg-black border border-green-400/30 flex items-center justify-center">
+            <div className="w-12 h-12 mx-auto mb-4 bg-white/5 rounded-lg flex items-center justify-center">
               <svg
-                className="w-8 h-8 text-green-400"
+                className="w-6 h-6 text-white/30"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -143,17 +151,15 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                 />
               </svg>
             </div>
-            <h3 className="text-sm font-semibold text-white mb-2 font-mono uppercase tracking-wide">
-              Upload an Image
-            </h3>
-            <p className="text-xs text-white/70 mb-4 leading-relaxed max-w-xs mx-auto font-mono">
+            <h3 className="text-sm font-medium mb-2">Upload an Image</h3>
+            <p className="text-[11px] text-white/50 mb-4 max-w-xs mx-auto">
               Choose an image to start applying effects
             </p>
             <button
               onClick={onNewImage}
-              className="inline-flex items-center px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 text-xs font-medium border border-green-400/30 hover:border-green-400/50 transition-all space-x-1.5 font-mono uppercase tracking-wide"
+              className="inline-flex items-center px-3 py-1.5 text-[11px] bg-white/10 hover:bg-white/20 transition-all rounded-md gap-1.5"
             >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -165,70 +171,70 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
             </button>
           </div>
         ) : (
-          <div className="py-2">
+          <div>
             {Object.entries(filteredEffectsByCategory).map(([category, effects]) => (
-              <div key={category} className="mb-1">
+              <div key={category}>
                 {/* Category Header */}
                 <button
                   onClick={() => toggleCategory(category)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left transition-all duration-200 group"
+                  className="w-full flex items-center justify-between px-4 py-3 text-left transition-all hover:bg-white/5 border-b border-white/10"
                 >
-                  <div className="flex items-center space-x-2.5">
-                    <div>
-                      <h3 className="text-xs font-semibold text-white/80 group-hover:text-white font-mono uppercase tracking-wide">
-                        {category}
-                      </h3>
-                      <p className="text-xs text-white/50 font-mono">[{effects.length}]</p>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[12px] font-medium">{category}</h3>
+                    <span className="text-[10px] text-white/40 font-mono">{effects.length}</span>
                   </div>
-                  <motion.svg
-                    className="w-4 h-4 text-green-400/70"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                  <motion.div
                     animate={{ rotate: collapsedCategories.has(category) ? 0 : 90 }}
-                    transition={{ duration: 0.1, ease: 'easeInOut' }}
+                    transition={{
+                      duration: 0.35,
+                      ease: 'easeInOut',
+                    }}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </motion.svg>
+                    <ChevronRight className="w-3.5 h-3.5 text-white/50" />
+                  </motion.div>
                 </button>
 
                 {/* Category Effects */}
-                <AnimatePresence>
+                <AnimatePresence mode="sync">
                   {!collapsedCategories.has(category) && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.12, ease: 'easeInOut' }}
-                      className="overflow-hidden"
+                      transition={{
+                        height: {
+                          duration: 0.35,
+                          ease: 'easeInOut',
+                        },
+                        opacity: {
+                          duration: 0.25,
+                          ease: 'easeInOut',
+                        },
+                      }}
+                      style={{ overflow: 'hidden' }}
                     >
-                      <div className="grid grid-cols-2 gap-2 px-4 pb-3">
-                        {effects.map(([effectId, effect]) => (
-                          <motion.button
-                            key={effectId}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.08 }}
-                            onClick={() => handleEffectClick(effectId)}
-                            className={`p-2.5 text-center transition-all duration-200 border ${
-                              activeEffect === effectId
-                                ? 'bg-green-600/20 border-green-400/60 shadow-lg ring-2 ring-green-500/20'
-                                : 'bg-black/60 border-white/20 hover:bg-green-600/10 hover:border-green-400/40'
-                            }`}
-                          >
-                            <h4 className="text-xs font-medium text-white/90 leading-tight font-mono uppercase tracking-wide">
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="grid grid-cols-2 gap-1.5 px-4 py-2 bg-black/5">
+                          {effects.map(([effectId, effect]) => (
+                            <button
+                              key={effectId}
+                              onClick={() => handleEffectClick(effectId)}
+                              className={`px-2 py-1 text-[10px] text-center transition-all rounded ${
+                                activeEffect === effectId
+                                  ? 'bg-white/15 border border-white/25 font-medium'
+                                  : 'hover:bg-white/5 text-white/70 hover:text-white/90'
+                              }`}
+                            >
                               {effect.label}
-                            </h4>
-                          </motion.button>
-                        ))}
-                      </div>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -237,9 +243,9 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
 
             {Object.keys(filteredEffectsByCategory).length === 0 && (
               <div className="text-center py-12 px-4">
-                <div className="w-12 h-12 mx-auto mb-3 bg-black border border-green-400/30 flex items-center justify-center">
+                <div className="w-10 h-10 mx-auto mb-3 bg-white/5 rounded-lg flex items-center justify-center">
                   <svg
-                    className="w-6 h-6 text-green-400"
+                    className="w-5 h-5 text-white/30"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -252,10 +258,8 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                     />
                   </svg>
                 </div>
-                <h3 className="text-sm font-medium text-white mb-1 font-mono uppercase tracking-wide">
-                  No Effects Found
-                </h3>
-                <p className="text-xs text-white/70 font-mono">Try adjusting your search term</p>
+                <h3 className="text-sm font-medium mb-1">No Effects Found</h3>
+                <p className="text-[11px] text-white/50">Try adjusting your search</p>
               </div>
             )}
           </div>

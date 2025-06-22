@@ -3,7 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig } from '@/lib/effects';
-import { Settings, Download, Layers, FileImage, FileText, Film, Monitor } from 'lucide-react';
+import {
+  Settings,
+  Download,
+  Layers,
+  FileImage,
+  Film,
+  Monitor,
+  X,
+  ChevronRight,
+} from 'lucide-react';
 
 interface EffectLayer {
   id: string;
@@ -14,7 +23,7 @@ interface EffectLayer {
 
 interface AppleControlsPanelProps {
   activeEffect?: string | null;
-  effectLayers: EffectLayer[];
+  effectLayers?: EffectLayer[];
   effectSettings?: Record<string, number>;
   onSettingChange?: (settingName: string, value: number) => void;
   onExport?: (format: string) => void;
@@ -100,7 +109,7 @@ const HexColorInput: React.FC<{
 
 const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   activeEffect,
-  effectLayers,
+  effectLayers = [],
   effectSettings = {},
   onSettingChange,
   onExport,
@@ -117,8 +126,8 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
     'settings'
   );
 
-  // Get the active layer
-  const activeLayer = effectLayers.find(layer => layer.id === activeEffect);
+  // Get the active layer with null checking
+  const activeLayer = effectLayers?.find(layer => layer.id === activeEffect);
   const activeEffectConfig = activeLayer ? effectsConfig[activeLayer.effectId] : null;
 
   // Get current effect settings with proper fallbacks
@@ -166,67 +175,44 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   ];
 
   if (isCollapsed) {
-    return (
-      <motion.div
-        initial={{ width: 0 }}
-        animate={{ width: 48 }}
-        transition={{ duration: 0.3 }}
-        className="h-full flex flex-col items-center py-4 glass-panel border-l"
-      >
-        <button
-          onClick={onToggle}
-          className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-lg transition-colors"
-        >
-          <Settings className="w-4 h-4 text-white/70" />
-        </button>
-      </motion.div>
-    );
+    return null; // Panel is hidden when collapsed
   }
 
   return (
-    <motion.div
-      initial={{ width: 48 }}
-      animate={{ width: 320 }}
-      transition={{ duration: 0.3 }}
-      className="h-full glass-panel border-l flex flex-col"
-    >
+    <div className="h-full w-full flex flex-col glass-panel">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10">
-        <h2 className="text-sm font-semibold text-white/90">Controls</h2>
-        <button
-          onClick={onToggle}
-          className="w-6 h-6 flex items-center justify-center hover:bg-white/10 rounded transition-colors"
-        >
-          <Settings className="w-4 h-4 text-white/70" />
-        </button>
+      <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="flex items-center gap-2">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider">Controls</h2>
+          <button
+            onClick={onToggle}
+            className="w-5 h-5 flex items-center justify-center hover:bg-white/10 rounded transition-all"
+            title="Hide Controls Panel"
+          >
+            <ChevronRight className="w-3 h-3 opacity-60" />
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white/10">
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 px-4 py-3 text-xs font-medium transition-colors relative ${
-                activeTab === tab.id ? 'text-green-400' : 'text-white/60 hover:text-white/80'
-              }`}
-            >
-              <div className="flex items-center justify-center space-x-2">
+      <div className="border-b px-4 py-2 mb-4">
+        <div className="flex gap-2">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-all rounded ${
+                  activeTab === tab.id ? 'bg-white/20 border border-white/30' : 'hover:bg-white/10'
+                }`}
+              >
                 <Icon className="w-3 h-3" />
                 <span>{tab.label}</span>
-              </div>
-              {activeTab === tab.id && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-400"
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                />
-              )}
-            </button>
-          );
-        })}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tab Content */}
@@ -242,32 +228,30 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               className="p-4 space-y-4"
             >
               {!activeLayer ? (
-                <div className="text-center text-white/50 text-sm py-8">
+                <div className="text-center text-xs opacity-70 py-12">
                   Effect controls will appear here when an effect is selected
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {/* Effect Header */}
-                  <div className="p-3 border border-white/20">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="p-4 bg-black/5 rounded-lg">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-sm font-semibold text-white font-mono uppercase tracking-wide">
-                          {activeEffectConfig?.label}
-                        </h3>
-                        <p className="text-xs text-white/70 font-mono">
+                        <h3 className="text-sm font-semibold">{activeEffectConfig?.label}</h3>
+                        <p className="text-[11px] opacity-60 mt-0.5">
                           {activeEffectConfig?.category}
                         </p>
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex gap-2">
                         <button
                           onClick={onResetSettings}
-                          className="px-3 py-1.5 text-xs font-medium bg-green-600/20 text-green-400 hover:bg-green-600/30 hover:text-green-300 border border-green-400/30 transition-all duration-200 font-mono uppercase tracking-wide"
+                          className="px-3 py-1.5 text-[11px] font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 rounded transition-all"
                         >
                           Reset
                         </button>
                         <button
                           onClick={() => activeLayer && onRemoveEffect?.(activeLayer.id)}
-                          className="px-3 py-1.5 text-xs font-medium bg-red-600/20 text-red-400 hover:bg-red-600/30 hover:text-red-300 border border-red-400/30 transition-all duration-200 font-mono uppercase tracking-wide"
+                          className="px-3 py-1.5 text-[11px] font-medium bg-red-500/10 hover:bg-red-500/20 text-red-600 rounded transition-all"
                         >
                           Remove
                         </button>
@@ -296,17 +280,15 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
 
                       // Regular slider for non-color settings
                       return (
-                        <div key={setting.id} className="p-3 border border-white/20">
-                          <div className="flex items-center justify-between mb-2">
-                            <label className="text-sm font-medium text-white font-mono uppercase tracking-wide">
-                              {setting.label}
-                            </label>
-                            <span className="text-xs text-green-400 font-mono bg-black/50 px-2 py-0.5 border border-green-400/30">
+                        <div key={setting.id} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-medium">{setting.label}</label>
+                            <span className="text-[11px] font-mono bg-black/5 px-2 py-0.5 rounded">
                               {setting.currentValue.toFixed(2)}
                             </span>
                           </div>
 
-                          <div className="space-y-2">
+                          <div className="relative">
                             <input
                               type="range"
                               min={setting.min}
@@ -316,13 +298,16 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                               onChange={e =>
                                 onSettingChange?.(setting.id, parseFloat(e.target.value))
                               }
-                              className="w-full"
+                              className="w-full h-5 bg-transparent cursor-pointer appearance-none slider"
+                              style={{
+                                background: `linear-gradient(to right, #007aff 0%, #007aff ${((setting.currentValue - setting.min) / (setting.max - setting.min)) * 100}%, rgba(0,0,0,0.1) ${((setting.currentValue - setting.min) / (setting.max - setting.min)) * 100}%, rgba(0,0,0,0.1) 100%)`,
+                              }}
                             />
 
                             {/* Range markers */}
-                            <div className="flex justify-between text-xs text-white/50 font-mono">
-                              <span>{setting.min}</span>
-                              <span>{setting.max}</span>
+                            <div className="flex justify-between mt-1">
+                              <span className="text-[9px] opacity-50 font-mono">{setting.min}</span>
+                              <span className="text-[9px] opacity-50 font-mono">{setting.max}</span>
                             </div>
                           </div>
                         </div>
@@ -343,7 +328,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               transition={{ duration: 0.2 }}
               className="p-4 space-y-4"
             >
-              <div className="text-center text-white/50 text-sm py-8">
+              <div className="text-center text-gray-500 text-sm py-12">
                 Layer controls coming soon
               </div>
             </motion.div>
@@ -358,68 +343,36 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               transition={{ duration: 0.2 }}
               className="p-4 space-y-4"
             >
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium text-white/90 uppercase tracking-wide">
-                  EXPORT OPTIONS
-                </h3>
-
-                {exportOptions.slice(0, 2).map(option => {
+              <div className="space-y-1.5">
+                {exportOptions.map(option => {
                   const Icon = option.icon;
                   return (
                     <button
                       key={option.format}
-                      className="w-full p-3 bg-black/60 hover:bg-black/80 rounded-lg transition-colors text-left group"
+                      onClick={() => onExport?.(option.format)}
+                      className="w-full p-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded transition-all text-left group"
                     >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
-                          <Icon className="w-4 h-4 text-white/70" />
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-white/10 rounded flex items-center justify-center mr-3">
+                          <Icon className="w-4 h-4" />
                         </div>
                         <div className="flex-1">
-                          <div className="text-sm font-medium text-white">{option.type}</div>
-                          <div className="text-xs text-white/70">{option.description}</div>
+                          <div className="text-xs font-medium">{option.type}</div>
+                          <div className="text-[10px] opacity-70">{option.description}</div>
                         </div>
-                        <div className="text-xs font-mono text-green-400 bg-green-400/20 px-2 py-1 rounded">
+                        <div className="text-[10px] font-medium bg-white/20 px-2 py-0.5 rounded ml-3">
                           {option.format}
                         </div>
                       </div>
                     </button>
                   );
                 })}
-
-                <div className="pt-4">
-                  <h3 className="text-sm font-medium text-white/90 uppercase tracking-wide mb-3">
-                    ANIMATED EXPORT
-                  </h3>
-
-                  {exportOptions.slice(2).map(option => {
-                    const Icon = option.icon;
-                    return (
-                      <button
-                        key={option.format}
-                        className="w-full p-3 bg-black/60 hover:bg-black/80 rounded-lg transition-colors text-left group mb-3"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
-                            <Icon className="w-4 h-4 text-white/70" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-white">{option.type}</div>
-                            <div className="text-xs text-white/70">{option.description}</div>
-                          </div>
-                          <div className="text-xs font-mono text-green-400 bg-green-400/20 px-2 py-1 rounded">
-                            {option.format}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

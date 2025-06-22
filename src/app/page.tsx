@@ -321,6 +321,29 @@ export default function Home() {
               selectedImage={selectedImage}
               onImageSelect={handleImageSelect}
               onImageUpload={handleImageUpload}
+              // Effect-related props
+              effectLayers={effectLayers}
+              activeEffect={activeEffectLayerId}
+              effectSettings={effectSettings}
+              onEffectChange={handleEffectChange}
+              onSettingChange={handleSettingChange}
+              onResetSettings={handleResetSettings}
+              onClearAllEffects={handleClearAllEffects}
+              onRemoveEffect={handleRemoveEffect}
+              onSetActiveLayer={setActiveEffectLayer}
+              onToggleLayerVisibility={handleToggleLayerVisibility}
+              onExport={format => {
+                console.log('📤 Export handler called with format:', format);
+                if (imageEditorRef.current) {
+                  try {
+                    imageEditorRef.current.exportImage(format);
+                  } catch (error) {
+                    console.error('❌ Error calling exportImage:', error);
+                  }
+                } else {
+                  console.error('❌ imageEditorRef.current is null - cannot export');
+                }
+              }}
             >
               <div id="main-content" className="w-full h-full">
                 {imageLoading ? (
