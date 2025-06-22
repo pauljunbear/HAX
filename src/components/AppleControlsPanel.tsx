@@ -179,19 +179,10 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   }
 
   return (
-    <div className="h-full w-full flex flex-col glass-panel border-l border-white/10">
+    <div className="h-full w-full flex flex-col glass-material">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <h2 className="text-[11px] font-semibold uppercase tracking-wider">Controls</h2>
-          <button
-            onClick={onToggle}
-            className="w-5 h-5 flex items-center justify-center hover:bg-white/10 rounded transition-all"
-            title="Hide Controls Panel"
-          >
-            <ChevronRight className="w-3 h-3 opacity-60" />
-          </button>
-        </div>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 glass-header">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider">Controls</h2>
       </div>
 
       {/* Tabs */}
@@ -202,11 +193,11 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               key={tab.id}
               onClick={() => setActiveTab(tab.id as 'settings' | 'layers' | 'export' | 'history')}
               className={`
-                px-4 py-2 text-sm font-medium transition-all shape-capsule
+                px-4 py-2 text-sm font-medium transition-all rounded-lg
                 ${
                   activeTab === tab.id
-                    ? 'text-white bg-white/20 backdrop-blur-sm shadow-sm'
-                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                    ? 'glass-active text-white shadow-sm'
+                    : 'glass-button text-white/80 hover:text-white'
                 }
               `}
             >
@@ -217,7 +208,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
       </div>
 
       {/* Tab Content - with scroll edge effects */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-edge-top scroll-edge-bottom px-4 pb-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden glass-scroll px-4 pb-4">
         <AnimatePresence mode="wait">
           {activeTab === 'settings' && (
             <motion.div
