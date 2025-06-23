@@ -369,13 +369,13 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
     return (
       <div
         ref={containerRef}
-        className="w-full h-full flex flex-col items-center justify-center bg-black text-white relative"
+        className="w-full h-full flex flex-col items-center justify-center relative"
       >
         {!selectedImage ? (
           <div className="text-center">
-            <div className="w-24 h-24 bg-black border border-green-400/30 flex items-center justify-center mb-6 mx-auto">
+            <div className="w-24 h-24 glass-material flex items-center justify-center mb-6 mx-auto rounded-2xl">
               <svg
-                className="w-12 h-12 text-green-400"
+                className="w-12 h-12 text-white/60"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -388,15 +388,11 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
                 />
               </svg>
             </div>
-            <h2 className="text-2xl font-semibold mb-3 text-white font-mono uppercase tracking-wide">
-              Welcome to HAX
-            </h2>
-            <p className="text-white/70 mb-8 max-w-md font-mono">
-              Upload an image to start applying tactical effects
-            </p>
+            <h2 className="text-2xl font-semibold mb-3 text-white">Welcome to HAX</h2>
+            <p className="text-white/70 mb-8 max-w-md">Upload an image to start applying effects</p>
             <button
               onClick={handleUploadClick}
-              className="bg-green-600/20 hover:bg-green-600/30 px-6 py-3 text-green-400 font-medium border border-green-400/30 hover:border-green-400/50 transition-all duration-200 font-mono uppercase tracking-wide"
+              className="bg-blue-500 hover:bg-blue-600 px-6 py-3 text-white font-medium rounded-lg transition-all duration-200 shadow-sm"
             >
               Choose Image
             </button>
@@ -407,17 +403,15 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
               className="hidden"
               onChange={handleFileChange}
             />
-            <p className="text-xs text-white/50 mt-4 font-mono">
-              Supports JPG, PNG, GIF, WebP • Max 10MB
-            </p>
+            <p className="text-xs text-white/50 mt-4">Supports JPG, PNG, GIF, WebP • Max 10MB</p>
           </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center p-4">
+          <div className="w-full h-full flex items-center justify-center">
             {image &&
               (() => {
-                // Calculate available space (accounting for padding and sidebars)
-                const maxWidth = Math.min(800, containerDimensions.width);
-                const maxHeight = Math.min(600, containerDimensions.height);
+                // Calculate available space (accounting for padding)
+                const maxWidth = containerDimensions.width - 32;
+                const maxHeight = containerDimensions.height - 32;
 
                 // Calculate scale to fit image while maintaining aspect ratio
                 const scaleX = maxWidth / image.width;
@@ -439,7 +433,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
                     ref={stageRef}
                     width={stageWidth}
                     height={stageHeight}
-                    className="rounded-2xl shadow-lg"
+                    className="rounded-lg shadow-2xl"
                     style={{ backgroundColor: 'transparent' }}
                   >
                     <Layer>

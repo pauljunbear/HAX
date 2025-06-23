@@ -23,6 +23,10 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [categoryMousePos, setCategoryMousePos] = useState<
+    Record<string, { x: number; y: number }>
+  >({});
 
   // Start with ALL categories collapsed by default
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
@@ -37,6 +41,18 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     });
+  };
+
+  // Handle mouse move for category buttons
+  const handleCategoryMouseMove = (e: React.MouseEvent<HTMLButtonElement>, category: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setCategoryMousePos(prev => ({
+      ...prev,
+      [category]: {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      },
+    }));
   };
 
   // Group effects by category
@@ -122,7 +138,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
             ref={buttonRef}
             onClick={onNewImage}
             onMouseMove={handleMouseMove}
-            className="relative flex items-center gap-1.5 text-xs font-medium text-white bg-blue-500 hover:bg-blue-600 transition-all px-3 py-1.5 rounded-lg shadow-sm overflow-hidden"
+            className="relative flex items-center gap-1 text-[11px] font-medium text-white bg-blue-500 hover:bg-blue-600 transition-all px-2 py-1 rounded-md shadow-sm overflow-hidden"
             style={
               {
                 '--mouse-x': `${mousePosition.x}px`,
@@ -131,20 +147,20 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
             }
           >
             <div className="button-light-effect" />
-            <Plus className="w-3.5 h-3.5 relative z-10" />
-            <span className="relative z-10">New Image</span>
+            <Plus className="w-3 h-3 relative z-10" />
+            <span className="relative z-10">New</span>
           </button>
         </div>
 
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/40" />
+        <div className="relative max-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
           <input
             type="search"
-            placeholder="Search effects..."
+            placeholder="Search effects"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm glass-input border border-white/10 rounded-lg focus:border-white/20 focus:outline-none transition-all placeholder:text-white/40 text-white"
+            className="w-full pl-8 pr-2.5 py-1.5 text-xs glass-input border border-white/10 rounded-md focus:border-white/20 focus:outline-none transition-all placeholder:text-white/40 text-white"
           />
         </div>
       </div>
@@ -195,13 +211,23 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                   {/* Category Header Button */}
                   <button
                     onClick={() => toggleCategory(category)}
+                    onMouseMove={e => handleCategoryMouseMove(e, category)}
+                    onMouseEnter={() => setHoveredCategory(category)}
+                    onMouseLeave={() => setHoveredCategory(null)}
                     className={`
                       w-full flex items-center justify-between px-3 py-2.5 text-left 
-                      transition-all rounded-lg group glass-button
+                      transition-all rounded-lg group glass-button relative overflow-hidden
                       ${isExpanded ? 'glass-active mb-1' : 'hover:glass-hover'}
                     `}
+                    style={
+                      {
+                        '--mouse-x': `${categoryMousePos[category]?.x || 0}px`,
+                        '--mouse-y': `${categoryMousePos[category]?.y || 0}px`,
+                      } as React.CSSProperties
+                    }
                   >
-                    <div className="flex items-center gap-2">
+                    {hoveredCategory === category && <div className="button-light-effect" />}
+                    <div className="flex items-center gap-2 relative z-10">
                       <motion.div
                         animate={{ rotate: isExpanded ? 90 : 0 }}
                         transition={{ duration: 0.2, ease: 'easeInOut' }}
