@@ -318,11 +318,118 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="p-4 space-y-4"
+              className="space-y-4"
             >
-              <div className="text-center text-gray-500 text-sm py-12">
-                Layer controls coming soon
-              </div>
+              {!hasImage ? (
+                <div className="text-center text-xs opacity-70 py-12">
+                  Upload an image to manage layers
+                </div>
+              ) : effectLayers.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-3 glass-material rounded-xl flex items-center justify-center">
+                    <Layers className="w-8 h-8 text-white/40" />
+                  </div>
+                  <p className="text-sm text-white/80 mb-1">No effect layers yet</p>
+                  <p className="text-xs text-white/60">Apply an effect to create a layer</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {effectLayers.map((layer, index) => {
+                    const effectConfig = effectsConfig[layer.effectId];
+                    const isActive = layer.id === activeEffect;
+
+                    return (
+                      <div
+                        key={layer.id}
+                        onClick={() => onSetActiveLayer?.(layer.id)}
+                        className={`
+                          p-3 rounded-lg cursor-pointer transition-all
+                          ${isActive ? 'glass-active shadow-sm' : 'glass-button hover:glass-hover'}
+                        `}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 flex-1">
+                            {/* Visibility Toggle */}
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                onToggleLayerVisibility?.(layer.id);
+                              }}
+                              className="text-white/60 hover:text-white transition-colors"
+                            >
+                              {layer.visible ? (
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                  />
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                  />
+                                </svg>
+                              ) : (
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                                  />
+                                </svg>
+                              )}
+                            </button>
+
+                            {/* Layer Info */}
+                            <div className="flex-1">
+                              <h4 className="text-sm font-medium text-white">
+                                {effectConfig?.label || 'Unknown Effect'}
+                              </h4>
+                              <p className="text-[11px] text-white/60">
+                                Layer {effectLayers.length - index}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              onRemoveEffect?.(layer.id);
+                            }}
+                            className="text-white/40 hover:text-red-400 transition-colors p-1"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {effectLayers.length > 1 && (
+                    <button
+                      onClick={() => onClearAllEffects?.()}
+                      className="w-full mt-2 px-3 py-2 text-xs font-medium bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
+                    >
+                      Clear All Layers
+                    </button>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
 

@@ -67,9 +67,9 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
   return (
     <div className="h-screen flex flex-col">
       {/* Main Content */}
-      <div className="flex-1 flex relative bg-[var(--bg-canvas)]">
-        {/* Effects Panel - Fixed width with proper spacing */}
-        <div className="w-80 h-full border-r border-white/10">
+      <div className="flex-1 flex relative">
+        {/* Effects Panel - Fixed width with proper glass effect */}
+        <div className="w-80 h-full glass-material border-r border-white/10">
           <AppleEffectsBrowser
             activeEffect={activeEffect}
             onEffectChange={onEffectChange}
@@ -79,11 +79,11 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
           />
         </div>
 
-        {/* Center Canvas */}
-        <div className="flex-1 flex items-center justify-center">{children}</div>
+        {/* Center Canvas - no extra background or padding */}
+        <div className="flex-1 canvas-area">{children}</div>
 
-        {/* Controls Panel - Fixed width with proper spacing */}
-        <div className="w-80 h-full border-l border-white/10">
+        {/* Controls Panel - Fixed width with proper glass effect */}
+        <div className="w-80 h-full glass-material border-l border-white/10">
           <AppleControlsPanel
             isCollapsed={false}
             onToggle={() => {}}
