@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Menu } from 'lucide-react';
 import AppleEffectsBrowser from './AppleEffectsBrowser';
 import AppleControlsPanel from './AppleControlsPanel';
 import { useTheme } from '@/lib/themes';
@@ -52,6 +52,9 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { theme, toggleTheme } = useTheme();
+  // State for mobile side-panel draw ers
+  const [isLeftOpen, setIsLeftOpen] = useState(false);
+  const [isRightOpen, setIsRightOpen] = useState(false);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -65,51 +68,115 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
   };
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Main Content */}
-      <div className="flex-1 flex relative">
-        {/* Effects Panel - Fixed width with proper glass effect */}
-        <div className="w-80 h-full glass-material border-r border-white/10">
-          <AppleEffectsBrowser
-            activeEffect={activeEffect}
-            onEffectChange={onEffectChange}
-            hasImage={!!selectedImage}
-            onNewImage={handleImageSelect}
-            onHidePanel={() => {}}
-          />
-        </div>
-
-        {/* Center Canvas - no extra background or padding */}
-        <div className="flex-1 canvas-area">{children}</div>
-
-        {/* Controls Panel - Fixed width with proper glass effect */}
-        <div className="w-80 h-full glass-material border-l border-white/10">
-          <AppleControlsPanel
-            isCollapsed={false}
-            onToggle={() => {}}
-            activeEffect={activeEffect}
-            effectLayers={effectLayers}
-            effectSettings={effectSettings}
-            onSettingChange={onSettingChange}
-            onResetSettings={onResetSettings}
-            onClearAllEffects={onClearAllEffects}
-            onRemoveEffect={onRemoveEffect}
-            onSetActiveLayer={onSetActiveLayer}
-            onToggleLayerVisibility={onToggleLayerVisibility}
-            onExport={onExport}
-            hasImage={!!selectedImage}
-          />
-        </div>
+    <div className="h-screen w-screen overflow-hidden layout-bg flex md:gap-4 md:p-4">
+      {/* Mobile Toggle Buttons */}
+      <div className="absolute top-4 left-4 flex items-center gap-2 md:hidden z-50">
+        <button
+          aria-label="Open Effects Panel"
+          className="p-2 rounded-full glass-button"
+          onClick={() => setIsLeftOpen(true)}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      </div>
+      <div className="absolute top-4 right-4 flex items-center gap-2 md:hidden z-50">
+        <button
+          aria-label="Open Controls Panel"
+          className="p-2 rounded-full glass-button"
+          onClick={() => setIsRightOpen(true)}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
       </div>
 
-      {/* Floating Theme Toggle - Bottom Right */}
-      <div className="fixed bottom-4 right-4 z-50">
+      {/* Left Effects Panel */}
+      {/* Desktop mode */}
+      <div className="hidden md:block w-64 lg:w-80 h-full sidebar-panel flex-shrink-0 left-panel relative z-10 glass-panel-surface">
+        <AppleEffectsBrowser
+          activeEffect={activeEffect}
+          onEffectChange={onEffectChange}
+          hasImage={!!selectedImage}
+          onNewImage={handleImageSelect}
+          onHidePanel={() => {}}
+        />
+      </div>
+      {/* Mobile overlay */}
+      {isLeftOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setIsLeftOpen(false)} />
+          <div className="relative w-4/5 max-w-xs h-full glass-panel-surface overflow-auto">
+            <AppleEffectsBrowser
+              activeEffect={activeEffect}
+              onEffectChange={e => {
+                onEffectChange?.(e);
+                setIsLeftOpen(false);
+              }}
+              hasImage={!!selectedImage}
+              onNewImage={() => {
+                handleImageSelect();
+                setIsLeftOpen(false);
+              }}
+              onHidePanel={() => setIsLeftOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Center Canvas Area */}
+      <div className="flex-1 h-full canvas-area min-w-0 glass-panel-surface">{children}</div>
+
+      {/* Right Controls Panel (desktop) */}
+      <div className="hidden md:block w-64 lg:w-80 h-full sidebar-panel flex-shrink-0 right-panel relative z-10 glass-panel-surface">
+        <AppleControlsPanel
+          isCollapsed={false}
+          onToggle={() => {}}
+          activeEffect={activeEffect}
+          effectLayers={effectLayers}
+          effectSettings={effectSettings}
+          onSettingChange={onSettingChange}
+          onResetSettings={onResetSettings}
+          onClearAllEffects={onClearAllEffects}
+          onRemoveEffect={onRemoveEffect}
+          onSetActiveLayer={onSetActiveLayer}
+          onToggleLayerVisibility={onToggleLayerVisibility}
+          onExport={onExport}
+          onNewImage={handleImageSelect}
+          hasImage={!!selectedImage}
+        />
+      </div>
+      {/* Right Controls Panel mobile overlay */}
+      {isRightOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setIsRightOpen(false)} />
+          <div className="relative w-4/5 max-w-xs h-full glass-panel-surface overflow-auto">
+            <AppleControlsPanel
+              isCollapsed={false}
+              onToggle={() => setIsRightOpen(false)}
+              activeEffect={activeEffect}
+              effectLayers={effectLayers}
+              effectSettings={effectSettings}
+              onSettingChange={onSettingChange}
+              onResetSettings={onResetSettings}
+              onClearAllEffects={onClearAllEffects}
+              onRemoveEffect={onRemoveEffect}
+              onSetActiveLayer={onSetActiveLayer}
+              onToggleLayerVisibility={onToggleLayerVisibility}
+              onExport={onExport}
+              onNewImage={handleImageSelect}
+              hasImage={!!selectedImage}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Theme Toggle - Bottom Right (move up on mobile) */}
+      <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50">
         <button
           onClick={toggleTheme}
-          className="w-10 h-10 glass-material rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center group"
-          title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+          className="w-10 h-10 md:w-12 md:h-12 theme-toggle-button rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
+          title={`Switch to ${theme === 'light' ? 'terminal' : 'light'} theme`}
         >
-          {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+          {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
         </button>
       </div>
 
