@@ -1260,3 +1260,38 @@ html.theme-light .glass-active:hover {
     opacity: 0.6;
   }
 }
+
+/* New Liquid Glass effect for side panels only */
+html.theme-light .sidebar-panel.glass-container {
+  border-radius: 16px !important;
+  box-shadow: 0 10px 40px rgba(31, 38, 135, 0.25) !important;
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer;
+}
+
+html.theme-light .sidebar-panel.glass-container:hover {
+  transform: translateY(-4px);
+}
+
+html.theme-light .sidebar-panel.glass-container .glass-overlay {
+  background: rgba(255, 255, 255, 0.1) !important;
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.167), transparent 50%) !important;
+}
+
+html.theme-light .sidebar-panel.glass-container:hover .glass-overlay {
+  background: rgba(255, 255, 255, 0.13) !important;
+}
+
+html.theme-light .sidebar-panel.glass-container .glass-specular {
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+  border-radius: 16px !important;
+}
+
+html.theme-light .sidebar-panel.glass-container .glass-filter {
+  backdrop-filter: blur(20px) !important;
+}
+
+html.theme-light .sidebar-panel.glass-container:hover .glass-filter {
+  filter: none !important;
+}
