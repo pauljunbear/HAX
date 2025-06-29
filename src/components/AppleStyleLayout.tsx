@@ -91,80 +91,105 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
 
       {/* Left Effects Panel */}
       {/* Desktop mode */}
-      <div className="hidden md:block w-64 lg:w-80 h-full sidebar-panel flex-shrink-0 left-panel relative z-10 glass-panel-surface">
-        <AppleEffectsBrowser
-          activeEffect={activeEffect}
-          onEffectChange={onEffectChange}
-          hasImage={!!selectedImage}
-          onNewImage={handleImageSelect}
-          onHidePanel={() => {}}
-        />
+      <div className="hidden md:block w-64 lg:w-80 h-full sidebar-panel flex-shrink-0 left-panel relative z-10 glass-container">
+        <div className="glass-filter" />
+        <div className="glass-overlay" />
+        <div className="glass-specular" />
+        <div className="glass-content h-full w-full">
+          <AppleEffectsBrowser
+            activeEffect={activeEffect}
+            onEffectChange={onEffectChange}
+            hasImage={!!selectedImage}
+            onNewImage={handleImageSelect}
+            onHidePanel={() => {}}
+          />
+        </div>
       </div>
       {/* Mobile overlay */}
       {isLeftOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsLeftOpen(false)} />
-          <div className="relative w-4/5 max-w-xs h-full glass-panel-surface overflow-auto">
-            <AppleEffectsBrowser
-              activeEffect={activeEffect}
-              onEffectChange={e => {
-                onEffectChange?.(e);
-                setIsLeftOpen(false);
-              }}
-              hasImage={!!selectedImage}
-              onNewImage={() => {
-                handleImageSelect();
-                setIsLeftOpen(false);
-              }}
-              onHidePanel={() => setIsLeftOpen(false)}
-            />
+          <div className="relative w-4/5 max-w-xs h-full glass-container overflow-auto">
+            <div className="glass-filter" />
+            <div className="glass-overlay" />
+            <div className="glass-specular" />
+            <div className="glass-content h-full w-full">
+              <AppleEffectsBrowser
+                activeEffect={activeEffect}
+                onEffectChange={e => {
+                  onEffectChange?.(e);
+                  setIsLeftOpen(false);
+                }}
+                hasImage={!!selectedImage}
+                onNewImage={() => {
+                  handleImageSelect();
+                  setIsLeftOpen(false);
+                }}
+                onHidePanel={() => setIsLeftOpen(false)}
+              />
+            </div>
           </div>
         </div>
       )}
 
       {/* Center Canvas Area */}
-      <div className="flex-1 h-full canvas-area min-w-0 glass-panel-surface">{children}</div>
+      <div className="flex-1 h-full canvas-area min-w-0 glass-container">
+        <div className="glass-filter" />
+        <div className="glass-overlay" />
+        <div className="glass-specular" />
+        <div className="glass-content h-full w-full">{children}</div>
+      </div>
 
       {/* Right Controls Panel (desktop) */}
-      <div className="hidden md:block w-64 lg:w-80 h-full sidebar-panel flex-shrink-0 right-panel relative z-10 glass-panel-surface">
-        <AppleControlsPanel
-          isCollapsed={false}
-          onToggle={() => {}}
-          activeEffect={activeEffect}
-          effectLayers={effectLayers}
-          effectSettings={effectSettings}
-          onSettingChange={onSettingChange}
-          onResetSettings={onResetSettings}
-          onClearAllEffects={onClearAllEffects}
-          onRemoveEffect={onRemoveEffect}
-          onSetActiveLayer={onSetActiveLayer}
-          onToggleLayerVisibility={onToggleLayerVisibility}
-          onExport={onExport}
-          onNewImage={handleImageSelect}
-          hasImage={!!selectedImage}
-        />
+      <div className="hidden md:block w-64 lg:w-80 h-full sidebar-panel flex-shrink-0 right-panel relative z-10 glass-container">
+        <div className="glass-filter" />
+        <div className="glass-overlay" />
+        <div className="glass-specular" />
+        <div className="glass-content h-full w-full">
+          <AppleControlsPanel
+            isCollapsed={false}
+            onToggle={() => {}}
+            activeEffect={activeEffect}
+            effectLayers={effectLayers}
+            effectSettings={effectSettings}
+            onSettingChange={onSettingChange}
+            onResetSettings={onResetSettings}
+            onClearAllEffects={onClearAllEffects}
+            onRemoveEffect={onRemoveEffect}
+            onSetActiveLayer={onSetActiveLayer}
+            onToggleLayerVisibility={onToggleLayerVisibility}
+            onExport={onExport}
+            onNewImage={handleImageSelect}
+            hasImage={!!selectedImage}
+          />
+        </div>
       </div>
       {/* Right Controls Panel mobile overlay */}
       {isRightOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsRightOpen(false)} />
-          <div className="relative w-4/5 max-w-xs h-full glass-panel-surface overflow-auto">
-            <AppleControlsPanel
-              isCollapsed={false}
-              onToggle={() => setIsRightOpen(false)}
-              activeEffect={activeEffect}
-              effectLayers={effectLayers}
-              effectSettings={effectSettings}
-              onSettingChange={onSettingChange}
-              onResetSettings={onResetSettings}
-              onClearAllEffects={onClearAllEffects}
-              onRemoveEffect={onRemoveEffect}
-              onSetActiveLayer={onSetActiveLayer}
-              onToggleLayerVisibility={onToggleLayerVisibility}
-              onExport={onExport}
-              onNewImage={handleImageSelect}
-              hasImage={!!selectedImage}
-            />
+          <div className="relative w-4/5 max-w-xs h-full glass-container overflow-auto">
+            <div className="glass-filter" />
+            <div className="glass-overlay" />
+            <div className="glass-specular" />
+            <div className="glass-content h-full w-full">
+              <AppleControlsPanel
+                isCollapsed={false}
+                onToggle={() => setIsRightOpen(false)}
+                activeEffect={activeEffect}
+                effectLayers={effectLayers}
+                effectSettings={effectSettings}
+                onSettingChange={onSettingChange}
+                onResetSettings={onResetSettings}
+                onClearAllEffects={onClearAllEffects}
+                onRemoveEffect={onRemoveEffect}
+                onSetActiveLayer={onSetActiveLayer}
+                onToggleLayerVisibility={onToggleLayerVisibility}
+                onExport={onExport}
+                onNewImage={handleImageSelect}
+                hasImage={!!selectedImage}
+              />
+            </div>
           </div>
         </div>
       )}
