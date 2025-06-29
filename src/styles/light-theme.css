@@ -73,8 +73,8 @@ html.theme-light {
   --duration-slow: 400ms;
 
   /* Liquid Glass Design Tokens */
-  --liquid-blur: 30px;
-  --liquid-saturation: 1.3;
+  --liquid-blur: 40px;
+  --liquid-saturation: 1.8;
   --liquid-noise: 0.02;
 }
 
@@ -305,17 +305,6 @@ html.theme-light .flex.border-b button[class*='bg-white/20'] {
   color: var(--text-primary) !important;
   box-shadow: var(--shadow-sm) !important;
   border: 1px solid var(--border-light) !important;
-}
-
-/* Sidebar with inset and glass material */
-html.theme-light .w-full.h-full.flex.flex-col {
-  backdrop-filter: blur(var(--liquid-blur)) saturate(var(--liquid-saturation)) !important;
-  background: var(--glass-regular) !important;
-  box-shadow: inset 0 0 0 1px var(--border-subtle) !important;
-  margin: 8px !important;
-  border-radius: var(--radius-lg) !important;
-  position: relative !important;
-  overflow: hidden !important;
 }
 
 /* Range Sliders - Capsule geometry */
@@ -890,11 +879,11 @@ html.theme-light .backdrop-blur-md {
 
 /* Dynamic Shadow Response */
 .glass-button {
-  --shadow-opacity: 0.03;
+  --shadow-opacity: 0.06;
 }
 
 .glass-button:hover {
-  --shadow-opacity: 0.05;
+  --shadow-opacity: 0.06;
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.9) 0%,
@@ -902,8 +891,8 @@ html.theme-light .backdrop-blur-md {
   ) !important;
   border-color: rgba(255, 255, 255, 0.6) !important;
   box-shadow:
-    0 8px 20px rgba(0, 0, 0, var(--shadow-opacity)),
-    0 4px 8px rgba(0, 0, 0, calc(var(--shadow-opacity) * 0.8)),
+    0 8px 24px rgba(0, 0, 0, var(--shadow-opacity)),
+    0 4px 12px rgba(0, 0, 0, calc(var(--shadow-opacity) * 0.8)),
     inset 0 2px 4px rgba(255, 255, 255, 1),
     inset 0 -1px 2px rgba(0, 0, 0, 0.03) !important;
   transform: translateY(-2px) scale(1.02);
@@ -921,15 +910,39 @@ html.theme-light .backdrop-blur-md {
 .glass-active {
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(245, 248, 255, 0.9) 100%
+    rgba(0, 122, 255, 0.95) 0%,
+    rgba(40, 140, 255, 0.9) 100%
   ) !important;
-  border-color: rgba(255, 255, 255, 0.6) !important;
+  color: white !important;
+  border-color: rgba(100, 170, 255, 0.5) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  font-weight: 600 !important;
   box-shadow:
-    0 3px 8px rgba(0, 0, 0, 0.04),
-    0 1px 2px rgba(0, 0, 0, 0.02),
-    inset 0 2px 4px rgba(255, 255, 255, 1),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.03) !important;
+    0 6px 16px rgba(0, 122, 255, 0.35),
+    0 2px 6px rgba(0, 122, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1) !important;
+  position: relative;
+  overflow: hidden;
+  animation: pulse-active 2s ease-in-out infinite;
+}
+
+@keyframes pulse-active {
+  0%,
+  100% {
+    box-shadow:
+      0 6px 16px rgba(0, 122, 255, 0.35),
+      0 2px 6px rgba(0, 122, 255, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 8px 24px rgba(0, 122, 255, 0.45),
+      0 4px 8px rgba(0, 122, 255, 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  }
 }
 
 .glass-badge {
@@ -1116,7 +1129,7 @@ html.theme-light .fixed.bottom-4.right-4 button {
 
 /* Export panel items */
 html.theme-light .bg-white\/5 {
-  /* Keep empty to not override */
+  /* This is now handled by the .glass-effect-button class */
 }
 
 /* Scrollbar styling with glass effect */
@@ -1135,96 +1148,56 @@ button:hover .button-light-effect {
   opacity: 1;
 }
 
-/* Light theme specific adjustments */
-html.theme-light .glass-material {
-  backdrop-filter: blur(40px) saturate(1.8) brightness(1.05) !important;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.75) 0%,
-    rgba(255, 255, 255, 0.65) 50%,
-    rgba(245, 247, 255, 0.7) 100%
-  ) !important;
+/* New Liquid Glass Architecture */
+
+/* 1. The Container: Sets up the coordinate system and clips the effect. */
+html.theme-light .glass-container {
+  position: relative;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: none;
 }
 
-html.theme-light .glass-header {
-  backdrop-filter: blur(50px) saturate(2) brightness(1.1) !important;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(252, 253, 255, 0.88) 100%
-  ) !important;
+/* 2. The Distortion Layer: Applies the SVG filter to the blurred backdrop. */
+html.theme-light .glass-filter {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(20px) !important;
+  filter: url(#lg-dist);
 }
 
-html.theme-light .glass-input {
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.85) 0%,
-    rgba(250, 252, 255, 0.8) 100%
-  ) !important;
-  color: var(--text-primary) !important;
+/* 3. The Tint Layer: A semi-transparent overlay that gives the glass its color. */
+html.theme-light .glass-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--glass-regular) !important;
 }
 
-html.theme-light .glass-input:focus {
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(250, 252, 255, 0.9) 100%
-  ) !important;
-  border-color: var(--system-blue) !important;
+/* 4. The Specular Highlight Layer: Creates the subtle inner shine on the edges. */
+html.theme-light .glass-specular {
+  position: absolute;
+  inset: 0;
   box-shadow:
-    0 0 0 3px rgba(0, 122, 255, 0.1),
-    inset 0 2px 4px rgba(0, 0, 0, 0.02) !important;
+    inset 1px 1px 0 rgba(255, 255, 255, 0.75),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-lg) !important;
 }
 
-html.theme-light .glass-button {
-  color: var(--text-primary) !important;
+/* 5. The Content Layer: Your UI goes here, safely on top of the effect stack. */
+html.theme-light .glass-content {
+  position: relative;
+  z-index: 2;
 }
 
-html.theme-light .glass-effect-button {
-  color: var(--text-primary) !important;
+/* Remove old panel style */
+html.theme-light .glass-panel-surface {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
-html.theme-light .glass-badge {
-  color: var(--text-secondary) !important;
-}
-
-/* Fix control panel buttons visibility */
-html.theme-light .px-4.py-2.text-sm {
-  color: var(--text-primary) !important;
-}
-
-html.theme-light .shape-capsule {
-  color: var(--text-primary) !important;
-}
-
-/* Export cards enhanced glass */
-html.theme-light .w-full.p-2.bg-white\/5 {
-  backdrop-filter: blur(30px) saturate(1.6) !important;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(248, 250, 255, 0.7) 100%
-  ) !important;
-  border: 1px solid rgba(255, 255, 255, 0.4) !important;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.03),
-    inset 0 1px 2px rgba(255, 255, 255, 0.9) !important;
-}
-
-html.theme-light .w-full.p-2.bg-white\/5:hover {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.9) 0%,
-    rgba(250, 252, 255, 0.85) 100%
-  ) !important;
-  transform: translateY(-2px) !important;
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.05),
-    inset 0 2px 4px rgba(255, 255, 255, 1) !important;
-}
-
-/* Settings sliders section */
-html.theme-light .p-4.bg-black\/5 {
+html.theme-light .glass-card {
   backdrop-filter: blur(20px) saturate(1.4) !important;
   background: linear-gradient(
     135deg,
@@ -1238,167 +1211,52 @@ html.theme-light .p-4.bg-black\/5 {
     inset 0 1px 2px rgba(255, 255, 255, 0.8) !important;
 }
 
-/* Range slider enhanced */
-html.theme-light input[type='range'] {
-  background: linear-gradient(
-    to right,
-    rgba(0, 122, 255, 0.2) 0%,
-    rgba(100, 170, 255, 0.1) 100%
-  ) !important;
-  border-radius: var(--radius-capsule) !important;
-  height: 6px !important;
-}
-
-html.theme-light input[type='range']::-webkit-slider-thumb {
+/* Enhanced Glass Buttons */
+html.theme-light .glass-button,
+html.theme-light .glass-effect-button {
+  backdrop-filter: blur(20px) saturate(180%) !important;
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(250, 252, 255, 0.95) 100%
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.1) 100%
   ) !important;
-  border: 1px solid rgba(0, 122, 255, 0.3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
   box-shadow:
-    0 2px 8px rgba(0, 122, 255, 0.2),
-    inset 0 1px 2px rgba(255, 255, 255, 1) !important;
-}
-
-/* Text colors */
-html.theme-light .text-white,
-html.theme-light .text-white\/80,
-html.theme-light .text-white\/60 {
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    inset 0 1px 4px rgba(255, 255, 255, 0.7) !important;
   color: var(--text-primary) !important;
+  transition: all 0.2s ease-in-out;
 }
 
-html.theme-light .text-white\/50,
-html.theme-light .text-white\/40 {
-  color: var(--text-secondary) !important;
-}
-
-/* Chevron icon colors */
-html.theme-light .text-white\/60 svg {
-  color: var(--text-secondary) !important;
-}
-
-/* Main background with subtle gradient */
-html.theme-light {
-  --bg-canvas: linear-gradient(
-    135deg,
-    #f8f9fb 0%,
-    #f3f5f9 25%,
-    #eef2f7 50%,
-    #e9eef5 75%,
-    #e4eaf3 100%
-  );
-}
-
-/* Side panels enhanced glass */
-html.theme-light .w-80.h-full {
-  position: relative;
-  overflow: hidden;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.88) 0%,
-    rgba(252, 254, 255, 0.85) 100%
-  ) !important;
-  backdrop-filter: blur(50px) saturate(1.8) brightness(1.08) !important;
-}
-
-/* Remove the after pseudo-element that was causing visual issues */
-html.theme-light .w-80.h-full::after {
-  display: none;
-}
-
-/* Active effect with more glass depth */
-html.theme-light .active-effect {
-  backdrop-filter: blur(30px) saturate(1.8) !important;
-  background: linear-gradient(
-    135deg,
-    rgba(0, 122, 255, 0.95) 0%,
-    rgba(40, 140, 255, 0.9) 100%
-  ) !important;
-  color: white !important;
-  border: 1px solid rgba(100, 170, 255, 0.5) !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
-  font-weight: 600 !important;
+html.theme-light .glass-button:hover,
+html.theme-light .glass-effect-button:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 100%) !important;
+  border-color: rgba(255, 255, 255, 0.8) !important;
+  transform: translateY(-1px);
   box-shadow:
-    0 6px 16px rgba(0, 122, 255, 0.35),
-    0 2px 6px rgba(0, 122, 255, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.1) !important;
-  position: relative;
-  overflow: hidden;
+    0 8px 16px rgba(0, 0, 0, 0.1),
+    inset 0 1px 4px rgba(255, 255, 255, 0.8) !important;
 }
 
-/* Liquid Glass glow spread for active elements */
-html.theme-light .active-effect::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(0, 122, 255, 0.2) 0%,
-    rgba(0, 122, 255, 0.1) 50%,
-    transparent 100%
-  );
-  pointer-events: none;
-  animation: pulse 2s ease-in-out infinite;
+/* Keep active state strong */
+html.theme-light .glass-active,
+html.theme-light .glass-active:hover {
+  background: var(--primary-accent-gradient) !important;
+  border-color: rgba(0, 122, 255, 0.6) !important;
+  color: white !important;
+  box-shadow:
+    0 6px 16px rgba(0, 122, 255, 0.3),
+    inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(0);
 }
 
-/* Ensure main flex container has no gaps */
-html.theme-light .flex-1.flex.relative {
-  gap: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* Ensure all direct children of flex container have no extra spacing */
-html.theme-light .flex-1.flex.relative > * {
-  margin: 0 !important;
-}
-
-/* Specific targeting for the layout structure */
-html.theme-light .flex-1.flex.relative.bg-\\[var\\(--bg-canvas\\)\\] {
-  gap: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* Fix border consistency issues - Updated */
-html.theme-light .border-r.border-white\\/10 {
-  border-right: 1px solid rgba(0, 0, 0, 0.05) !important;
-  border-left: none !important;
-  box-shadow: none !important;
-  margin: 0 !important;
-}
-
-html.theme-light .border-l.border-white\\/10 {
-  border-left: 1px solid rgba(0, 0, 0, 0.05) !important;
-  border-right: none !important;
-  box-shadow: none !important;
-  margin: 0 !important;
-}
-
-/* Liquid Glass Scroll Edge Effects */
-html.theme-light .scroll-edge-soft {
-  position: relative;
-}
-
-html.theme-light .scroll-edge-soft::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 40px;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.9) 0%,
-    rgba(255, 255, 255, 0.6) 50%,
-    transparent 100%
-  );
-  pointer-events: none;
-  z-index: 10;
-  backdrop-filter: blur(10px);
+/* Pulsating Animation for Active State */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }

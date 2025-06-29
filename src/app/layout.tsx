@@ -51,6 +51,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className={inter.className}>
+        <svg style={{ position: 'absolute', width: 0, height: 0 }} aria-hidden="true">
+          <defs>
+            <filter id="lg-dist">
+              <feTurbulence baseFrequency="0.01 0.03" numOctaves="3" seed="2" type="fractalNoise" />
+              <feDisplacementMap in="SourceGraphic" scale="70" />
+            </filter>
+          </defs>
+        </svg>
         <main className="min-h-screen">{children}</main>
       </body>
     </html>
