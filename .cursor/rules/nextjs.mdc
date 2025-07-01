@@ -16,6 +16,7 @@ globs: **/*.tsx, **/*.ts, src/**/*.ts, src/**/*.tsx
 - Place shared components in `components` directory
 - Place utilities and helpers in `lib` directory
 - Use lowercase with dashes for directories (e.g., `components/auth-wizard`)
+
 ## Components
 - Use Server Components by default
 - Mark client components explicitly with 'use client'

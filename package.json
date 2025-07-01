@@ -39,6 +39,7 @@
     "@pixi/filter-blur": "^7.4.3",
     "@pixi/filter-color-matrix": "^7.4.3",
     "@pixi/filter-displacement": "^7.4.3",
+    "@radix-ui/colors": "^3.0.0",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
     "@tsparticles/engine": "^3.8.1",

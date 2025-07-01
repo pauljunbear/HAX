@@ -75,6 +75,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
     const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
     const [isExportingAnimation, setIsExportingAnimation] = useState(false);
     const [animationProgress, setAnimationProgress] = useState(0);
+    const [stage, setStage] = useState({ scale: 1, x: 0, y: 0 });
 
     // Simplified state (removed unused performance monitoring)
 
@@ -105,7 +106,11 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
           console.log('📸 Starting export process...');
 
           // For now, only handle static exports (PNG/JPEG)
-          if (format === 'png' || format === 'jpeg') {
+          if (
+            format.toLowerCase() === 'png' ||
+            format.toLowerCase() === 'jpeg' ||
+            format.toLowerCase() === 'jpg'
+          ) {
             console.log('📸 Exporting static image at original resolution...');
 
             // Create a completely isolated canvas for clean export
@@ -205,9 +210,10 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
               ctx.drawImage(image, 0, 0);
             }
 
-            // Export the clean canvas
+            // Export the clean canvas - handle both JPG and JPEG formats
+            const isJpeg = format.toLowerCase() === 'jpeg' || format.toLowerCase() === 'jpg';
             const dataURL = canvas.toDataURL(
-              format === 'jpeg' ? 'image/jpeg' : 'image/png',
+              isJpeg ? 'image/jpeg' : 'image/png',
               1 // Use maximum quality for both PNG and JPEG
             );
 
@@ -218,7 +224,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
 
             // Create download link
             const link = document.createElement('a');
-            link.download = `hax-export-${Date.now()}.${format === 'jpeg' ? 'jpg' : 'png'}`;
+            link.download = `hax-export-${Date.now()}.${isJpeg ? 'jpg' : 'png'}`;
             link.href = dataURL;
             link.style.display = 'none';
 
@@ -258,14 +264,12 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
       setIsBrowser(true);
 
       const updateContainerDimensions = () => {
-        if (typeof window !== 'undefined') {
-          // Account for sidebars: 280px left + 320px right + padding
-          const availableWidth = window.innerWidth - 680;
-          const availableHeight = window.innerHeight - 120; // Account for header/footer
-
+        if (typeof window !== 'undefined' && containerRef.current) {
+          // Use the actual container dimensions
+          const rect = containerRef.current.getBoundingClientRect();
           setContainerDimensions({
-            width: Math.max(availableWidth, 400), // Minimum width
-            height: Math.max(availableHeight, 300), // Minimum height
+            width: rect.width,
+            height: rect.height,
           });
         }
       };
@@ -366,16 +370,65 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
       fileInputRef.current?.click();
     };
 
+    // Zoom handlers
+    const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
+      e.evt.preventDefault();
+      const scaleBy = 1.05;
+      const stage = e.target.getStage();
+      if (!stage) return;
+
+      const oldScale = stage.scaleX();
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
+
+      const mousePointTo = {
+        x: (pointer.x - stage.x()) / oldScale,
+        y: (pointer.y - stage.y()) / oldScale,
+      };
+
+      const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
+
+      setStage({
+        scale: newScale,
+        x: pointer.x - mousePointTo.x * newScale,
+        y: pointer.y - mousePointTo.y * newScale,
+      });
+    };
+
+    const zoomIn = () => {
+      setStage(prev => ({ ...prev, scale: prev.scale * 1.1 }));
+    };
+
+    const zoomOut = () => {
+      setStage(prev => ({ ...prev, scale: prev.scale / 1.1 }));
+    };
+
+    const fitToScreen = useCallback(() => {
+      if (!image || !containerRef.current) return;
+      const container = containerRef.current;
+      const containerWidth = container.offsetWidth - 64;
+      const containerHeight = container.offsetHeight - 64;
+      const scaleX = containerWidth / image.width;
+      const scaleY = containerHeight / image.height;
+      const scale = Math.min(scaleX, scaleY, 1);
+      setStage({ scale, x: 0, y: 0 });
+    }, [image]);
+
+    useEffect(() => {
+      fitToScreen();
+    }, [fitToScreen, containerDimensions]);
+
     return (
       <div
         ref={containerRef}
         className="w-full h-full flex flex-col items-center justify-center relative"
+        style={{ background: 'transparent', border: 'none', margin: 0, padding: 0 }}
       >
         {!selectedImage ? (
           <div className="text-center">
-            <div className="w-24 h-24 glass-material flex items-center justify-center mb-6 mx-auto rounded-2xl">
+            <div className="w-24 h-24 liquid-glass-button flex items-center justify-center mb-6 mx-auto rounded-2xl">
               <svg
-                className="w-12 h-12 text-white/60"
+                className="w-12 h-12 text-gray-500"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -388,11 +441,11 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
                 />
               </svg>
             </div>
-            <h2 className="text-2xl font-semibold mb-3 text-white">Welcome to HAX</h2>
-            <p className="text-white/70 mb-8 max-w-md">Upload an image to start applying effects</p>
+            <h2 className="text-2xl font-semibold mb-3 text-gray-800">Welcome to HAX</h2>
+            <p className="text-gray-600 mb-8 max-w-md">Upload an image to start applying effects</p>
             <button
               onClick={handleUploadClick}
-              className="bg-blue-500 hover:bg-blue-600 px-6 py-3 text-white font-medium rounded-lg transition-all duration-200 shadow-sm"
+              className="liquid-glass-button px-6 py-3 text-gray-800 font-medium rounded-lg transition-all duration-200"
             >
               Choose Image
             </button>
@@ -403,15 +456,18 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
               className="hidden"
               onChange={handleFileChange}
             />
-            <p className="text-xs text-white/50 mt-4">Supports JPG, PNG, GIF, WebP • Max 10MB</p>
+            <p className="text-xs text-gray-500 mt-4">Supports JPG, PNG, GIF, WebP • Max 10MB</p>
           </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div
+            className="w-full h-full flex items-center justify-center"
+            style={{ background: 'transparent', border: 'none', margin: 0, padding: '32px' }}
+          >
             {image &&
               (() => {
-                // Calculate available space (accounting for padding)
-                const maxWidth = containerDimensions.width - 32;
-                const maxHeight = containerDimensions.height - 32;
+                // Calculate available space (with proper padding)
+                const maxWidth = containerDimensions.width - 64;
+                const maxHeight = containerDimensions.height - 64;
 
                 // Calculate scale to fit image while maintaining aspect ratio
                 const scaleX = maxWidth / image.width;
@@ -433,14 +489,24 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
                     ref={stageRef}
                     width={stageWidth}
                     height={stageHeight}
-                    className="rounded-lg shadow-2xl"
-                    style={{ backgroundColor: 'transparent' }}
+                    scaleX={stage.scale}
+                    scaleY={stage.scale}
+                    x={stage.x}
+                    y={stage.y}
+                    onWheel={handleWheel}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      margin: 0,
+                      padding: 0,
+                      display: 'block',
+                    }}
                   >
                     <Layer>
                       <KonvaImage
                         image={image}
-                        width={stageWidth}
-                        height={stageHeight}
+                        width={image.width}
+                        height={image.height}
                         filters={[]}
                         ref={node => {
                           if (node) {
@@ -463,6 +529,30 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
           >
             <strong className="font-bold">Error: </strong>
             <span className="block sm:inline">{error}</span>
+          </div>
+        )}
+
+        {/* Zoom Controls */}
+        {selectedImage && (
+          <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1">
+            <button
+              onClick={zoomOut}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            >
+              -
+            </button>
+            <button
+              onClick={fitToScreen}
+              className="h-8 px-3 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors text-xs"
+            >
+              {Math.round(stage.scale * 100)}%
+            </button>
+            <button
+              onClick={zoomIn}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            >
+              +
+            </button>
           </div>
         )}
       </div>
