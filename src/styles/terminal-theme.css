@@ -1,358 +1,310 @@
-/* Terminal Theme - Tactical Intelligence Dashboard */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* =======================================
+   TERMINAL THEME - CYBERPUNK DASHBOARD
+   ======================================== */
 
-/* Base Variables */
+/* --- Variable & Font Definition --- */
 html.theme-terminal {
-  --terminal-bg: 0, 0, 0;
-  --terminal-surface: 8, 8, 8;
-  --terminal-border: 35, 35, 35;
-  --terminal-accent: 0, 255, 0;
-  --terminal-accent-dim: 0, 180, 0;
-  --terminal-text: 255, 255, 255;
-  --terminal-text-dim: 200, 200, 200;
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-fira-code);
+  --font-display: var(--font-space-mono); /* New font for display elements */
+
+  --bg: #010409;
+  --panel-bg: rgba(22, 27, 34, 0.5);
+  --panel-border: rgba(56, 139, 253, 0.3);
+  --panel-glow: rgba(56, 139, 253, 0.2);
+
+  --text-primary: #e6edf3;
+  --text-secondary: #7d8590;
+  --text-accent: #58a6ff;
+  --text-danger: #f85149;
+
+  --accent-glow: #58a6ff;
+  --accent-hover: #79c0ff;
+
+  --scanline-bg: rgba(255, 255, 255, 0.03);
+  --grid-bg: rgba(56, 139, 253, 0.07);
 }
 
-/* Base Reset */
-html.theme-terminal * {
-  font-family: 'JetBrains Mono', monospace !important;
-  border-radius: 0 !important;
-}
-
-/* Main Background - Deep Black */
+/* --- Base Body & Background --- */
 html.theme-terminal body {
-  background: rgb(var(--terminal-bg)) !important;
-  color: rgb(var(--terminal-text)) !important;
+  background-color: var(--bg) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-mono) !important;
+  font-feature-settings: 'ss01', 'ss03', 'ss04', 'ss05'; /* Fira Code ligatures */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Subtle Grid Pattern */
-html.theme-terminal body::before {
+html.theme-terminal .layout-bg::before {
   content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: absolute;
+  inset: 0;
   background-image:
-    linear-gradient(rgba(var(--terminal-border), 0.3) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--terminal-border), 0.3) 1px, transparent 1px);
-  background-size: 24px 24px;
+    linear-gradient(var(--grid-bg) 1px, transparent 1px),
+    linear-gradient(to right, var(--grid-bg) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.5;
   pointer-events: none;
-  z-index: -1;
-  opacity: 0.4;
 }
-
-/* Headers - Tactical Style */
-html.theme-terminal h2 {
-  font-size: 0.625rem !important;
-  font-weight: 600 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.2em !important;
-  color: rgba(var(--terminal-accent), 0.9) !important;
-  margin: 0 0 12px 0 !important;
-  padding: 8px 0 !important;
-  border-bottom: 1px solid rgba(var(--terminal-accent-dim), 0.3) !important;
-  position: relative !important;
-}
-
-/* Green glow effect on headers */
-html.theme-terminal h2::after {
+html.theme-terminal .layout-bg::after {
   content: '';
   position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 30%;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(var(--terminal-accent), 0.8), transparent);
-  box-shadow: 0 0 4px rgba(var(--terminal-accent), 0.4);
+  inset: 0;
+  background-image: linear-gradient(to bottom, var(--scanline-bg) 50%, transparent 50%);
+  background-size: 100% 4px;
+  animation: scanline-anim 10s linear infinite;
+  pointer-events: none;
+  opacity: 0.5;
 }
 
-/* Search Input - Tactical */
-html.theme-terminal input[type='search'] {
-  background: rgba(var(--terminal-surface), 0.8) !important;
-  border: 1px solid rgba(var(--terminal-border), 1) !important;
-  color: rgb(var(--terminal-text)) !important;
-  font-size: 0.625rem !important;
-  padding: 10px 12px !important;
-  letter-spacing: 0.05em !important;
-  text-transform: uppercase !important;
-  width: 100% !important;
-  transition: all 0.2s ease !important;
-}
-
-html.theme-terminal input[type='search']:focus {
-  background: rgba(var(--terminal-surface), 1) !important;
-  border-color: rgba(var(--terminal-accent), 0.6) !important;
-  box-shadow: 0 0 8px rgba(var(--terminal-accent), 0.2) !important;
-  outline: none !important;
-}
-
-html.theme-terminal input[type='search']::placeholder {
-  color: rgba(var(--terminal-text-dim), 0.5) !important;
-}
-
-/* Category Container */
-html.theme-terminal .space-y-1 {
-  display: block !important;
-}
-
-/* Category Buttons - Intelligence Style */
-html.theme-terminal button[class*='flex'][class*='items-center'][class*='w-full'] {
-  display: flex !important;
-  align-items: center !important;
-  width: 100% !important;
-  padding: 12px !important;
-  background: transparent !important;
-  border: none !important;
-  border-bottom: 1px solid rgba(var(--terminal-border), 0.5) !important;
-  transition: all 0.2s ease !important;
-  position: relative !important;
-}
-
-/* Green glow emanating on hover */
-html.theme-terminal button[class*='flex'][class*='items-center']:hover {
-  background: rgba(var(--terminal-accent), 0.03) !important;
-  border-bottom-color: rgba(var(--terminal-accent), 0.3) !important;
-  box-shadow: inset 0 0 20px rgba(var(--terminal-accent), 0.05) !important;
-}
-
-/* Subtle green glow on category buttons */
-html.theme-terminal button[class*='flex'][class*='items-center']:hover::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, transparent, rgba(var(--terminal-accent), 0.1), transparent);
-  animation: scan-line 2s ease-in-out infinite;
-}
-
-@keyframes scan-line {
-  0%,
-  100% {
-    opacity: 0;
+@keyframes scanline-anim {
+  from {
+    background-position-y: 0;
   }
-  50% {
-    opacity: 1;
+  to {
+    background-position-y: 100vh;
   }
 }
 
-/* Category Button Content Wrapper */
-html.theme-terminal button[class*='flex'][class*='items-center'][class*='w-full'] > div {
-  display: flex !important;
-  align-items: center !important;
-  width: 100% !important;
-  gap: 8px !important;
+/* --- Panel & Glass Styling --- */
+html.theme-terminal .glass-container {
+  background: var(--panel-bg) !important;
+  border: 1px solid var(--panel-border) !important;
+  box-shadow: 0 0 20px 0 var(--panel-glow) !important;
+  backdrop-filter: blur(10px) !important;
 }
 
-/* Hide emojis */
-html.theme-terminal span[aria-hidden='true'] {
+/* Remove filter/overlay layers from light theme */
+html.theme-terminal .glass-filter,
+html.theme-terminal .glass-overlay,
+html.theme-terminal .glass-specular {
   display: none !important;
 }
 
-/* Chevron - Green Theme */
-html.theme-terminal button svg {
-  width: 10px !important;
-  height: 10px !important;
-  color: rgba(var(--terminal-accent-dim), 0.7) !important;
-  transition: all 0.2s ease !important;
-  flex-shrink: 0 !important;
+/* --- Buttons --- */
+html.theme-terminal .glass-button {
+  background: transparent !important;
+  border: 1px solid var(--panel-border) !important;
+  color: var(--text-accent) !important;
+  font-family: var(--font-display) !important; /* Use display font */
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease-in-out;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
 
-html.theme-terminal button:hover svg {
-  color: rgba(var(--terminal-accent), 0.9) !important;
-  filter: drop-shadow(0 0 2px rgba(var(--terminal-accent), 0.5));
+html.theme-terminal .glass-button:hover {
+  background: var(--panel-border) !important;
+  color: var(--bg) !important;
+  border-color: var(--accent-hover) !important;
+  box-shadow: 0 0 15px 0 var(--panel-glow) !important;
 }
 
-/* Category Name */
-html.theme-terminal button .font-medium {
-  font-size: 0.6875rem !important;
-  font-weight: 500 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.1em !important;
-  color: rgba(var(--terminal-text), 0.8) !important;
-  flex: 1 !important;
+html.theme-terminal .glass-active,
+html.theme-terminal .glass-active:hover {
+  background: var(--text-accent) !important;
+  color: var(--bg) !important;
+  border-color: var(--accent-hover) !important;
+  box-shadow: 0 0 20px 0 var(--accent-glow) !important;
 }
 
-html.theme-terminal button:hover .font-medium {
-  color: rgb(var(--terminal-text)) !important;
-  text-shadow: 0 0 4px rgba(var(--terminal-accent), 0.3);
+/* Fix for icon buttons inside an active layer */
+html.theme-terminal .glass-active .glass-button {
+  background: rgba(0, 0, 0, 0.2) !important;
+  color: var(--bg) !important;
+  border: none !important;
 }
 
-/* Effect Count - Green Accent */
-html.theme-terminal button span[class*='text-[10px]'] {
-  font-size: 0.5625rem !important;
-  color: rgba(var(--terminal-accent), 0.9) !important;
-  padding: 2px 8px !important;
-  border: 1px solid rgba(var(--terminal-accent), 0.3) !important;
-  background: rgba(var(--terminal-accent), 0.05) !important;
+html.theme-terminal .glass-active .glass-button:hover {
+  background: rgba(0, 0, 0, 0.4) !important;
 }
 
-html.theme-terminal button:hover span[class*='text-[10px]'] {
-  background: rgba(var(--terminal-accent), 0.1) !important;
-  box-shadow: 0 0 6px rgba(var(--terminal-accent), 0.2) !important;
+/* --- Headers & Titles --- */
+html.theme-terminal h2,
+html.theme-terminal .control-panel-title {
+  color: var(--text-accent) !important;
+  font-family: var(--font-display) !important; /* Use display font */
+  text-transform: uppercase;
+  font-size: 0.8rem !important;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 5px var(--panel-glow);
 }
 
-/* Expanded State */
-html.theme-terminal button[aria-expanded='true'] {
-  background: rgba(var(--terminal-accent), 0.08) !important;
-  border-bottom-color: rgba(var(--terminal-accent), 0.4) !important;
+/* --- Effects Browser Specific Styles --- */
+/* Search bar padding fix */
+html.theme-terminal input[type='search'].glass-input {
+  padding-left: 36px !important;
 }
 
-html.theme-terminal button[aria-expanded='true'] svg {
-  transform: rotate(90deg) !important;
-  color: rgba(var(--terminal-accent), 1) !important;
-  filter: drop-shadow(0 0 3px rgba(var(--terminal-accent), 0.6));
+/* Category Headers */
+html.theme-terminal .glass-effect-button {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--panel-border) !important;
+  border-radius: 0 !important;
+  padding: 12px 8px !important;
+}
+html.theme-terminal .glass-effect-button:hover {
+  background: var(--panel-border) !important;
+  transform: none !important;
+}
+html.theme-terminal .glass-effect-button.glass-active {
+  background: var(--text-accent) !important;
 }
 
-/* Effect Grid - Tactical Layout */
-html.theme-terminal .grid {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 4px !important;
-  padding: 8px !important;
-  background: rgba(var(--terminal-surface), 0.3) !important;
-  border-left: 1px solid rgba(var(--terminal-border), 0.5) !important;
-  border-right: 1px solid rgba(var(--terminal-border), 0.5) !important;
-  border-bottom: 1px solid rgba(var(--terminal-border), 0.5) !important;
-}
-
-/* Effect Buttons - Intelligence Style */
-html.theme-terminal button[class*='px-2.5'],
-html.theme-terminal button[class*='px-3'][class*='py-2'] {
-  padding: 8px 10px !important;
-  background: rgba(var(--terminal-surface), 0.6) !important;
-  border: 1px solid rgba(var(--terminal-border), 0.4) !important;
-  font-size: 0.5625rem !important;
+/* Category Title Text */
+html.theme-terminal .glass-effect-button h3 {
+  font-family: var(--font-mono) !important;
+  color: var(--text-primary) !important;
+  font-size: 0.75rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
-  color: rgba(var(--terminal-text), 0.7) !important;
-  transition: all 0.2s ease !important;
-  text-align: left !important;
-  position: relative !important;
+  text-shadow: none !important;
+}
+html.theme-terminal .glass-effect-button:hover h3,
+html.theme-terminal .glass-effect-button.glass-active h3 {
+  color: var(--bg) !important;
 }
 
-/* Green glow on effect button hover */
-html.theme-terminal button[class*='px-2.5']:hover,
-html.theme-terminal button[class*='px-3'][class*='py-2']:hover {
-  background: rgba(var(--terminal-accent), 0.08) !important;
-  border-color: rgba(var(--terminal-accent), 0.4) !important;
-  color: rgb(var(--terminal-text)) !important;
-  box-shadow: 0 0 8px rgba(var(--terminal-accent), 0.15) !important;
+/* Effect Count Badge */
+html.theme-terminal .glass-badge {
+  background: transparent !important;
+  color: var(--text-accent) !important;
+  border: 1px solid var(--panel-border) !important;
+  font-family: var(--font-mono) !important;
+  border-radius: 9999px !important;
+  font-size: 0.6rem !important;
+  min-width: 24px;
+  text-align: center;
+}
+html.theme-terminal .glass-effect-button:hover .glass-badge,
+html.theme-terminal .glass-effect-button.glass-active .glass-badge {
+  color: var(--bg) !important;
+  background: var(--text-accent) !important;
+  border-color: var(--text-accent) !important;
 }
 
-/* Active Effect - Bright Green */
-html.theme-terminal button[aria-pressed='true'] {
-  background: rgba(var(--terminal-accent), 0.15) !important;
-  border-color: rgba(var(--terminal-accent), 0.6) !important;
-  color: rgb(var(--terminal-text)) !important;
-  box-shadow:
-    0 0 12px rgba(var(--terminal-accent), 0.3),
-    inset 0 0 8px rgba(var(--terminal-accent), 0.1) !important;
+/* Chevron Icon */
+html.theme-terminal .glass-effect-button svg {
+  color: var(--text-secondary) !important;
+}
+html.theme-terminal .glass-effect-button:hover svg,
+html.theme-terminal .glass-effect-button.glass-active svg {
+  color: var(--bg) !important;
 }
 
-/* Active effect indicator */
-html.theme-terminal button[aria-pressed='true']::before {
-  content: '' !important;
-  position: absolute !important;
-  left: 0 !important;
-  top: 0 !important;
-  bottom: 0 !important;
-  width: 2px !important;
-  background: rgb(var(--terminal-accent)) !important;
-  box-shadow: 0 0 4px rgba(var(--terminal-accent), 0.6) !important;
+/* --- Inputs & Sliders --- */
+html.theme-terminal input[type='search'] {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid var(--panel-border) !important;
+  color: var(--text-primary) !important;
+}
+html.theme-terminal input[type='search']:focus {
+  border-color: var(--accent-hover);
+  box-shadow: 0 0 10px 0 var(--panel-glow);
 }
 
-/* Focus States - Green Glow */
-html.theme-terminal button:focus,
-html.theme-terminal input:focus {
-  outline: none !important;
-  box-shadow: 0 0 0 1px rgba(var(--terminal-accent), 0.5) !important;
+html.theme-terminal .slider {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 100% !important;
+  height: 2px !important;
+  background: var(--panel-border) !important;
+}
+html.theme-terminal .slider::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 12px !important;
+  height: 12px !important;
+  background: var(--accent-glow) !important;
+  border: 1px solid var(--bg) !important;
+  box-shadow: 0 0 10px 0 var(--accent-glow) !important;
+  cursor: pointer !important;
 }
 
-/* Panels - Dark Tactical */
-html.theme-terminal .glass-panel,
-html.theme-terminal aside {
-  background: rgb(var(--terminal-bg)) !important;
-  border: 1px solid rgba(var(--terminal-border), 0.5) !important;
+/* --- Color Picker Controls --- */
+html.theme-terminal .p-3.border {
+  border-color: var(--panel-border) !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* --- Settings Cards --- */
+html.theme-terminal .glass-card {
+  background: rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid var(--panel-border) !important;
   box-shadow: none !important;
 }
 
-/* Settings Panel */
-html.theme-terminal .border-t {
-  border-color: rgba(var(--terminal-border), 0.5) !important;
+/* Card Titles (e.g., "Mosaic") and Labels (e.g., "Tile Size") */
+html.theme-terminal .control-panel-title,
+html.theme-terminal .control-panel-label {
+  font-family: var(--font-display) !important;
+  color: var(--text-accent) !important;
+  text-transform: uppercase;
+  font-size: 0.8rem !important;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 5px var(--panel-glow);
 }
 
-/* Sliders - Green Accent */
-html.theme-terminal input[type='range'] {
-  -webkit-appearance: none !important;
-  background: rgba(var(--terminal-border), 0.5) !important;
-  height: 2px !important;
+/* Category text (e.g., "Artistic") */
+html.theme-terminal .control-panel-category {
+  color: var(--text-secondary) !important;
+  font-family: var(--font-mono) !important;
 }
 
-html.theme-terminal input[type='range']::-webkit-slider-thumb {
-  -webkit-appearance: none !important;
-  width: 10px !important;
-  height: 10px !important;
-  background: rgb(var(--terminal-accent)) !important;
-  cursor: pointer !important;
-  box-shadow: 0 0 6px rgba(var(--terminal-accent), 0.5) !important;
+/* Value display chip */
+html.theme-terminal .bg-gray-100 {
+  background: var(--bg) !important;
+  border: 1px solid var(--panel-border) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-mono) !important;
+  box-shadow: none !important;
 }
 
-/* Scrollbar - Green Theme */
-html.theme-terminal ::-webkit-scrollbar {
-  width: 8px !important;
+/* Slider range markers (min/max values) */
+html.theme-terminal .flex.justify-between.text-xs.text-gray-500 {
+  color: var(--text-secondary) !important;
+  font-family: var(--font-mono) !important;
 }
 
-html.theme-terminal ::-webkit-scrollbar-track {
-  background: rgb(var(--terminal-bg)) !important;
+/* Main label (e.g., "COLOR 1 (HEX#)") */
+html.theme-terminal .text-sm.font-medium.text-gray-800 {
+  color: var(--text-secondary) !important;
+  font-family: var(--font-display) !important;
+  font-size: 0.7rem !important;
 }
 
-html.theme-terminal ::-webkit-scrollbar-thumb {
-  background: rgba(var(--terminal-border), 0.8) !important;
-  border: 1px solid rgba(var(--terminal-border), 1) !important;
+/* Hex value display chip */
+html.theme-terminal .text-xs.text-green-400 {
+  background: var(--bg) !important;
+  border-color: var(--panel-border) !important;
+  color: var(--text-accent) !important;
+  font-family: var(--font-mono) !important;
 }
 
-html.theme-terminal ::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--terminal-accent), 0.5) !important;
+/* Color swatch input */
+html.theme-terminal input[type='color'] {
+  border-color: var(--panel-border) !important;
+  background-color: var(--bg) !important;
 }
 
-/* Canvas area will use default terminal background */
-
-/* Remove shadows except intentional glows */
-html.theme-terminal * {
-  text-shadow: none !important;
+/* Hex code text input */
+html.theme-terminal .flex-1.px-3.py-1\\.5 {
+  background: var(--bg) !important;
+  border-color: var(--panel-border) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-mono) !important;
+}
+html.theme-terminal .flex-1.px-3.py-1\\.5:focus {
+  border-color: var(--accent-hover) !important;
+  box-shadow: 0 0 10px 0 var(--panel-glow) !important;
 }
 
-/* Recent Effects */
-html.theme-terminal .border-b {
-  border-bottom-color: rgba(var(--terminal-border), 0.5) !important;
-}
-
-/* Theme Toggle */
-html.theme-terminal .theme-toggle {
-  background: rgba(var(--terminal-surface), 0.8) !important;
-  border: 1px solid rgba(var(--terminal-border), 0.5) !important;
-  color: rgba(var(--terminal-accent), 0.9) !important;
-}
-
-html.theme-terminal .theme-toggle:hover {
-  background: rgba(var(--terminal-surface), 1) !important;
-  border-color: rgba(var(--terminal-accent), 0.5) !important;
-  color: rgb(var(--terminal-accent)) !important;
-  box-shadow: 0 0 8px rgba(var(--terminal-accent), 0.2) !important;
-}
-
-/* View Mode Toggle */
-html.theme-terminal button[aria-label*='Switch'] {
-  background: transparent !important;
-  border: 1px solid rgba(var(--terminal-border), 0.5) !important;
-  padding: 6px !important;
-  color: rgba(var(--terminal-text-dim), 1) !important;
-}
-
-html.theme-terminal button[aria-label*='Switch']:hover {
-  border-color: rgba(var(--terminal-accent), 0.5) !important;
-  color: rgb(var(--terminal-text)) !important;
-  box-shadow: 0 0 4px rgba(var(--terminal-accent), 0.2) !important;
+/* Help text */
+html.theme-terminal .text-xs.text-gray-500 {
+  color: var(--text-secondary) !important;
+  font-family: var(--font-mono) !important;
+  opacity: 0.7;
 }

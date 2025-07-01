@@ -3,10 +3,24 @@ import '../styles/apple-colors.css';
 import '../styles/light-theme.css';
 import '../styles/terminal-theme.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Fira_Code, Space_Mono } from 'next/font/google';
 import { initializeTheme } from '@/lib/themes';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+});
+
+const firaCode = Fira_Code({
+  subsets: ['latin'],
+  variable: '--font-fira-code',
+});
+
+const spaceMono = Space_Mono({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-space-mono',
+});
 
 export const metadata: Metadata = {
   title: 'HAX - Real-time Image Effects',
@@ -50,7 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${firaCode.variable} ${spaceMono.variable}`}>
         <svg style={{ position: 'absolute', width: 0, height: 0 }} aria-hidden="true">
           <defs>
             <filter id="lg-dist">

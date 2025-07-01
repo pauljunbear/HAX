@@ -13,6 +13,7 @@ import {
   X,
   ChevronRight,
 } from 'lucide-react';
+import { useTheme } from '@/lib/themes';
 
 interface EffectLayer {
   id: string;
@@ -32,6 +33,7 @@ interface AppleControlsPanelProps {
   onRemoveEffect?: (layerId: string) => void;
   onSetActiveLayer?: (layerId: string) => void;
   onToggleLayerVisibility?: (layerId: string) => void;
+  onNewImage?: () => void;
   hasImage?: boolean;
   isCollapsed: boolean;
   onToggle: () => void;
@@ -76,9 +78,9 @@ const HexColorInput: React.FC<{
   };
 
   return (
-    <div className="p-3 border border-white/20">
+    <div className="p-3 border border-gray-200/20">
       <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-white font-mono uppercase tracking-wide">
+        <label className="text-sm font-medium text-gray-800 font-mono uppercase tracking-wide">
           {label}
         </label>
         <span className="text-xs text-green-400 font-mono bg-black/50 px-2 py-0.5 border border-green-400/30">
@@ -98,11 +100,11 @@ const HexColorInput: React.FC<{
           value={hexValue}
           onChange={e => handleTextInputChange(e.target.value)}
           placeholder="#000000"
-          className="flex-1 px-3 py-1.5 text-sm border border-white/20 bg-black/50 text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-colors font-mono"
+          className="flex-1 px-3 py-1.5 text-sm border border-gray-200/20 bg-black/50 text-gray-800 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-colors font-mono"
         />
       </div>
 
-      <div className="mt-2 text-xs text-white/50 font-mono">Click color box or enter hex code</div>
+      <div className="mt-2 text-xs text-gray-500 font-mono">Click color box or enter hex code</div>
     </div>
   );
 };
@@ -118,13 +120,13 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   onRemoveEffect,
   onSetActiveLayer,
   onToggleLayerVisibility,
+  onNewImage,
   hasImage = false,
   isCollapsed,
   onToggle,
 }) => {
-  const [activeTab, setActiveTab] = useState<'settings' | 'layers' | 'export' | 'history'>(
-    'settings'
-  );
+  const { theme } = useTheme();
+  const [activeTab, setActiveTab] = useState<'settings' | 'layers' | 'export'>('settings');
 
   // Get the active layer with null checking
   const activeLayer = effectLayers?.find(layer => layer.id === activeEffect);
@@ -141,6 +143,15 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'layers', label: 'Layers', icon: Layers },
     { id: 'export', label: 'Export', icon: Download },
+    {
+      id: 'new',
+      label: '+',
+      icon: () => (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+      ),
+    },
   ];
 
   const exportOptions = [
@@ -179,26 +190,29 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   }
 
   return (
-    <div className="h-full w-full flex flex-col glass-material">
+    <div className="h-full w-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 glass-header">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider">Controls</h2>
+      <div className="flex items-center justify-between px-4 py-3">
+        <h2 className="text-sm font-semibold">Controls</h2>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-white/10 px-4 py-2 mb-4">
-        <div className="flex gap-2">
+      <div className="px-3 pb-3 mb-4">
+        <div className="flex gap-1 w-full">
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as 'settings' | 'layers' | 'export' | 'history')}
-              className={`
-                px-4 py-2 text-sm font-medium transition-all rounded-lg
-                ${
-                  activeTab === tab.id
-                    ? 'glass-active text-white shadow-sm'
-                    : 'glass-button text-white/80 hover:text-white'
+              onClick={() => {
+                if (tab.id === 'new') {
+                  onNewImage?.();
+                  // Don't change active tab for action buttons
+                } else {
+                  setActiveTab(tab.id as 'settings' | 'layers' | 'export');
                 }
+              }}
+              className={`
+                glass-button ${tab.id === 'new' ? 'px-2 py-1.5 flex-shrink-0' : 'px-2.5 py-1.5 flex-1 min-w-0'} text-xs font-medium transition-all rounded-lg
+                ${activeTab === tab.id && tab.id !== 'new' ? 'glass-active' : ''}
               `}
             >
               {tab.label}
@@ -208,7 +222,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
       </div>
 
       {/* Tab Content - with scroll edge effects */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden glass-scroll px-4 pb-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4">
         <AnimatePresence mode="wait">
           {activeTab === 'settings' && (
             <motion.div
@@ -217,42 +231,47 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="p-4 space-y-4"
+              className="space-y-4"
             >
               {!activeLayer ? (
-                <div className="text-center text-xs opacity-70 py-12">
+                <div className="text-center text-xs text-gray-500 py-12">
                   Effect controls will appear here when an effect is selected
                 </div>
               ) : (
-                <div className="space-y-5">
+                <div className="space-y-4">
                   {/* Effect Header */}
-                  <div className="p-4 bg-black/5 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-semibold">{activeEffectConfig?.label}</h3>
-                        <p className="text-[11px] opacity-60 mt-0.5">
+                  <div className="glass-card rounded-xl p-4 mb-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold truncate control-panel-title">
+                          {activeEffectConfig?.label}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1 control-panel-category">
                           {activeEffectConfig?.category}
                         </p>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => onResetSettings?.()}
-                          className="px-3 py-1.5 text-[11px] font-medium bg-white/20 hover:bg-white/30 text-white rounded transition-all"
-                        >
-                          Reset
-                        </button>
-                        <button
-                          onClick={() => onRemoveEffect?.(activeLayer.id)}
-                          className="px-3 py-1.5 text-[11px] font-medium bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-all"
-                        >
-                          Remove
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => onRemoveEffect?.(activeLayer.id)}
+                        className="ml-3 p-2 rounded-lg transition-all duration-200 flex-shrink-0 glass-button"
+                        title="Remove effect"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => onResetSettings?.()}
+                        className="flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 glass-button"
+                      >
+                        Reset Values
+                      </button>
                     </div>
                   </div>
 
                   {/* Settings Controls */}
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {currentEffectSettings.map(setting => {
                       // Check if this is a color setting (hex color)
                       const isColorSetting =
@@ -261,26 +280,34 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
 
                       if (isColorSetting) {
                         return (
-                          <HexColorInput
-                            key={setting.id}
-                            label={setting.label}
-                            value={setting.currentValue}
-                            onChange={value => onSettingChange?.(setting.id, value)}
-                          />
+                          <div key={setting.id} className="glass-card rounded-xl p-4">
+                            <HexColorInput
+                              label={setting.label}
+                              value={setting.currentValue}
+                              onChange={value => onSettingChange?.(setting.id, value)}
+                            />
+                          </div>
                         );
                       }
 
+                      const percentage =
+                        ((setting.currentValue - setting.min) / (setting.max - setting.min)) * 100;
+                      const lightTrack = `linear-gradient(to right, #007aff 0%, #007aff ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`;
+                      const terminalTrack = `linear-gradient(to right, var(--text-accent) 0%, var(--text-accent) ${percentage}%, var(--panel-border) ${percentage}%, var(--panel-border) 100%)`;
+
                       // Regular slider for non-color settings
                       return (
-                        <div key={setting.id} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-medium">{setting.label}</label>
-                            <span className="text-[11px] font-mono bg-black/5 px-2 py-0.5 rounded">
+                        <div key={setting.id} className="glass-card rounded-xl p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <label className="text-sm font-medium control-panel-label">
+                              {setting.label}
+                            </label>
+                            <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded-md">
                               {setting.currentValue.toFixed(2)}
                             </span>
                           </div>
 
-                          <div className="relative">
+                          <div className="space-y-2">
                             <input
                               type="range"
                               min={setting.min}
@@ -290,16 +317,16 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                               onChange={e =>
                                 onSettingChange?.(setting.id, parseFloat(e.target.value))
                               }
-                              className="w-full h-5 bg-transparent cursor-pointer appearance-none slider"
+                              className="w-full appearance-none cursor-pointer slider"
                               style={{
-                                background: `linear-gradient(to right, #007aff 0%, #007aff ${((setting.currentValue - setting.min) / (setting.max - setting.min)) * 100}%, rgba(0,0,0,0.1) ${((setting.currentValue - setting.min) / (setting.max - setting.min)) * 100}%, rgba(0,0,0,0.1) 100%)`,
+                                background: theme === 'light' ? lightTrack : terminalTrack,
                               }}
                             />
 
                             {/* Range markers */}
-                            <div className="flex justify-between mt-1">
-                              <span className="text-[9px] opacity-50 font-mono">{setting.min}</span>
-                              <span className="text-[9px] opacity-50 font-mono">{setting.max}</span>
+                            <div className="flex justify-between text-xs text-gray-500">
+                              <span>{setting.min}</span>
+                              <span>{setting.max}</span>
                             </div>
                           </div>
                         </div>
@@ -321,16 +348,16 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               className="space-y-4"
             >
               {!hasImage ? (
-                <div className="text-center text-xs opacity-70 py-12">
+                <div className="text-center text-xs text-gray-500 py-12">
                   Upload an image to manage layers
                 </div>
               ) : effectLayers.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="w-16 h-16 mx-auto mb-3 glass-material rounded-xl flex items-center justify-center">
-                    <Layers className="w-8 h-8 text-white/40" />
+                  <div className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center liquid-material">
+                    <Layers className="w-8 h-8 text-gray-400" />
                   </div>
-                  <p className="text-sm text-white/80 mb-1">No effect layers yet</p>
-                  <p className="text-xs text-white/60">Apply an effect to create a layer</p>
+                  <p className="text-sm mb-1">No effect layers yet</p>
+                  <p className="text-xs text-gray-500">Apply an effect to create a layer</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -343,8 +370,8 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                         key={layer.id}
                         onClick={() => onSetActiveLayer?.(layer.id)}
                         className={`
-                          p-3 rounded-lg cursor-pointer transition-all
-                          ${isActive ? 'glass-active shadow-sm' : 'glass-button hover:glass-hover'}
+                          p-3 rounded-xl cursor-pointer transition-all glass-effect-button
+                          ${isActive ? 'glass-active' : ''}
                         `}
                       >
                         <div className="flex items-center justify-between">
@@ -355,7 +382,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                                 e.stopPropagation();
                                 onToggleLayerVisibility?.(layer.id);
                               }}
-                              className="text-white/60 hover:text-white transition-colors"
+                              className="transition-colors glass-button"
                             >
                               {layer.visible ? (
                                 <svg
@@ -396,10 +423,12 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
 
                             {/* Layer Info */}
                             <div className="flex-1">
-                              <h4 className="text-sm font-medium text-white">
+                              <h4 className={`text-sm font-medium ${isActive ? 'text-white' : ''}`}>
                                 {effectConfig?.label || 'Unknown Effect'}
                               </h4>
-                              <p className="text-[11px] text-white/60">
+                              <p
+                                className={`text-[11px] ${isActive ? 'text-white/80' : 'text-gray-600'}`}
+                              >
                                 Layer {effectLayers.length - index}
                               </p>
                             </div>
@@ -411,7 +440,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                               e.stopPropagation();
                               onRemoveEffect?.(layer.id);
                             }}
-                            className="text-white/40 hover:text-red-400 transition-colors p-1"
+                            className="p-1 glass-button"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -423,7 +452,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                   {effectLayers.length > 1 && (
                     <button
                       onClick={() => onClearAllEffects?.()}
-                      className="w-full mt-2 px-3 py-2 text-xs font-medium bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
+                      className="w-full mt-2 px-3 py-2 text-xs font-medium text-red-600 rounded-xl glass-button"
                     >
                       Clear All Layers
                     </button>
@@ -449,17 +478,17 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                     <button
                       key={option.format}
                       onClick={() => onExport?.(option.format)}
-                      className="w-full p-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded transition-all text-left group"
+                      className="w-full p-2 rounded-xl transition-all text-left group glass-effect-button"
                     >
                       <div className="flex items-center">
-                        <div className="w-8 h-8 bg-white/10 rounded flex items-center justify-center mr-3">
+                        <div className="w-8 h-8 rounded flex items-center justify-center mr-3 liquid-material">
                           <Icon className="w-4 h-4" />
                         </div>
                         <div className="flex-1">
                           <div className="text-xs font-medium">{option.type}</div>
-                          <div className="text-[10px] opacity-70">{option.description}</div>
+                          <div className="text-[10px] text-gray-600">{option.description}</div>
                         </div>
-                        <div className="text-[10px] font-medium bg-white/20 px-2 py-0.5 rounded ml-3">
+                        <div className="text-[10px] font-medium px-2 py-0.5 rounded ml-3 glass-badge">
                           {option.format}
                         </div>
                       </div>
