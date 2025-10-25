@@ -4,29 +4,35 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 
 interface BeforeAfterSplitViewProps {
-  beforeImage: HTMLImageElement | null;
-  afterCanvas: HTMLCanvasElement | null;
-  width: number;
-  height: number;
-  isActive: boolean;
+  // Back-compat props expected by tests
+  beforeImage?: string | HTMLImageElement | null;
+  afterImage?: string | HTMLCanvasElement | null;
+  initialPosition?: number;
+  onPositionChange?: (pos: number) => void;
+  // Current props
+  width?: number;
+  height?: number;
+  isActive?: boolean;
   onClose?: () => void;
 }
 
 export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
   beforeImage,
-  afterCanvas,
-  width,
-  height,
-  isActive,
+  afterImage,
+  initialPosition = 50,
+  onPositionChange,
+  width = 800,
+  height = 600,
+  isActive = true,
   onClose
 }) => {
-  const [dividerPosition, setDividerPosition] = useState(50); // Percentage
+  const [dividerPosition, setDividerPosition] = useState(initialPosition); // Percentage
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const beforeCanvasRef = useRef<HTMLCanvasElement>(null);
   const afterCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Draw the before image on canvas
+  // Draw the before image on canvas (supports src string or HTMLImageElement)
   useEffect(() => {
     if (!beforeImage || !beforeCanvasRef.current) return;
     
@@ -37,12 +43,22 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
     beforeCanvasRef.current.height = height;
     
     ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(beforeImage, 0, 0, width, height);
+    if (typeof beforeImage === 'string') {
+      const img = new Image();
+      img.onload = () => {
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+      };
+      img.src = beforeImage;
+    } else {
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(beforeImage as HTMLImageElement, 0, 0, width, height);
+    }
   }, [beforeImage, width, height]);
 
-  // Copy the after canvas content
+  // Copy the after image/canvas content
   useEffect(() => {
-    if (!afterCanvas || !afterCanvasRef.current) return;
+    if (!afterImage || !afterCanvasRef.current) return;
     
     const ctx = afterCanvasRef.current.getContext('2d');
     if (!ctx) return;
@@ -51,8 +67,17 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
     afterCanvasRef.current.height = height;
     
     ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(afterCanvas, 0, 0, width, height);
-  }, [afterCanvas, width, height]);
+    if (typeof afterImage === 'string') {
+      const img = new Image();
+      img.onload = () => {
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+      };
+      img.src = afterImage;
+    } else {
+      ctx.drawImage(afterImage as HTMLCanvasElement, 0, 0, width, height);
+    }
+  }, [afterImage, width, height]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -72,12 +97,16 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
     }
     
     const x = clientX - rect.left;
-    const percentage = (x / rect.width) * 100;
-    setDividerPosition(Math.max(0, Math.min(100, percentage)));
+    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+    setDividerPosition(percentage);
+    onPositionChange?.(percentage);
   }, [isDragging]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+    if (navigator && 'vibrate' in navigator) {
+      try { (navigator as any).vibrate(10); } catch {}
+    }
   }, []);
 
   useEffect(() => {
@@ -102,9 +131,17 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
     
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
-        setDividerPosition(prev => Math.max(0, prev - 5));
+        setDividerPosition(prev => {
+          const next = Math.max(0, prev - 5);
+          onPositionChange?.(next);
+          return next;
+        });
       } else if (e.key === 'ArrowRight') {
-        setDividerPosition(prev => Math.min(100, prev + 5));
+        setDividerPosition(prev => {
+          const next = Math.min(100, prev + 5);
+          onPositionChange?.(next);
+          return next;
+        });
       } else if (e.key === 'Escape' && onClose) {
         onClose();
       }
@@ -114,7 +151,7 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [isActive, onClose]);
 
-  if (!isActive || !beforeImage || !afterCanvas) return null;
+  if (!isActive || !beforeImage || !afterImage) return null;
 
   return (
     <motion.div
@@ -153,8 +190,16 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
           ref={containerRef}
           className="relative overflow-hidden rounded-lg shadow-2xl cursor-ew-resize"
           style={{ width, height }}
+          data-testid="split-view-container"
         >
           {/* Before image */}
+          <img
+            src={typeof beforeImage === 'string' ? beforeImage : undefined}
+            alt="Before"
+            className="absolute inset-0 object-cover"
+            style={{ width: '100%', height: '100%', clipPath: `inset(0 0 0 0)` }}
+            data-testid="before-image"
+          />
           <canvas
             ref={beforeCanvasRef}
             className="absolute inset-0"
@@ -168,6 +213,13 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
               clipPath: `polygon(${dividerPosition}% 0, 100% 0, 100% 100%, ${dividerPosition}% 100%)`
             }}
           >
+            <img
+              src={typeof afterImage === 'string' ? afterImage : undefined}
+              alt="After"
+              className="absolute inset-0 object-cover"
+              style={{ width: '100%', height: '100%' }}
+              data-testid="after-image"
+            />
             <canvas
               ref={afterCanvasRef}
               className="absolute inset-0"
@@ -181,6 +233,7 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
             style={{ left: `${dividerPosition}%`, transform: 'translateX(-50%)' }}
             onMouseDown={handleMouseDown}
             onTouchStart={handleMouseDown}
+            data-testid="divider"
           >
             {/* Handle */}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">

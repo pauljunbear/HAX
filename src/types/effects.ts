@@ -1,4 +1,5 @@
-import { Image as KonvaImage } from 'konva';
+// Use a loose type for Konva image nodes to avoid tight coupling to Konva typings
+type KonvaImage = any;
 
 export interface EffectSetting {
   min: number;

@@ -25,6 +25,9 @@ const customJestConfig = {
     '^@react-three/drei$': '<rootDir>/src/components/__mocks__/react-three-fiber.tsx',
     '^three$': '<rootDir>/src/components/__mocks__/three.js',
     '^@tsparticles/(.*)$': '<rootDir>/src/components/__mocks__/tsparticles.js',
+    '^test-module$': '<rootDir>/src/__mocks__/dynamic-modules/test-module.js',
+    '^dependency-module$': '<rootDir>/src/__mocks__/dynamic-modules/dependency-module.js',
+    '^large-module$': '<rootDir>/src/__mocks__/dynamic-modules/large-module.js',
     '\\.(css|less|sass|scss)$': 'identity-obj-proxy',
     '\\.(gif|ttf|eot|svg|png)$': '<rootDir>/src/components/__mocks__/fileMock.js'
   },

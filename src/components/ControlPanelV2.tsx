@@ -18,19 +18,20 @@ const ControlPanelV2: React.FC<ControlPanelV2Props> = ({
   onSettingChange,
   hasImage = false,
 }) => {
-  const [activeCategory, setActiveCategory] = useState<string>('Adjust');
+  const [activeCategory, setActiveCategory] = useState<string>(Object.keys(effectCategories)[0] || 'Adjust');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSettings, setShowSettings] = useState(true);
 
   // Filter effects based on search query
-  const filteredEffects = useMemo(() => {
+  const filteredEffects = useMemo<string[]>(() => {
     if (!searchQuery) {
-      return effectCategories[activeCategory]?.effects || [];
+      return (effectCategories as any)[activeCategory]?.effects || [];
     }
 
     // Search across all categories
     const results: { id: string; category: string }[] = [];
-    Object.entries(effectCategories).forEach(([category, data]) => {
+    Object.entries(effectCategories as Record<string, { icon?: string; effects: string[] }>).
+      forEach(([category, data]) => {
       data.effects.forEach(effectId => {
         const effect = effectsConfig[effectId];
         if (effect && effect.label.toLowerCase().includes(searchQuery.toLowerCase())) {
@@ -141,7 +142,7 @@ const ControlPanelV2: React.FC<ControlPanelV2Props> = ({
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-2">
-            {filteredEffects.map(effectId => {
+            {(filteredEffects as string[]).map((effectId: string) => {
               const effect = effectsConfig[effectId];
               if (!effect) return null;
 

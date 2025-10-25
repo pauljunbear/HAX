@@ -28,7 +28,7 @@ const EffectControls: React.FC<EffectControlsProps> = ({
         // Use current setting if available, otherwise use default
         initialSettings[key] = effectSettings[key] !== undefined 
           ? effectSettings[key] 
-          : setting.default;
+          : (setting as any).default;
       });
       
       setLocalSettings(initialSettings);
@@ -82,16 +82,16 @@ const EffectControls: React.FC<EffectControlsProps> = ({
                 {setting.label}
               </label>
               <span className="text-xs text-[rgb(var(--apple-gray-600))]">
-                {Math.round(localSettings[key] * 100) / 100}
+                {Math.round((localSettings[key] ?? (setting as any).default) * 100) / 100}
               </span>
             </div>
             
             <input
               type="range"
-              min={setting.min}
-              max={setting.max}
-              step={setting.step}
-              value={localSettings[key] || setting.default}
+              min={(setting as any).min}
+              max={(setting as any).max}
+              step={(setting as any).step}
+              value={localSettings[key] ?? (setting as any).default}
               onChange={(e) => handleSettingChange(key, parseFloat(e.target.value))}
               className="w-full h-2 bg-[rgb(var(--apple-gray-200))] rounded-lg appearance-none cursor-pointer"
             />

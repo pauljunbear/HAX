@@ -20,7 +20,7 @@ export const EffectHoverPreview: React.FC<EffectHoverPreviewProps> = ({
 }) => {
   const [previewSize, setPreviewSize] = useState({ width: PREVIEW_SIZE, height: PREVIEW_SIZE });
   const { canvas, isLoading, error } = useEffectPreview(effectId, imageUrl, previewSize);
-  const effect = effectsConfig[effectId];
+  const effect = effectsConfig[effectId] as any;
 
   if (!effect) return null;
 

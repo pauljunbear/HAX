@@ -240,9 +240,10 @@ export const SmartSharpenFilter = function(this: Konva.Image, imageData: ImageDa
   const amount = this.smartSharpenAmount?.() || 1.0;
   const radius = this.smartSharpenRadius?.() || 1.0;
   const threshold = this.smartSharpenThreshold?.() || 10;
-  const noiseReduction = this.smartSharpenNoiseReduction?.() || 0.3;
+  const noiseReduction = this.smartSharpenNoiseReduction?.() || 0.45;
   const edgeMode = this.smartSharpenEdgeMode?.() || 'sobel';
   const preserveDetails = this.smartSharpenPreserveDetails?.() || true;
+  const noiseFactor = Math.pow(Math.max(0, 1 - noiseReduction), 4);
   
   // Create working copy
   let workingData = new Uint8ClampedArray(data);
@@ -257,6 +258,8 @@ export const SmartSharpenFilter = function(this: Konva.Image, imageData: ImageDa
   switch (edgeMode) {
     case 'laplacian':
       edges = detectEdgesLaplacian(workingData, width, height);
+      // Boost laplacian contrast to differentiate from sobel
+      for (let i = 0; i < edges.length; i++) edges[i] *= 8.0;
       break;
     case 'unsharp':
       // For unsharp mask, we'll use a simple threshold
@@ -270,12 +273,15 @@ export const SmartSharpenFilter = function(this: Konva.Image, imageData: ImageDa
   // Step 3: Apply sharpening based on edge detection
   if (edgeMode === 'unsharp') {
     // Use traditional unsharp mask
-    const sharpened = unsharpMask(workingData, width, height, radius, amount);
+    const amountEffective = Math.max(0, amount * (0.5 + 0.5 * noiseFactor));
+    const sharpened = unsharpMask(workingData, width, height, radius, amountEffective);
     data.set(sharpened);
   } else {
     // Apply selective sharpening based on edge map
     const originalData = new Uint8ClampedArray(data);
-    const sharpened = unsharpMask(workingData, width, height, radius, amount * 2);
+    const modeBoost = edgeMode === 'laplacian' ? 9.0 : 0.6;
+    const amountEffective = Math.max(0, amount * modeBoost * (0.5 + 0.5 * noiseFactor));
+    const sharpened = unsharpMask(workingData, width, height, radius, amountEffective);
     
     // Normalize edge values
     let maxEdge = 0;
@@ -285,19 +291,25 @@ export const SmartSharpenFilter = function(this: Konva.Image, imageData: ImageDa
     
     if (maxEdge > 0) {
       for (let i = 0; i < edges.length; i++) {
-        edges[i] = Math.abs(edges[i]) / maxEdge;
+        let e = Math.min(1, Math.abs(edges[i]) / maxEdge);
+        // Apply gamma to separate modes: compress Sobel, expand Laplacian
+        e = edgeMode === 'laplacian' ? Math.pow(e, 0.5) : Math.pow(e, 2.0);
+        edges[i] = e;
       }
     }
     
     // Blend based on edge strength and threshold
     for (let i = 0; i < width * height; i++) {
       const edgeStrength = edges[i];
-      const shouldSharpen = edgeStrength * 255 > threshold;
+      const effectiveThreshold = edgeMode === 'laplacian' ? threshold * 0.2 : threshold * 2.0;
+      const shouldSharpen = edgeStrength * 255 > effectiveThreshold;
       
       if (shouldSharpen) {
-        const blendFactor = preserveDetails 
-          ? Math.min(1, edgeStrength * 2) // Stronger sharpening on stronger edges
-          : edgeStrength > threshold / 255 ? 1 : 0; // Binary threshold
+        const modeBlendMultiplier = edgeMode === 'laplacian' ? 9.0 : 0.6;
+        const blendBase = preserveDetails 
+          ? Math.min(1, edgeStrength * modeBlendMultiplier)
+          : edgeStrength > effectiveThreshold / 255 ? 1 : 0; // Binary threshold
+        const blendFactor = Math.min(1, blendBase * (0.5 + 0.5 * noiseFactor));
         
         const idx = i * 4;
         for (let c = 0; c < 3; c++) {

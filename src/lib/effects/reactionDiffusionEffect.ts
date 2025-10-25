@@ -151,21 +151,22 @@ export const ReactionDiffusionFilter = function(this: Konva.Image, imageData: Im
   const data = imageData.data;
   
   // Get settings
+  const self = this as any;
   const settings = {
-    feedRate: this.reactionFeedRate() || 0.055,
-    killRate: this.reactionKillRate() || 0.062,
-    diffusionA: this.reactionDiffusionA() || 1.0,
-    diffusionB: this.reactionDiffusionB() || 0.5,
-    iterations: this.reactionIterations() || 100,
-    initialPattern: this.reactionPattern() || 'random' as any,
+    feedRate: self.reactionFeedRate?.() || 0.055,
+    killRate: self.reactionKillRate?.() || 0.062,
+    diffusionA: self.reactionDiffusionA?.() || 1.0,
+    diffusionB: self.reactionDiffusionB?.() || 0.5,
+    iterations: self.reactionIterations?.() || 100,
+    initialPattern: (self.reactionPattern?.() || 'random') as any,
   };
   
   // Run simulation
   const { a, b } = simulateReactionDiffusion(width, height, settings);
   
   // Color mapping
-  const colorScheme = this.reactionColorScheme() || 0;
-  const opacity = this.reactionOpacity() || 0.8;
+  const colorScheme = self.reactionColorScheme?.() || 0;
+  const opacity = self.reactionOpacity?.() || 0.8;
   
   // Save original image
   const tempData = new Uint8ClampedArray(data.length);
@@ -181,37 +182,37 @@ export const ReactionDiffusionFilter = function(this: Konva.Image, imageData: Im
       const bVal = b[idx];
       
       // Different color mappings
-      let r = 0, g = 0, b = 0;
+      let r = 0, g = 0, bb = 0;
       
       switch (Math.floor(colorScheme)) {
         case 0: // Organic (green-blue)
           r = Math.floor(aVal * 50);
           g = Math.floor((1 - bVal) * 200 + 55);
-          b = Math.floor(bVal * 255);
+          bb = Math.floor(bVal * 255);
           break;
           
         case 1: // Fire (red-yellow)
           r = Math.floor((1 - aVal) * 255);
           g = Math.floor(bVal * 200);
-          b = Math.floor(aVal * 50);
+          bb = Math.floor(aVal * 50);
           break;
           
         case 2: // Zebra (black-white)
           const zebra = bVal > 0.3 ? 255 : 0;
-          r = g = b = zebra;
+          r = zebra; g = zebra; bb = zebra;
           break;
           
         case 3: // Psychedelic
           r = Math.floor(Math.sin(bVal * Math.PI * 8) * 127 + 128);
           g = Math.floor(Math.sin(aVal * Math.PI * 6 + Math.PI/3) * 127 + 128);
-          b = Math.floor(Math.sin((aVal + bVal) * Math.PI * 4 + Math.PI*2/3) * 127 + 128);
+          bb = Math.floor(Math.sin((aVal + bVal) * Math.PI * 4 + Math.PI*2/3) * 127 + 128);
           break;
       }
       
       // Blend with original image
       data[dataIdx] = Math.round(tempData[dataIdx] * (1 - opacity) + r * opacity);
       data[dataIdx + 1] = Math.round(tempData[dataIdx + 1] * (1 - opacity) + g * opacity);
-      data[dataIdx + 2] = Math.round(tempData[dataIdx + 2] * (1 - opacity) + b * opacity);
+      data[dataIdx + 2] = Math.round(tempData[dataIdx + 2] * (1 - opacity) + bb * opacity);
     }
   }
 };
@@ -229,6 +230,6 @@ export const RD_PRESETS = {
 };
 
 // Register filter with Konva
-if (typeof window !== 'undefined' && window.Konva) {
-  Konva.Filters.ReactionDiffusion = ReactionDiffusionFilter;
-} 
+if (typeof window !== 'undefined' && (window as any).Konva) {
+  (Konva as any).Filters.ReactionDiffusion = ReactionDiffusionFilter;
+}

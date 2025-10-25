@@ -1,4 +1,25 @@
-export const effectCategories: EffectCategory[] = [
+// Local types to avoid missing global references
+interface EffectCategoryLocal {
+  id: string;
+  name: string;
+  icon?: string;
+  effects: string[];
+}
+
+interface EffectParamLocal {
+  min: number;
+  max: number;
+  default: number;
+  step: number;
+  labels?: string[];
+}
+
+interface EffectConfigLocal {
+  name: string;
+  params: Record<string, EffectParamLocal>;
+}
+
+export const effectCategories: EffectCategoryLocal[] = [
   {
     id: 'artistic',
     name: 'Artistic',
@@ -18,7 +39,7 @@ export const effectCategories: EffectCategory[] = [
   },
 ];
 
-export const effectsConfig: Record<string, EffectConfig> = {
+export const effectsConfig: Record<string, EffectConfigLocal> = {
   vintage: {
     name: 'Vintage',
     params: {

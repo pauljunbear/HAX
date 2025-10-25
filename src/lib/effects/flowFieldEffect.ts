@@ -101,12 +101,13 @@ export const FlowFieldFilter = function(this: Konva.Image, imageData: ImageData)
   const data = imageData.data;
   
   // Get settings
-  const scale = this.flowFieldScale() || 0.01;
-  const strength = this.flowFieldStrength() || 10;
-  const particleCount = this.flowFieldParticles() || 1000;
-  const fieldType = this.flowFieldType() || 0; // 0: swirl, 1: turbulence, 2: wave, 3: radial
-  const blend = this.flowFieldBlend() || 0.7;
-  const seed = this.flowFieldSeed() || 42;
+  const self = this as any;
+  const scale = self.flowFieldScale?.() || 0.01;
+  const strength = self.flowFieldStrength?.() || 10;
+  const particleCount = self.flowFieldParticles?.() || 1000;
+  const fieldType = self.flowFieldType?.() || 0; // 0: swirl, 1: turbulence, 2: wave, 3: radial
+  const blend = self.flowFieldBlend?.() || 0.7;
+  const seed = self.flowFieldSeed?.() || 42;
   
   // Create noise generator
   const noise = new PerlinNoise(seed);
@@ -274,11 +275,12 @@ export const VectorFieldFilter = function(this: Konva.Image, imageData: ImageDat
   const height = imageData.height;
   const data = imageData.data;
   
-  const scale = this.vectorFieldScale() || 0.02;
-  const spacing = this.vectorFieldSpacing() || 20;
-  const length = this.vectorFieldLength() || 15;
-  const thickness = this.vectorFieldThickness() || 2;
-  const colorMode = this.vectorFieldColorMode() || 0; // 0: direction, 1: magnitude, 2: original
+  const self = this as any;
+  const scale = self.vectorFieldScale?.() || 0.02;
+  const spacing = self.vectorFieldSpacing?.() || 20;
+  const length = self.vectorFieldLength?.() || 15;
+  const thickness = self.vectorFieldThickness?.() || 2;
+  const colorMode = self.vectorFieldColorMode?.() || 0; // 0: direction, 1: magnitude, 2: original
   
   const noise = new PerlinNoise();
   
@@ -437,7 +439,7 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 }
 
 // Register filters with Konva
-if (typeof window !== 'undefined' && window.Konva) {
-  Konva.Filters.FlowField = FlowFieldFilter;
-  Konva.Filters.VectorField = VectorFieldFilter;
-} 
+if (typeof window !== 'undefined' && (window as any).Konva) {
+  (Konva as any).Filters.FlowField = FlowFieldFilter;
+  (Konva as any).Filters.VectorField = VectorFieldFilter;
+}

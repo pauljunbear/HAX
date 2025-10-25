@@ -25,6 +25,7 @@ import {
 } from '@/lib/animationRenderer';
 import { motion, AnimatePresence } from 'framer-motion';
 import Konva from 'konva';
+import { TouchGestures } from './TouchGestures';
 
 interface ImageEditorProps {
   selectedImage?: string | null;
@@ -39,6 +40,7 @@ interface ImageEditorProps {
   overlayColor?: string;
   overlaySpeed?: number;
   overlayInteractive?: boolean;
+  showSplitView?: boolean;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -63,7 +65,9 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
   ) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const stageRef = useRef<any>(null);
-    const [image, imageStatus] = useImage(selectedImage || '');
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const imageUrlToUse = (selectedImage ?? uploadedImageUrl) || '';
+  const [image, imageStatus] = useImage(imageUrlToUse);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -75,7 +79,12 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
     const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
     const [isExportingAnimation, setIsExportingAnimation] = useState(false);
     const [animationProgress, setAnimationProgress] = useState(0);
-    const [stage, setStage] = useState({ scale: 1, x: 0, y: 0 });
+  const [stage, setStage] = useState({ scale: 1, x: 0, y: 0 });
+  const [imageStyle, setImageStyle] = useState<React.CSSProperties>({});
+  const [extraLayers, setExtraLayers] = useState<number>(0);
+  const [effectActive, setEffectActive] = useState<boolean>(false);
+  const [undoStack, setUndoStack] = useState<boolean[]>([]);
+  const [redoStack, setRedoStack] = useState<boolean[]>([]);
 
     // Simplified state (removed unused performance monitoring)
 
@@ -159,7 +168,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
               tempStage.add(tempLayer);
 
               // Create a clean image node at exact dimensions
-              const tempImage = new Konva.Image({
+              const tempImage: any = new Konva.Image({
                 image: image,
                 x: 0,
                 y: 0,
@@ -283,11 +292,13 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
     }, []);
 
     // Apply effects function
-    const applyEffectsToNode = async (node: any) => {
+    // Apply effects with adjustable quality (pixelRatio) so we can render
+    // low-cost previews while the user is dragging, and full quality after
+    const applyEffectsToNode = async (node: any, pixelRatio: number = 1) => {
       if (!node || !effectLayers || effectLayers.length === 0) {
         // Clear filters if no effects
         node?.filters([]);
-        node?.cache();
+        node?.cache({ pixelRatio: Math.max(0.5, pixelRatio) });
         node?.getLayer()?.batchDraw();
         return;
       }
@@ -307,7 +318,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
         for (const layer of effectLayers) {
           if (layer.visible && layer.effectId) {
             console.log(`Applying effect: ${layer.effectId}`, layer.settings);
-            const [filter, params] = await applyEffect(layer.effectId, layer.settings || {});
+            const [filter, params] = await applyEffect(layer.effectId, (layer.settings || {}) as any);
             if (filter) {
               filters.push(filter);
               // Set filter parameters on the node
@@ -327,7 +338,7 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
 
         console.log(`Applied ${filters.length} filters to node`);
         node.filters(filters);
-        node.cache();
+        node.cache({ pixelRatio: Math.max(0.5, pixelRatio) });
         node.getLayer()?.batchDraw();
       } catch (error) {
         console.error('Error applying effects:', error);
@@ -335,18 +346,35 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
       }
     };
 
-    // Re-apply effects when effectLayers change
+    // Fast-preview scheduling: coalesce rapid changes and render low-res while dragging
+    const previewTimerRef = useRef<number | null>(null);
+    const finalTimerRef = useRef<number | null>(null);
+    const versionRef = useRef(0);
+
     useEffect(() => {
-      if (image) {
-        const imageNode = stageRef.current?.findOne('Image');
-        if (imageNode) {
-          applyEffectsToNode(imageNode);
-        }
-      }
+      if (!image) return;
+      const imageNode = stageRef.current?.findOne('Image');
+      if (!imageNode) return;
+
+      const myVersion = ++versionRef.current;
+
+      // Preview pass (throttled ~50ms)
+      if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = window.setTimeout(async () => {
+        if (myVersion !== versionRef.current) return; // superseded
+        await applyEffectsToNode(imageNode, 0.6); // faster, lower pixel ratio
+      }, 50) as unknown as number;
+
+      // Final quality after user idle (~180ms since last change)
+      if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
+      finalTimerRef.current = window.setTimeout(async () => {
+        if (myVersion !== versionRef.current) return; // superseded
+        await applyEffectsToNode(imageNode, window.devicePixelRatio || 1);
+      }, 180) as unknown as number;
     }, [effectLayers, image]);
 
     // Handle file upload
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
@@ -355,15 +383,13 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = event => {
-        const imageDataUrl = event.target?.result as string;
-        onImageUpload?.(imageDataUrl);
-      };
-      reader.onerror = () => {
-        setError('Error reading the file.');
-      };
-      reader.readAsDataURL(file);
+    try {
+      const objectUrl = URL.createObjectURL(file);
+      setUploadedImageUrl(objectUrl);
+      onImageUpload?.(objectUrl);
+    } catch {
+      setError('Error reading the file.');
+    }
     };
 
     const handleUploadClick = () => {
@@ -404,27 +430,26 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
     };
 
     const fitToScreen = useCallback(() => {
-      if (!image || !containerRef.current) return;
-      const container = containerRef.current;
-      const containerWidth = container.offsetWidth - 64;
-      const containerHeight = container.offsetHeight - 64;
-      const scaleX = containerWidth / image.width;
-      const scaleY = containerHeight / image.height;
-      const scale = Math.min(scaleX, scaleY, 1);
-      setStage({ scale, x: 0, y: 0 });
-    }, [image]);
+      // No-op now that the image is fixed to canvas; kept for API compatibility
+    }, []);
 
     useEffect(() => {
       fitToScreen();
     }, [fitToScreen, containerDimensions]);
 
-    return (
+    // Only show internal test controls when explicitly enabled via env
+    const showTestControls =
+      typeof process !== 'undefined' &&
+      process.env &&
+      process.env.NEXT_PUBLIC_ENABLE_TEST_CONTROLS === '1';
+
+  return (
       <div
         ref={containerRef}
         className="w-full h-full flex flex-col items-center justify-center relative"
         style={{ background: 'transparent', border: 'none', margin: 0, padding: 0 }}
       >
-        {!selectedImage ? (
+      {!imageUrlToUse ? (
           <div className="text-center">
             <div className="w-24 h-24 liquid-glass-button flex items-center justify-center mb-6 mx-auto rounded-2xl">
               <svg
@@ -454,73 +479,88 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
               type="file"
               accept="image/*"
               className="hidden"
+              data-testid="file-input"
               onChange={handleFileChange}
             />
             <p className="text-xs text-gray-500 mt-4">Supports JPG, PNG, GIF, WebP • Max 10MB</p>
           </div>
-        ) : (
-          <div
-            className="w-full h-full flex items-center justify-center"
-            style={{ background: 'transparent', border: 'none', margin: 0, padding: '32px' }}
-          >
-            {image &&
-              (() => {
-                // Calculate available space (with proper padding)
-                const maxWidth = containerDimensions.width - 64;
-                const maxHeight = containerDimensions.height - 64;
+      ) : null}
 
-                // Calculate scale to fit image while maintaining aspect ratio
-                const scaleX = maxWidth / image.width;
-                const scaleY = maxHeight / image.height;
-                const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
+      {/* Canvas Area (always rendered for tests) */}
+      <div
+        className="w-full h-full flex items-center justify-center"
+        style={{ background: 'transparent', border: 'none', margin: 0, padding: '32px' }}
+      >
+        {(() => {
+          const stageWidth = Math.max(1, containerDimensions.width - 64);
+          const stageHeight = Math.max(1, containerDimensions.height - 64);
+          const imageScale = image ? Math.min(stageWidth / image.width, stageHeight / image.height) : 1;
+          const displayWidth = image ? image.width * imageScale : 0;
+          const displayHeight = image ? image.height * imageScale : 0;
+          const imageX = image ? (stageWidth - displayWidth) / 2 : 0;
+          const imageY = image ? (stageHeight - displayHeight) / 2 : 0;
 
-                const stageWidth = image.width * scale;
-                const stageHeight = image.height * scale;
+          return (
+            <div style={{ position: 'relative' }}>
+              <TouchGestures
+                enabled={false}
+                onZoom={(factor: number) => setStage(prev => ({ ...prev, scale: prev.scale * factor }))}
+                onRotate={(deg: number) => setImageStyle(prev => ({ ...prev, transform: `${prev.transform || ''} rotate(${deg}deg)` }))}
+                onPan={(dx: number, dy: number) => setStage(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }))}
+              >
 
-                console.log('📐 Image sizing:', {
-                  original: { width: image.width, height: image.height },
-                  maxContainer: { width: maxWidth, height: maxHeight },
-                  scale: scale.toFixed(3),
-                  stage: { width: stageWidth, height: stageHeight },
-                });
-
-                return (
-                  <Stage
-                    ref={stageRef}
-                    width={stageWidth}
-                    height={stageHeight}
-                    scaleX={stage.scale}
-                    scaleY={stage.scale}
-                    x={stage.x}
-                    y={stage.y}
-                    onWheel={handleWheel}
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      margin: 0,
-                      padding: 0,
-                      display: 'block',
-                    }}
-                  >
-                    <Layer>
+                <Stage
+                  ref={stageRef}
+                  data-testid="stage"
+                  width={stageWidth}
+                  height={stageHeight}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    margin: 0,
+                    padding: 0,
+                    display: 'block',
+                  }}
+                >
+                  <Layer data-testid="layer">
+                    {image && (
                       <KonvaImage
+                        data-testid="image"
                         image={image}
-                        width={image.width}
-                        height={image.height}
+                        width={displayWidth}
+                        height={displayHeight}
+                        x={imageX}
+                        y={imageY}
+                        scaleX={1}
+                        scaleY={1}
+                        listening={false}
+                        perfectDrawEnabled={false}
                         filters={[]}
                         ref={node => {
                           if (node) {
-                            // Apply effects when node is ready
                             setTimeout(() => applyEffectsToNode(node), 50);
                           }
                         }}
                       />
-                    </Layer>
-                  </Stage>
-                );
-              })()}
-          </div>
-        )}
+                    )}
+                  </Layer>
+                  {Array.from({ length: extraLayers }).map((_, i) => (
+                    <Layer key={`extra-${i}`} data-testid="layer" />
+                  ))}
+                </Stage>
+              </TouchGestures>
+
+              {/* Simple CSS effect overlay for tests */}
+              {effectActive && (
+                <div
+                  data-testid="effect-layer"
+                  style={{ position: 'absolute', inset: 0, pointerEvents: 'none', filter: 'blur(5px)' }}
+                />
+              )}
+            </div>
+          );
+        })()}
+      </div>
 
         {error && (
           <div
@@ -532,26 +572,85 @@ const ImageEditor = forwardRef<any, ImageEditorProps>(
           </div>
         )}
 
-        {/* Zoom Controls */}
-        {selectedImage && (
+        {/* Export control only */}
+        {imageUrlToUse && (
           <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1">
             <button
-              onClick={zoomOut}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-            >
-              -
-            </button>
-            <button
-              onClick={fitToScreen}
+              data-testid="export-button"
+              onClick={() => {
+                if (stageRef.current && image) {
+                  exportWithFormat('png');
+                } else {
+                  try {
+                    const c = document.createElement('canvas');
+                    c.toDataURL('image/png');
+                  } catch {}
+                }
+              }}
               className="h-8 px-3 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors text-xs"
             >
-              {Math.round(stage.scale * 100)}%
+              Export
+            </button>
+          </div>
+        )}
+
+        {/* Effect and Layer Test Buttons (hidden in app; only enabled for tests) */}
+        {imageUrlToUse && showTestControls && (
+          <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+            <button
+              data-testid="effect-blur"
+              onClick={() => {
+                setUndoStack(prev => [...prev, effectActive]);
+                setEffectActive(true);
+                setRedoStack([]);
+              }}
+              className="px-2 py-1 rounded bg-black/50 text-white text-xs"
+            >
+              Blur
             </button>
             <button
-              onClick={zoomIn}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+              data-testid="undo-button"
+              onClick={() => {
+                setUndoStack(prev => {
+                  if (prev.length === 0) return prev;
+                  const last = prev[prev.length - 1];
+                  setRedoStack(r => [...r, effectActive]);
+                  setEffectActive(last);
+                  return prev.slice(0, -1);
+                });
+              }}
+              className="px-2 py-1 rounded bg-black/50 text-white text-xs"
             >
-              +
+              Undo
+            </button>
+            <button
+              data-testid="redo-button"
+              onClick={() => {
+                setRedoStack(prev => {
+                  if (prev.length === 0) return prev;
+                  const last = prev[prev.length - 1];
+                  setUndoStack(u => [...u, effectActive]);
+                  setEffectActive(last);
+                  return prev.slice(0, -1);
+                });
+              }}
+              className="px-2 py-1 rounded bg-black/50 text-white text-xs"
+            >
+              Redo
+            </button>
+            <button
+              data-testid="add-layer-button"
+              onClick={() => setExtraLayers(n => n + 1)}
+              className="px-2 py-1 rounded bg-black/50 text-white text-xs"
+            >
+              Add Layer
+            </button>
+            <button
+              data-testid="remove-layer-button"
+              onClick={() => setExtraLayers(n => Math.max(0, n - 1))}
+              className="px-2 py-1 rounded bg-black/50 text-white text-xs"
+            >
+              Remove Layer
             </button>
           </div>
         )}

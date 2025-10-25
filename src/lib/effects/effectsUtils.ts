@@ -35,8 +35,13 @@ export const getFilterConfig = (effectId: string | null) => {
 
 export const ensureKonvaInitialized = () => {
   // Initialize Konva filters if needed
-  if (!Konva.Filters) {
-    Konva.Filters = {}
+  try {
+    // Some Konva builds mark Filters as readonly; this guards against assignment errors in TS
+    if (!(Konva as any).Filters) {
+      (Konva as any).Filters = {}
+    }
+  } catch (_) {
+    // ignore
   }
 }
 

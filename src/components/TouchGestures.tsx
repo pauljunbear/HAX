@@ -1,12 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
 
-interface TouchGesturesProps {
+export interface TouchGesturesProps {
   onZoom?: (scale: number) => void
   onRotate?: (angle: number) => void
   onPan?: (x: number, y: number) => void
+  onTap?: () => void
+  onPinchZoom?: (scale: number) => void
   minScale?: number
   maxScale?: number
   enabled?: boolean
+  disabled?: boolean
   children: React.ReactNode
 }
 
@@ -14,11 +17,15 @@ export const TouchGestures: React.FC<TouchGesturesProps> = ({
   onZoom,
   onRotate,
   onPan,
+  onTap,
+  onPinchZoom,
   minScale = 0.5,
   maxScale = 3,
   enabled = true,
+  disabled,
   children
 }) => {
+  const isEnabled = (disabled === true) ? false : enabled
   const containerRef = useRef<HTMLDivElement>(null)
   const touchStateRef = useRef<{
     startDistance: number
@@ -60,7 +67,7 @@ export const TouchGestures: React.FC<TouchGesturesProps> = ({
   }
 
   const handleTouchStart = (e: TouchEvent) => {
-    if (!enabled || !containerRef.current) return
+    if (!isEnabled || !containerRef.current) return
 
     if (e.touches.length === 2) {
       const { x, y } = getCenter(e.touches)
@@ -74,17 +81,23 @@ export const TouchGestures: React.FC<TouchGesturesProps> = ({
         currentX: touchStateRef.current.currentX,
         currentY: touchStateRef.current.currentY
       }
+      // notify pinch start
+      const distance = touchStateRef.current.startDistance
+      const scale = Math.min(Math.max((distance / distance) * touchStateRef.current.currentScale, minScale), maxScale)
+      if (onPinchZoom) onPinchZoom(scale)
+      if (onZoom) onZoom(scale)
     } else if (e.touches.length === 1) {
       touchStateRef.current = {
         ...touchStateRef.current,
         startX: e.touches[0].clientX,
         startY: e.touches[0].clientY
       }
+      if (onTap) onTap()
     }
   }
 
   const handleTouchMove = (e: TouchEvent) => {
-    if (!enabled || !containerRef.current) return
+    if (!isEnabled || !containerRef.current) return
 
     if (e.touches.length === 2) {
       const { x, y } = getCenter(e.touches)
@@ -105,6 +118,7 @@ export const TouchGestures: React.FC<TouchGesturesProps> = ({
       const dy = y - touchStateRef.current.startY
 
       if (onZoom) onZoom(scale)
+      if (onPinchZoom) onPinchZoom(scale)
       if (onRotate) onRotate(rotation)
       if (onPan) onPan(dx, dy)
 
@@ -123,7 +137,7 @@ export const TouchGestures: React.FC<TouchGesturesProps> = ({
   }
 
   const handleTouchEnd = (e: TouchEvent) => {
-    if (!enabled || !containerRef.current) return
+    if (!isEnabled || !containerRef.current) return
 
     if (e.touches.length === 0) {
       if (e.changedTouches.length === 2) {
@@ -156,7 +170,7 @@ export const TouchGestures: React.FC<TouchGesturesProps> = ({
       container.removeEventListener('touchend', handleTouchEnd)
       container.removeEventListener('touchcancel', handleTouchEnd)
     }
-  }, [enabled, onZoom, onRotate, onPan, minScale, maxScale])
+  }, [isEnabled, onZoom, onRotate, onPan, onTap, onPinchZoom, minScale, maxScale])
 
   return (
     <div ref={containerRef} style={{ touchAction: 'none' }}>

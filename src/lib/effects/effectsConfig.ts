@@ -72,7 +72,7 @@ export const effectsConfig: EffectsConfig = {
     },
     apply: effects.smartSharpen
   },
-  clarity: {
+  /* clarity: {
     label: 'Clarity',
     description: 'Enhances local contrast and detail',
     settings: {
@@ -92,14 +92,14 @@ export const effectsConfig: EffectsConfig = {
       }
     },
     apply: effects.clarity
-  }
+  } */
 }
 
 export const effectCategories: EffectCategories = {
   Enhancement: {
     name: 'Enhancement',
     description: 'Tools to improve image quality and detail',
-    effects: ['smartSharpen', 'clarity']
+    effects: ['smartSharpen']
   },
   Artistic: {
     name: 'Artistic',

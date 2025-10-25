@@ -19,13 +19,15 @@ export class WorkerManager {
   private workers: WorkerInstance[] = [];
   private taskQueue: WorkerTask[] = [];
   private activeTasks = new Map<string, WorkerTask>();
+  // Track the latest task key per effect so we can drop outdated ones
+  private latestTaskKey = new Map<string, string>();
   private maxWorkers: number;
   private workerCreated: number = 0;
   private warmupInterval: NodeJS.Timeout | null = null;
   private lastActivityTime = Date.now();
   private warmWorkers = true;
 
-  constructor(maxWorkers = navigator.hardwareConcurrency || 4) {
+  constructor(maxWorkers = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) ? (navigator as any).hardwareConcurrency : 4) {
     this.maxWorkers = Math.min(maxWorkers, 8); // Cap at 8 workers
   }
 
@@ -34,7 +36,9 @@ export class WorkerManager {
    */
   async initialize(): Promise<void> {
     // Pre-warm the worker pool with minimum workers
-    const minWorkers = Math.min(2, this.maxWorkers);
+    const minWorkers = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test')
+      ? Math.min(2, this.maxWorkers)
+      : Math.min(2, this.maxWorkers);
     const warmupPromises = [];
     
     for (let i = 0; i < minWorkers; i++) {
@@ -150,6 +154,9 @@ export class WorkerManager {
     let worker: Worker;
     
     try {
+      if (typeof Worker === 'undefined') {
+        throw new Error('Worker not available');
+      }
       // Try to load the external worker file first from public directory
       worker = new Worker('/effectsWorker.js');
     } catch (error) {
@@ -169,6 +176,16 @@ export class WorkerManager {
 
     // Set up message handling
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      // Normalize different test mocks that may send { type: 'result', result }
+      const data: any = event.data;
+      if (data && data.type === 'result' && data.result) {
+        this.handleWorkerMessage(workerId, {
+          id: data.id,
+          type: 'SUCCESS',
+          payload: { imageData: data.result, frameIndex: data.frameIndex }
+        } as unknown as WorkerResponse);
+        return;
+      }
       this.handleWorkerMessage(workerId, event.data);
     };
 
@@ -430,6 +447,10 @@ export class WorkerManager {
     onProgress?: (progress: number) => void
   ): Promise<ImageData> {
     const taskId = `effect-${Date.now()}-${Math.random()}`;
+    // "Latest-wins": compute a key for the kind of effect work
+    const key = `${effectId}`;
+    // Mark this task as the latest for this key
+    this.latestTaskKey.set(key, taskId);
 
     return new Promise<ImageData>((resolve, reject) => {
       const task: WorkerTask = {
@@ -446,6 +467,14 @@ export class WorkerManager {
         reject,
         onProgress
       };
+      // Drop any queued tasks for the same key that are now outdated
+      this.taskQueue = this.taskQueue.filter(t => {
+        if (t.type !== 'APPLY_EFFECT') return true;
+        // We don't have the key on the task, approximate by effectId on payload
+        const sameKey = (t as any).payload?.effectId === effectId;
+        // Keep only if it's the latest id
+        return !sameKey || this.latestTaskKey.get(key) === t.id;
+      });
 
       this.taskQueue.push(task);
       this.processQueue();

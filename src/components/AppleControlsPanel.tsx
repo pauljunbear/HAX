@@ -139,7 +139,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
       currentValue: effectSettings[setting.id] ?? setting.defaultValue,
     })) || [];
 
-  const tabs = [
+  const tabs: Array<{ id: 'settings' | 'layers' | 'export' | 'new'; label: string; icon: any }> = [
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'layers', label: 'Layers', icon: Layers },
     { id: 'export', label: 'Export', icon: Download },
@@ -212,7 +212,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               }}
               className={`
                 glass-button ${tab.id === 'new' ? 'px-2 py-1.5 flex-shrink-0' : 'px-2.5 py-1.5 flex-1 min-w-0'} text-xs font-medium transition-all rounded-lg
-                ${activeTab === tab.id && tab.id !== 'new' ? 'glass-active' : ''}
+                ${activeTab === (tab.id as 'settings' | 'layers' | 'export') && tab.id !== 'new' ? 'glass-active' : ''}
               `}
             >
               {tab.label}
