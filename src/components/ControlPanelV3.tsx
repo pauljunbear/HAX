@@ -40,7 +40,9 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
   currentImageId,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Adjust']));
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set([Object.keys(effectCategories)[0] || 'Adjust'])
+  );
   const [recentEffects, setRecentEffects] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [containerHeight, setContainerHeight] = useState(400);
@@ -133,13 +135,14 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
   };
 
   // Filter effects based on search query
-  const searchResults = useMemo(() => {
+  const searchResults = useMemo<string[] | null>(() => {
     if (!searchQuery) return null;
 
     const results: { id: string; category: string; score: number }[] = [];
     const query = searchQuery.toLowerCase();
 
-    Object.entries(effectCategories).forEach(([category, data]) => {
+    Object.entries(effectCategories as Record<string, { effects: string[] }>).
+      forEach(([category, data]) => {
       data.effects.forEach(effectId => {
         const effect = effectsConfig[effectId];
         if (effect) {
@@ -451,7 +454,8 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
         ) : (
           /* Category Groups with Virtual Scrolling */
           <GroupedVirtualScroll
-            groups={Object.entries(effectCategories).map(([category, data]) => ({
+            groups={Object.entries(effectCategories as Record<string, { effects: string[] }>).
+              map(([category, data]) => ({
               label: category,
               items: expandedCategories.has(category) ? data.effects : [],
             }))}
@@ -459,7 +463,7 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
             groupHeaderHeight={40}
             containerHeight={containerHeight}
             renderGroupHeader={category => {
-              const data = effectCategories[category];
+              const data = (effectCategories as any)[category];
               return (
                 <button
                   onClick={() => toggleCategory(category)}

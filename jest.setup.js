@@ -1,4 +1,6 @@
 import '@testing-library/jest-dom'
+const rtl = require('@testing-library/react')
+global.act = rtl.act
 
 // Mock IntersectionObserver
 global.IntersectionObserver = class IntersectionObserver {

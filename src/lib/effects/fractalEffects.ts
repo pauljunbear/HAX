@@ -210,12 +210,13 @@ export const MandelbrotFilter = function(this: Konva.Image, imageData: ImageData
   const height = imageData.height;
   const data = imageData.data;
 
+  const self = this as any;
   const settings = {
-    centerX: this.mandelbrotCenterX() || 0,
-    centerY: this.mandelbrotCenterY() || 0,
-    zoom: this.mandelbrotZoom() || 1,
-    maxIterations: this.mandelbrotIterations() || 100,
-    colorScheme: mapColorScheme(this.mandelbrotColorScheme() || 0),
+    centerX: self.mandelbrotCenterX?.() || 0,
+    centerY: self.mandelbrotCenterY?.() || 0,
+    zoom: self.mandelbrotZoom?.() || 1,
+    maxIterations: self.mandelbrotIterations?.() || 100,
+    colorScheme: mapColorScheme(self.mandelbrotColorScheme?.() || 0),
   };
   
   console.log('Mandelbrot settings:', settings);
@@ -228,8 +229,8 @@ export const MandelbrotFilter = function(this: Konva.Image, imageData: ImageData
   });
   
   // Blend with original image
-  const blendMode = mapBlendMode(this.mandelbrotBlendMode() || 0);
-  const opacity = this.mandelbrotOpacity() || 0.5;
+  const blendMode = mapBlendMode(self.mandelbrotBlendMode?.() || 0);
+  const opacity = self.mandelbrotOpacity?.() || 0.5;
 
   try {
     for (let i = 0; i < data.length; i += 4) {
@@ -287,12 +288,13 @@ export const JuliaSetFilter = function(this: Konva.Image, imageData: ImageData) 
   const height = imageData.height;
   const data = imageData.data;
 
+  const self = this as any;
   const settings = {
-    cReal: this.juliaCReal() || -0.7,
-    cImag: this.juliaCImag() || 0.27,
-    zoom: this.juliaZoom() || 1,
-    maxIterations: this.juliaIterations() || 100,
-    colorScheme: mapColorScheme(this.juliaColorScheme() || 3),
+    cReal: self.juliaCReal?.() || -0.7,
+    cImag: self.juliaCImag?.() || 0.27,
+    zoom: self.juliaZoom?.() || 1,
+    maxIterations: self.juliaIterations?.() || 100,
+    colorScheme: mapColorScheme(self.juliaColorScheme?.() || 3),
   };
   
   console.log('Julia set settings:', settings);
@@ -305,8 +307,8 @@ export const JuliaSetFilter = function(this: Konva.Image, imageData: ImageData) 
   });
   
   // Blend with original image
-  const blendMode = mapBlendMode(this.juliaBlendMode() || 0);
-  const opacity = this.juliaOpacity() || 0.5;
+  const blendMode = mapBlendMode(self.juliaBlendMode?.() || 0);
+  const opacity = self.juliaOpacity?.() || 0.5;
 
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i];
@@ -346,9 +348,9 @@ export const JuliaSetFilter = function(this: Konva.Image, imageData: ImageData) 
 };
 
 // Register filters with Konva
-if (typeof window !== 'undefined' && window.Konva) {
-  Konva.Filters.Mandelbrot = MandelbrotFilter;
-  Konva.Filters.JuliaSet = JuliaSetFilter;
+if (typeof window !== 'undefined' && (window as any).Konva) {
+  (Konva as any).Filters.Mandelbrot = MandelbrotFilter;
+  (Konva as any).Filters.JuliaSet = JuliaSetFilter;
 }
 
 // Export registration function

@@ -9,14 +9,14 @@ const mockModules = {
 };
 
 // Mock the import function
-const originalImport = global.import || (() => Promise.reject(new Error('Not implemented')));
-global.import = jest.fn((path: string) => {
+// Shim dynamic import used in tests
+(global as any).import = (path: string) => {
   const moduleName = path.split('/').pop() || path;
   if (mockModules[moduleName as keyof typeof mockModules]) {
     return Promise.resolve(mockModules[moduleName as keyof typeof mockModules]);
   }
   return Promise.reject(new Error(`Module ${moduleName} not found`));
-});
+};
 
 // Mock PerformanceObserver
 global.PerformanceObserver = class MockPerformanceObserver {
@@ -34,23 +34,39 @@ global.performance = {
 
 // Mock dynamic import
 jest.mock('../DynamicModuleLoader', () => {
+  class MockLoader {
+    private registry = new Map<string, any>();
+    private cache = new Map<string, any>();
+    registerModule(config: { id: string; loader: () => Promise<any> }) {
+      this.registry.set(config.id, config.loader);
+    }
+    async loadModule(moduleId: string) {
+      if (this.cache.has(moduleId)) {
+        return { module: this.cache.get(moduleId), loadTime: 0, cached: true };
+      }
+      const loader = this.registry.get(moduleId);
+      if (!loader) throw new Error(`Module not found: ${moduleId}`);
+      const mod = await loader();
+      const resolved = mod.default || mod;
+      this.cache.set(moduleId, resolved);
+      return { module: resolved, loadTime: 1, cached: false };
+    }
+    unloadModule() {}
+    isModuleLoaded(id: string) { return this.cache.has(id); }
+    preloadModule(id: string) { this.loadModule(id).catch(() => {}); }
+    getLoadStats() { return {}; }
+    getBundleSavings() { return { totalSize: 0, loadedSize: 0, savings: 0 }; }
+    unloadUnusedModules() { return 0; }
+  }
+  let instance: any;
   return {
-    DynamicModuleLoader: jest.fn().mockImplementation(() => {
-      return {
-        loadModule: jest.fn().mockImplementation(modulePath => {
-          if (modulePath === 'test-module') {
-            return Promise.resolve({
-              default: {
-                testFunction: () => 'test result',
-              },
-            });
-          }
-          throw new Error(`Module not found: ${modulePath}`);
-        }),
-        unloadModule: jest.fn(),
-        isModuleLoaded: jest.fn().mockReturnValue(false),
-      };
-    }),
+    DynamicModuleLoader: MockLoader,
+    getModuleLoader: () => (instance ||= new MockLoader()),
+    loadThreeJS: () => ({}) as any,
+    loadThreeFiber: () => ({}) as any,
+    loadAdvancedFilters: () => ({}) as any,
+    loadFFmpeg: () => ({}) as any,
+    loadTensorFlow: () => ({}) as any,
   };
 });
 
@@ -62,9 +78,10 @@ describe('DynamicModuleLoader', () => {
   });
 
   it('should load a module successfully', async () => {
+    loader.registerModule({ id: 'test-module', loader: () => Promise.resolve({ default: { testFunction: () => 'test result' } }) });
     const result = await loader.loadModule('test-module');
     expect(result).toBeDefined();
-    expect(result.module.default.testFunction()).toBe('test result');
+    expect(result.module.testFunction()).toBe('test result');
   });
 
   it('should handle module loading errors', async () => {

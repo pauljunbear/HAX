@@ -21,7 +21,8 @@ describe('Effects Configuration - Generative Overlays', () => {
 
       it(`has required settings for ${effectId}`, () => {
         const effect = effectsConfig[effectId];
-        const settings = effect.settings;
+        const arr = effect.settings as any[];
+        const settings = arr.reduce((acc, s) => { acc[s.id] = s; return acc; }, {} as any);
 
         // All generative effects should have these settings
         expect(settings.opacity).toBeDefined();
@@ -33,8 +34,9 @@ describe('Effects Configuration - Generative Overlays', () => {
         // Check setting properties
         expect(settings.opacity.min).toBe(0);
         expect(settings.opacity.max).toBe(1);
-        expect(settings.opacity.default).toBeGreaterThanOrEqual(0);
-        expect(settings.opacity.default).toBeLessThanOrEqual(1);
+        const opDefault = settings.opacity.default ?? settings.opacity.defaultValue;
+        expect(opDefault).toBeGreaterThanOrEqual(0);
+        expect(opDefault).toBeLessThanOrEqual(1);
 
         expect(settings.particleCount.min).toBeGreaterThan(0);
         expect(settings.particleCount.max).toBeGreaterThan(settings.particleCount.min);
@@ -49,19 +51,23 @@ describe('Effects Configuration - Generative Overlays', () => {
 
       it(`has appropriate default values for ${effectId}`, () => {
         const effect = effectsConfig[effectId];
-        const settings = effect.settings;
+        const arr2 = effect.settings as any[];
+        const settings = arr2.reduce((acc, s) => { acc[s.id] = s; return acc; }, {} as any);
 
         // Opacity should be reasonable for overlays
-        expect(settings.opacity.default).toBeGreaterThanOrEqual(0.3);
-        expect(settings.opacity.default).toBeLessThanOrEqual(0.8);
+        const opDefault2 = settings.opacity.default ?? settings.opacity.defaultValue;
+        expect(opDefault2).toBeGreaterThanOrEqual(0.3);
+        expect(opDefault2).toBeLessThanOrEqual(0.8);
 
         // Particle count should be reasonable for performance
-        expect(settings.particleCount.default).toBeGreaterThanOrEqual(10);
-        expect(settings.particleCount.default).toBeLessThanOrEqual(100);
+        const countDefault = settings.particleCount.default ?? settings.particleCount.defaultValue;
+        expect(countDefault).toBeGreaterThanOrEqual(10);
+        expect(countDefault).toBeLessThanOrEqual(100);
 
         // Speed should be reasonable for visible animation
-        expect(settings.speed.default).toBeGreaterThanOrEqual(0.5);
-        expect(settings.speed.default).toBeLessThanOrEqual(3);
+        const speedDefault = settings.speed.default ?? settings.speed.defaultValue;
+        expect(speedDefault).toBeGreaterThanOrEqual(0.5);
+        expect(speedDefault).toBeLessThanOrEqual(3);
       });
     });
   });
@@ -155,7 +161,8 @@ describe('Effects Configuration - Generative Overlays', () => {
       );
 
       generativeEffects.forEach(effectId => {
-        const settings = effectsConfig[effectId].settings;
+        const arr3 = effectsConfig[effectId].settings as any[];
+        const settings = arr3.reduce((acc, s) => { acc[s.id] = s; return acc; }, {} as any);
 
         // Opacity should be 0-1
         expect(settings.opacity.min).toBe(0);
@@ -183,13 +190,15 @@ describe('Effects Configuration - Generative Overlays', () => {
       );
 
       generativeEffects.forEach(effectId => {
-        const colorSetting = effectsConfig[effectId].settings.color;
+        const arr4 = effectsConfig[effectId].settings as any[];
+        const colorSetting = arr4.find((s: any) => s.id === 'color');
 
         expect(colorSetting.min).toBe(0x000000);
         expect(colorSetting.max).toBe(0xffffff);
         expect(colorSetting.step).toBe(1);
-        expect(colorSetting.default).toBeGreaterThanOrEqual(0x000000);
-        expect(colorSetting.default).toBeLessThanOrEqual(0xffffff);
+        const colorDefault = colorSetting.default ?? colorSetting.defaultValue;
+        expect(colorDefault).toBeGreaterThanOrEqual(0x000000);
+        expect(colorDefault).toBeLessThanOrEqual(0xffffff);
       });
     });
   });

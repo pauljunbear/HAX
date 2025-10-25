@@ -109,9 +109,9 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
       },
       fpsLimit: 20, // Further reduced for stability
       detectRetina: false, // Disabled for better performance
-              particles: {
+      particles: {
           number: {
-            value: Math.min(particleCount, 25), // Cap particle count for stability
+          value: particleCount,
             density: {
               enable: true,
               area: 1000, // Increased area to spread particles more
@@ -121,7 +121,7 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
           value: color,
         },
         opacity: {
-          value: opacity * 0.8, // Slightly reduce particle opacity
+          value: opacity,
         },
         size: {
           value: { min: 1, max: 3 },
@@ -138,7 +138,7 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
         },
       },
       interactivity: interactive ? {
-        detect_on: 'window' as const,
+        detectsOn: 'canvas' as const,
         events: {
           onHover: {
             enable: true,
@@ -148,7 +148,7 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
             enable: true,
             mode: 'push' as const,
           },
-          resize: true,
+          resize: { enable: true },
         },
         modes: {
           grab: {
@@ -162,8 +162,11 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
           },
         },
       } : {
+        detectsOn: 'canvas' as const,
         events: {
-          resize: true,
+          onHover: { enable: false },
+          onClick: { enable: false },
+          resize: { enable: true },
         },
       },
     };
@@ -214,14 +217,7 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
               direction: 'top' as const,
               speed: speed * 1.5,
             },
-            opacity: {
-              value: { min: 0.1, max: 0.5 },
-              animation: {
-                enable: true,
-                speed: 1,
-                minimumValue: 0.1,
-              },
-            },
+            opacity: { value: opacity },
           },
         };
 
@@ -280,7 +276,7 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
           particles: {
             ...baseConfig.particles,
             shape: {
-              type: ['square', 'triangle', 'polygon'] as const,
+              type: 'polygon' as const,
               polygon: {
                 sides: 6,
               },
@@ -305,9 +301,8 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
                 },
               },
             },
-            color: {
-              value: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'],
-            },
+            color: { value: color },
+            opacity: { value: opacity },
           },
         };
 
@@ -337,14 +332,7 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
                 },
               },
             },
-            opacity: {
-              value: { min: 0.3, max: 1 },
-              animation: {
-                enable: true,
-                speed: 2,
-                minimumValue: 0.3,
-              },
-            },
+            opacity: { value: opacity },
           },
         };
 
@@ -352,6 +340,9 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
         return baseConfig;
     }
   }, [effectType, opacity, particleCount, color, speed, interactive]);
+
+  // tsParticles React typing workaround (library version differences)
+  const ParticlesComponent = Particles as unknown as React.FC<any>;
 
   return (
     <div
@@ -367,7 +358,7 @@ const GenerativeOverlay: React.FC<GenerativeOverlayProps> = ({
       aria-label={`Decorative ${effectType} overlay effect`}
       aria-hidden={!interactive}
     >
-      <Particles
+      <ParticlesComponent
         id={id}
         init={particlesInit}
         loaded={particlesLoaded}

@@ -37,3 +37,18 @@ export const useThree = jest.fn(() => ({
     setSize: jest.fn(),
   },
 })); 
+
+// Mock useFrame hook (no-op in tests)
+export const useFrame = jest.fn((callback?: any) => {
+  // Intentionally do nothing in unit tests
+});
+
+// Mock PerspectiveCamera (from drei mapping)
+export const PerspectiveCamera = (props: any) => (
+  <div data-testid="perspective-camera" data-props={JSON.stringify(props)} />
+);
+
+// Mock useTexture (from drei mapping)
+export const useTexture = jest.fn((url?: string) => ({
+  image: { width: 100, height: 100 },
+}));

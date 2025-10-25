@@ -403,3 +403,6 @@ export const GIF_QUALITY_PRESETS = {
 } as const;
 
 export type GifQualityPreset = keyof typeof GIF_QUALITY_PRESETS; 
+
+// Provide explicit result type referenced by tests
+export type OptimizationResult = ReturnType<typeof GifOptimizer.optimizeSettings>;

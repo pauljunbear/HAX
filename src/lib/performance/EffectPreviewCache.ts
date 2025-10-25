@@ -85,11 +85,11 @@ export class EffectPreviewCache {
 
           // Apply effect
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const [filterFunc, filterParams] = await applyEffect(effectId, settings);
+          const [filterFunc, filterParams] = await applyEffect(effectId, settings as any);
 
           if (filterFunc) {
             // Apply filter using a temporary Konva stage
-            const Konva = await import('konva');
+            const Konva: any = await import('konva');
             const stage = new Konva.Stage({
               container: document.createElement('div'),
               width: canvas.width,

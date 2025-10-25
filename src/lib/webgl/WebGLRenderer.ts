@@ -18,8 +18,13 @@ export class WebGLRenderer {
 
   constructor() {
     // Initialize PIXI settings for better performance
-    PIXI.settings.PREFER_ENV = PIXI.ENV.WEBGL2;
-    PIXI.settings.RENDER_OPTIONS.hello = false; // Disable console log
+    const anyPIXI = PIXI as any;
+    if (anyPIXI.settings && anyPIXI.ENV) {
+      anyPIXI.settings.PREFER_ENV = anyPIXI.ENV.WEBGL2;
+      if (anyPIXI.settings.RENDER_OPTIONS) {
+        anyPIXI.settings.RENDER_OPTIONS.hello = false;
+      }
+    }
   }
 
   async initialize(container: HTMLElement, width: number, height: number): Promise<void> {
@@ -50,29 +55,29 @@ export class WebGLRenderer {
 
   private preloadFilters(): void {
     // Blur filter
-    const blurFilter = new BlurFilter();
+    const blurFilter = new BlurFilter() as unknown as PIXI.Filter;
     this.effectsCache.set('blur', { name: 'blur', filter: blurFilter });
 
     // Color matrix filters
-    const brightnessFilter = new ColorMatrixFilter();
+    const brightnessFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
     this.effectsCache.set('brightness', { name: 'brightness', filter: brightnessFilter });
 
-    const contrastFilter = new ColorMatrixFilter();
+    const contrastFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
     this.effectsCache.set('contrast', { name: 'contrast', filter: contrastFilter });
 
-    const saturationFilter = new ColorMatrixFilter();
+    const saturationFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
     this.effectsCache.set('saturation', { name: 'saturation', filter: saturationFilter });
 
-    const hueFilter = new ColorMatrixFilter();
+    const hueFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
     this.effectsCache.set('hue', { name: 'hue', filter: hueFilter });
 
     // Vintage filter
-    const vintageFilter = new ColorMatrixFilter();
+    const vintageFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
     vintageFilter.vintage(true);
     this.effectsCache.set('vintage', { name: 'vintage', filter: vintageFilter });
 
     // Sepia filter
-    const sepiaFilter = new ColorMatrixFilter();
+    const sepiaFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
     sepiaFilter.sepia(true);
     this.effectsCache.set('sepia', { name: 'sepia', filter: sepiaFilter });
   }
@@ -86,7 +91,7 @@ export class WebGLRenderer {
     }
 
     // Load texture
-    const texture = await PIXI.Assets.load(imageUrl);
+    const texture = await (PIXI as any).Assets.load(imageUrl);
     this.sprite = new PIXI.Sprite(texture);
 
     // Scale sprite to fit canvas
@@ -117,19 +122,19 @@ export class WebGLRenderer {
     if (params) {
       switch (effectName) {
         case 'blur':
-          (effect.filter as BlurFilter).blur = params.intensity || 5;
+      (effect.filter as unknown as BlurFilter).blur = params.intensity || 5;
           break;
         case 'brightness':
-          (effect.filter as ColorMatrixFilter).brightness(params.value || 1, false);
+          (effect.filter as unknown as ColorMatrixFilter).brightness(params.value || 1, false);
           break;
         case 'contrast':
-          (effect.filter as ColorMatrixFilter).contrast(params.value || 1, false);
+          (effect.filter as unknown as ColorMatrixFilter).contrast(params.value || 1, false);
           break;
         case 'saturation':
-          (effect.filter as ColorMatrixFilter).saturate(params.value || 1, false);
+          (effect.filter as unknown as ColorMatrixFilter).saturate(params.value || 1, false);
           break;
         case 'hue':
-          (effect.filter as ColorMatrixFilter).hue(params.value || 0, false);
+          (effect.filter as unknown as ColorMatrixFilter).hue(params.value || 0, false);
           break;
       }
     }

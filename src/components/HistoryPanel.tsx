@@ -99,7 +99,8 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({
                   {state.activeEffect && Object.keys(state.effectSettings).length > 0 && (
                     <div className="text-[10px] mt-0.5 opacity-70 truncate text-dark-textMuted">
                       {Object.entries(state.effectSettings).map(([key, value]) => {
-                        const settingLabel = effectsConfig[state.activeEffect!]?.settings?.[key]?.label || key;
+                        const effectCfg: any = effectsConfig[state.activeEffect!];
+                        const settingLabel = effectCfg?.settings?.[key]?.label || key;
                         return (
                           <span key={key} className="mr-1.5">
                             {settingLabel}: {typeof value === 'number' ? value.toFixed(1) : value}

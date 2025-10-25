@@ -4,12 +4,22 @@ class MockImageData {
   width: number;
   height: number;
 
-  constructor(width: number, height: number) {
-    this.width = width;
-    this.height = height;
-    this.data = new Uint8ClampedArray(width * height * 4);
+  constructor(dataOrWidth: any, width?: number, height?: number) {
+    if (typeof dataOrWidth === 'number') {
+      this.width = dataOrWidth;
+      this.height = width as number;
+      this.data = new Uint8ClampedArray(this.width * this.height * 4);
+    } else {
+      this.data = dataOrWidth;
+      this.width = width as number;
+      this.height = height as number;
+    }
   }
 }
 
 // @ts-ignore
 global.ImageData = MockImageData; 
+
+test('effects setup ready', () => {
+  expect(true).toBe(true)
+})

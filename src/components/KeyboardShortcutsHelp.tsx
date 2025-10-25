@@ -38,6 +38,7 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
             onClick={onClose}
+            role="presentation"
           />
 
           {/* Dialog */}
@@ -47,6 +48,7 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', duration: 0.3 }}
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white dark:bg-gray-900 rounded-xl shadow-xl z-50 overflow-hidden"
+            role="dialog"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
@@ -74,7 +76,7 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
             </div>
 
             {/* Content */}
-            <div className="p-4 max-h-[70vh] overflow-y-auto">
+            <div className="p-4 max-h-[70vh] overflow-y-auto" role="region" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
               {Object.entries(groupedShortcuts).map(([category, categoryShortcuts]) => (
                 <div key={category} className="mb-6 last:mb-0">
                   <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
@@ -102,7 +104,9 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
             {/* Footer */}
             <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Press <kbd className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded">Esc</kbd> to close
+                <span>Press</span>{' '}
+                <kbd className="px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded">Esc</kbd>{' '}
+                <span>to close</span>
               </p>
             </div>
           </motion.div>

@@ -172,6 +172,7 @@ export class DynamicModuleLoader {
 
     // Check cache first
     if (this.moduleCache.has(moduleId)) {
+      // Short-circuit without touching loader/spies
       return {
         module: this.moduleCache.get(moduleId),
         loadTime: 0,
@@ -252,6 +253,10 @@ export class DynamicModuleLoader {
    * Preload a module without waiting
    */
   preloadModule(moduleId: string): void {
+    // If already loaded or loading, do nothing
+    if (this.moduleCache.has(moduleId) || this.loadingPromises.has(moduleId)) {
+      return;
+    }
     if (!this.moduleCache.has(moduleId) && !this.loadingPromises.has(moduleId)) {
       this.loadModule(moduleId).catch(error => {
         console.warn(`Preload failed for module ${moduleId}:`, error);

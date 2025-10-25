@@ -78,6 +78,8 @@
     "@types/node": "^20.19.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@typescript-eslint/eslint-plugin": "^8.44.1",
+    "@typescript-eslint/parser": "^8.44.1",
     "axe-core": "^4.10.3",
     "cypress": "^14.4.1",
     "cypress-axe": "^1.6.0",

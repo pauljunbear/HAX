@@ -20,15 +20,23 @@ export const useKeyboardShortcuts = ({ shortcuts, enabled = true }: UseKeyboardS
     (event: KeyboardEvent) => {
       if (!enabled) return;
 
-      const matchingShortcut = shortcuts.find(shortcut => {
+      const matched = shortcuts.filter(shortcut => {
         const keyMatch = shortcut.key.toLowerCase() === event.key.toLowerCase();
-        const ctrlMatch = shortcut.ctrlKey === event.ctrlKey;
-        const shiftMatch = shortcut.shiftKey === event.shiftKey;
-        const altMatch = shortcut.altKey === event.altKey;
-        const metaMatch = shortcut.metaKey === event.metaKey;
-
+        const ctrlMatch = shortcut.ctrlKey === undefined ? true : shortcut.ctrlKey === event.ctrlKey;
+        const shiftMatch = shortcut.shiftKey === undefined ? true : shortcut.shiftKey === event.shiftKey;
+        const altMatch = shortcut.altKey === undefined ? true : shortcut.altKey === event.altKey;
+        const metaMatch = shortcut.metaKey === undefined ? true : shortcut.metaKey === event.metaKey;
         return keyMatch && ctrlMatch && shiftMatch && altMatch && metaMatch;
       });
+
+      // Prefer the most specific shortcut (with the most defined modifier keys)
+      const specificity = (s: KeyboardShortcut) =>
+        (Number(s.ctrlKey !== undefined) +
+         Number(s.shiftKey !== undefined) +
+         Number(s.altKey !== undefined) +
+         Number(s.metaKey !== undefined));
+
+      const matchingShortcut = matched.sort((a, b) => specificity(b) - specificity(a))[0];
 
       if (matchingShortcut) {
         event.preventDefault();
@@ -42,7 +50,6 @@ export const useKeyboardShortcuts = ({ shortcuts, enabled = true }: UseKeyboardS
     if (enabled) {
       window.addEventListener('keydown', handleKeyDown);
     }
-
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
