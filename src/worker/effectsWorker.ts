@@ -4,15 +4,20 @@
 export interface WorkerMessage {
   id: string;
   type: 'APPLY_EFFECT' | 'PROCESS_IMAGE' | 'GENERATE_FRAME' | 'OFFSCREEN_RENDER' | 'TERMINATE';
-  payload: any;
+  payload: EffectParams | FrameGenerationParams | OffscreenRenderParams | null;
 }
 
 export interface WorkerResponse {
   id: string;
   type: 'SUCCESS' | 'ERROR' | 'PROGRESS';
-  payload: any;
+  payload: WorkerResponsePayload;
   error?: string;
 }
+
+export type WorkerResponsePayload =
+  | { progress: number }
+  | { imageData: ImageData; frameIndex?: number }
+  | null;
 
 export interface EffectParams {
   effectId: string;

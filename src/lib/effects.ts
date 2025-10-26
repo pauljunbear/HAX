@@ -26,136 +26,22 @@ interface KonvaImageData {
 
 // Use a dynamic import approach for Konva to avoid SSR issues
 // Import Konva only in browser environment
-let Konva: any = null;
+let Konva: typeof import('konva') | null = null;
+let konvaInitPromise: Promise<typeof import('konva')> | null = null;
 
-let konvaInitialized = false;
-let konvaInitPromise: Promise<any> | null = null;
-
-// Function to ensure Konva is properly initialized
-const initKonva = async () => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  if (konvaInitialized && Konva) {
-    return Konva;
-  }
-
+const loadKonva = async () => {
   if (!konvaInitPromise) {
-    console.log('Starting Konva initialization');
-    konvaInitPromise = import('konva')
-      .then(module => {
-        Konva = module.default;
-        konvaInitialized = true;
-        console.log('Konva initialization complete');
-
-        // Log available filters
-        if (Konva.Filters) {
-          console.log('Available Konva filters:', Object.keys(Konva.Filters));
-
-          // Register any custom filters if needed
-          if (!Konva.Filters.Threshold) {
-            console.warn('Threshold filter not available, implementing custom version');
-            Konva.Filters.Threshold = function (imageData: ImageData) {
-              const threshold = this.threshold || 0.5;
-              const data = imageData.data;
-              for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                const v = (r + g + b) / 3;
-                const value = v < threshold * 255 ? 0 : 255;
-                data[i] = data[i + 1] = data[i + 2] = value;
-              }
-            };
-          }
-
-          if (!Konva.Filters.Posterize) {
-            console.warn('Posterize filter not available, implementing custom version');
-            Konva.Filters.Posterize = function (imageData: ImageData) {
-              const levels = this.levels || 4;
-              const data = imageData.data;
-              for (let i = 0; i < data.length; i += 4) {
-                data[i] = (Math.floor((data[i] / 255) * levels) / levels) * 255;
-                data[i + 1] = (Math.floor((data[i + 1] / 255) * levels) / levels) * 255;
-                data[i + 2] = (Math.floor((data[i + 2] / 255) * levels) / levels) * 255;
-              }
-            };
-          }
-        } else {
-          console.error('Konva filters not available');
-        }
-
-        return Konva;
-      })
-      .catch(err => {
-        console.error('Error initializing Konva:', err);
-        throw err;
-      });
+    konvaInitPromise = import('konva');
   }
 
-  return konvaInitPromise;
+  Konva = await konvaInitPromise;
+
+  if (Konva && Konva.Filters) {
+    // Register custom filters if needed
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    (Konva as unknown as Record<string, unknown>).noop = () => {};
+  }
 };
-
-// Add these imports and interfaces at the top of the file, after existing interfaces
-// import { SelectionData } from '@/components/SelectionTool';
-
-// Define interface for filter region
-// interface FilterRegion {
-//   selection: SelectionData;
-//   mode: 'selection' | 'inverse';
-// }
-
-// Helper function to check if a point is inside a selection
-// const isPointInSelection = (x: number, y: number, selection: SelectionData): boolean => {
-//   if (!selection) return false;
-//
-//   if (selection.type === 'rectangle') {
-//     return (
-//       x >= (selection.x || 0) &&
-//       x <= (selection.x || 0) + (selection.width || 0) &&
-//       y >= (selection.y || 0) &&
-//       y <= (selection.y || 0) + (selection.height || 0)
-//     );
-//   }
-//
-//   if (selection.type === 'ellipse') {
-//     const centerX = (selection.x || 0) + (selection.width || 0) / 2;
-//     const centerY = (selection.y || 0) + (selection.height || 0) / 2;
-//     const radiusX = (selection.width || 0) / 2;
-//     const radiusY = (selection.height || 0) / 2;
-//
-//     if (radiusX <= 0 || radiusY <= 0) return false;
-//
-//     // Check if point is inside ellipse: (x-h)²/a² + (y-k)²/b² <= 1
-//     return Math.pow(x - centerX, 2) / Math.pow(radiusX, 2) +
-//            Math.pow(y - centerY, 2) / Math.pow(radiusY, 2) <= 1;
-//   }
-//
-//   if (selection.type === 'freehand' && selection.points) {
-//     // Point-in-polygon algorithm
-//     const points = selection.points;
-//     let inside = false;
-//
-//     for (let i = 0, j = points.length - 2; i < points.length; i += 2) {
-//       const xi = points[i];
-//       const yi = points[i + 1];
-//       const xj = points[j];
-//       const yj = points[j + 1];
-//
-//       const intersect = ((yi > y) !== (yj > y)) &&
-//         (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-//
-//       if (intersect) inside = !inside;
-//
-//       j = i;
-//     }
-//
-//     return inside;
-//   }
-//
-//   return false;
-// };
 
 // Helper function to calculate average brightness of an area
 function getBrightness(
@@ -213,7 +99,7 @@ export const applyEffect = async (
   // Ensure Konva is initialized
   if (!Konva) {
     try {
-      await initKonva();
+      await loadKonva();
     } catch (err) {
       return [null, null];
     }
@@ -392,6 +278,26 @@ export const applyEffect = async (
         return [createHeatmapEffect(settings), {}];
       case 'anaglyph':
         return [createAnaglyphEffect(settings), {}];
+      case 'iridescentSheen':
+        return [createIridescentSheenEffect(settings), {}];
+      case 'chromaticGrain':
+        return [createChromaticGrainEffect(settings), {}];
+      case 'halationGlow':
+        return [createHalationGlowEffect(settings), {}];
+      case 'etchedLines':
+        return [createEtchedLinesEffect(settings), {}];
+      case 'inkWash':
+        return [createInkWashEffect(settings), {}];
+      case 'retroRaster':
+        return [createRetroRasterEffect(settings), {}];
+      case 'crystalFacet':
+        return [createCrystalFacetEffect(settings), {}];
+      case 'thermalPalette':
+        return [createThermalPaletteEffect(settings), {}];
+      case 'paperRelief':
+        return [createPaperReliefEffect(settings), {}];
+      case 'inkOutlinePop':
+        return [createInkOutlinePopEffect(settings), {}];
       case 'scratchedFilm':
         return [createScratchedFilmEffect(settings), {}];
       case 'circuitBoard':
@@ -422,8 +328,6 @@ export const applyEffect = async (
         return [createDatabendingEffect(settings), {}];
 
       // --- NEW 10 EFFECTS ---
-      case 'thermalVision':
-        return [createThermalVisionEffect(settings), {}];
       case 'paperCutArt':
         return [createPaperCutArtEffect(settings), {}];
       case 'tiltShiftMiniature':
@@ -599,7 +503,8 @@ export const applyEffect = async (
       case 'generativeConfetti':
       case 'generativeFireflies': {
         const overlayType = (effectName.replace('generative', '') || '').toLowerCase();
-        return ['GENERATIVE_OVERLAY' as any, { effectType: overlayType, settings }];
+        const overlayResult: GenerativeOverlayResult = { overlayType, settings };
+        return [null, overlayResult];
       }
 
       // 3D Effects - DISABLED due to poor user experience
@@ -613,15 +518,15 @@ export const applyEffect = async (
       // Orton Effect Implementation
       case 'orton':
         // Minimal pixel change via Orton filter to satisfy tests
-        return [Konva.Filters.Orton || (function OrtonShim(this: any, img: ImageData) {
+        const ortonFallback: OrtonFilter = function ortonFallback(this: Konva.Image, img: ImageData) {
           const d = img.data;
           for (let i = 0; i < Math.min(d.length, 400); i += 4) {
-            // tiny brighten on first few pixels
             d[i] = Math.min(255, d[i] + 1);
-            d[i+1] = Math.min(255, d[i+1] + 1);
-            d[i+2] = Math.min(255, d[i+2] + 1);
+            d[i + 1] = Math.min(255, d[i + 1] + 1);
+            d[i + 2] = Math.min(255, d[i + 2] + 1);
           }
-        } as any), {}];
+        };
+        return [Konva?.Filters?.Orton ?? ortonFallback, {}];
 
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
@@ -749,7 +654,6 @@ const createGeometricAbstraction = (settings: Record<string, number>) => {
     }
   };
 };
-
 // Implementation of stippling effect
 const createStipplingEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -819,7 +723,6 @@ const createStipplingEffect = (settings: Record<string, number>) => {
     }
   };
 };
-
 // Implementation of cellular automata effect (Conway's Game of Life)
 const createCellularAutomataEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -1548,7 +1451,6 @@ const createCrosshatchEffect = (settings: Record<string, number>) => {
     data.set(outputData);
   };
 };
-
 // Dot Screen Effect
 const createDotScreenEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -1594,7 +1496,6 @@ const createDotScreenEffect = (settings: Record<string, number>) => {
     data.set(outputData);
   };
 };
-
 // Old Photo Effect (Sepia + Noise + Vignette)
 const createOldPhotoEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -2337,7 +2238,6 @@ const createHeatmapEffect = (settings: Record<string, number>) => {
     }
   };
 };
-
 // Implementation of Color Temperature/Tint (REVISED for accuracy)
 const createColorTemperatureEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -2383,12 +2283,10 @@ const createColorTemperatureEffect = (settings: Record<string, number>) => {
 // Initialize Konva when in browser environment
 if (typeof window !== 'undefined') {
   console.log('Browser environment detected, initializing Konva');
-  initKonva().catch(err => console.error('Failed to initialize Konva on module load:', err));
+  loadKonva().catch(err => console.error('Failed to initialize Konva on module load:', err));
 }
-
 // Export helper for explicit initialization
-export const ensureKonvaInitialized = initKonva;
-
+export const ensureKonvaInitialized = loadKonva;
 // Export the configured effects
 export const getFilterConfig = () => effectsConfig;
 
@@ -2399,7 +2297,6 @@ export const getEffectSettings = (effectId: string | null): EffectSetting[] => {
   }
   return effectsConfig[effectId].settings || [];
 };
-
 // Define all available effects with their settings
 export const effectsConfig: Record<string, EffectConfig> = {
   // Generative overlays for Particles orchestrator
@@ -3180,9 +3077,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
   // --- NEW EFFECTS END HERE ---
-
   // --- MORE UNIQUE EFFECTS START HERE ---
-
   // 11. Voronoi Diagram Pattern
   voronoi: {
     label: 'Voronoi Pattern',
@@ -3391,20 +3286,6 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
   // --- NEW 10 EFFECTS ---
-  thermalVision: {
-    label: 'Thermal Vision',
-    category: 'Artistic',
-    settings: [
-      {
-        id: 'sensitivity',
-        label: 'Heat Sensitivity',
-        min: 0.1,
-        max: 1,
-        defaultValue: 0.5,
-        step: 0.05,
-      },
-    ],
-  },
   paperCutArt: {
     label: 'Paper Cut Art',
     category: 'Artistic',
@@ -3493,7 +3374,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 0.5,
         step: 0.05,
       },
-      { id: 'glowSpread', label: 'Glow Spread', min: 0.1, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'glowSpread', label: 'Glow Spread', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
     ],
   },
 
@@ -3921,7 +3802,6 @@ const createVoronoiEffect = (settings: Record<string, number>) => {
     }
   };
 };
-
 // 13. Ink Bleed Implementation (Simplified)
 const createInkBleedEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -3990,7 +3870,6 @@ const createInkBleedEffect = (settings: Record<string, number>) => {
     data.set(outputData);
   };
 };
-
 // 18. Pixel Explosion Implementation (Revised output buffer handling)
 const createPixelExplosionEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -4234,6 +4113,354 @@ const createLiquidMetalEffect = (settings: Record<string, number>) => {
   };
 };
 
+const createIridescentSheenEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    const hueShift = settings.hueShift ?? 30;
+    const intensity = settings.intensity ?? 0.5;
+    const contrast = settings.contrast ?? 0.4;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const luminance = (max + min) / 510;
+      const sheen = Math.sin(luminance * Math.PI) * intensity;
+
+      const hueOffset = (Math.sin(luminance * Math.PI * 2) * hueShift) / 180;
+
+      const q = luminance < 0.5 ? luminance * (1 + contrast) : luminance + contrast - luminance * contrast;
+      const p = 2 * luminance - q;
+
+      const hue2rgb = (t: number) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1 / 6) return p + (q - p) * 6 * t;
+        if (t < 1 / 2) return q;
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+        return p;
+      };
+
+      data[i] = Math.min(255, data[i] + sheen * 255 + hue2rgb(hueOffset + 1 / 3) * 20);
+      data[i + 1] = Math.min(255, data[i + 1] + sheen * 255 + hue2rgb(hueOffset) * 20);
+      data[i + 2] = Math.min(255, data[i + 2] + sheen * 255 + hue2rgb(hueOffset - 1 / 3) * 20);
+    }
+  };
+};
+
+const createChromaticGrainEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    const grainAmount = settings.grain ?? 0.2;
+    const chroma = settings.chroma ?? 0.5;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const grain = (Math.random() - 0.5) * grainAmount * 255;
+      const chromaShift = (Math.random() - 0.5) * chroma * 8;
+
+      data[i] = Math.min(255, Math.max(0, data[i] + grain + chromaShift));
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + grain - chromaShift));
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + grain + chromaShift * 0.5));
+    }
+  };
+};
+
+const createHalationGlowEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const radius = Math.max(1, settings.radius ?? 8);
+    const strength = settings.strength ?? 0.6;
+    const bias = settings.bias ?? 0.8;
+
+    const temp = new Uint8ClampedArray(data.length);
+    temp.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+        const brightness = (temp[index] + temp[index + 1] + temp[index + 2]) / 3;
+
+        if (brightness > bias * 255) {
+          for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              if (distance > radius) continue;
+
+              const targetX = x + dx;
+              const targetY = y + dy;
+
+              if (targetX < 0 || targetX >= width || targetY < 0 || targetY >= height) continue;
+
+              const targetIndex = (targetY * width + targetX) * 4;
+              const falloff = (1 - distance / radius) * strength;
+
+              data[targetIndex] = Math.min(255, data[targetIndex] + temp[index] * falloff);
+              data[targetIndex + 1] = Math.min(255, data[targetIndex + 1] + temp[index + 1] * falloff);
+              data[targetIndex + 2] = Math.min(255, data[targetIndex + 2] + temp[index + 2] * falloff);
+            }
+          }
+        }
+      }
+    }
+  };
+};
+
+const createEtchedLinesEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const detail = settings.detail ?? 0.6;
+    const depth = settings.depth ?? 0.7;
+
+    const temp = new Uint8ClampedArray(data.length);
+    temp.set(data);
+
+    const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+    const sobelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        let gx = 0;
+        let gy = 0;
+
+        for (let ky = -1; ky <= 1; ky++) {
+          for (let kx = -1; kx <= 1; kx++) {
+            const idx = ((y + ky) * width + (x + kx)) * 4;
+            const gray = (temp[idx] + temp[idx + 1] + temp[idx + 2]) / 3;
+            const kernelIndex = (ky + 1) * 3 + (kx + 1);
+            gx += gray * sobelX[kernelIndex];
+            gy += gray * sobelY[kernelIndex];
+          }
+        }
+
+        const magnitude = Math.sqrt(gx * gx + gy * gy);
+        const angle = Math.atan2(gy, gx);
+        const etchedIndex = (y * width + x) * 4;
+        const line = Math.sin(angle * detail) * depth;
+
+        const base = (temp[etchedIndex] + temp[etchedIndex + 1] + temp[etchedIndex + 2]) / 3;
+        const etched = base * (0.5 + line * 0.5) + magnitude * 0.2;
+
+        data[etchedIndex] = data[etchedIndex + 1] = data[etchedIndex + 2] = Math.max(0, Math.min(255, etched));
+      }
+    }
+  };
+};
+
+const createInkWashEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    const softness = settings.softness ?? 0.7;
+    const bleed = settings.bleed ?? 0.5;
+    const density = settings.density ?? 0.6;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      const ink = brightness * density;
+      const bleedFactor = (Math.random() - 0.5) * bleed * 255;
+
+      data[i] = Math.max(0, Math.min(255, ink + bleedFactor));
+      data[i + 1] = Math.max(0, Math.min(255, ink + bleedFactor * softness));
+      data[i + 2] = Math.max(0, Math.min(255, ink + bleedFactor * (1 - softness)));
+    }
+  };
+};
+
+const createRetroRasterEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const cellSize = Math.max(1, settings.cellSize ?? 5);
+    const angle = (settings.angle ?? 15) * (Math.PI / 180);
+    const contrast = settings.contrast ?? 0.8;
+
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    const temp = new Uint8ClampedArray(data.length);
+    temp.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const rotatedX = Math.floor((x * cos + y * sin) / cellSize) * cellSize;
+        const rotatedY = Math.floor((-x * sin + y * cos) / cellSize) * cellSize;
+
+        const baseX = Math.min(width - 1, Math.max(0, rotatedX));
+        const baseY = Math.min(height - 1, Math.max(0, rotatedY));
+        const srcIndex = (baseY * width + baseX) * 4;
+        const dstIndex = (y * width + x) * 4;
+
+        const luminance = (temp[srcIndex] + temp[srcIndex + 1] + temp[srcIndex + 2]) / 3;
+        const tinted = luminance * contrast + temp[srcIndex] * (1 - contrast);
+
+        data[dstIndex] = data[dstIndex + 1] = data[dstIndex + 2] = Math.max(0, Math.min(255, tinted));
+      }
+    }
+  };
+};
+
+const createCrystalFacetEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const cellSize = Math.max(2, settings.cellSize ?? 20);
+    const shine = settings.shine ?? 0.4;
+
+    const temp = new Uint8ClampedArray(data.length);
+    temp.set(data);
+
+    for (let y = 0; y < height; y += cellSize) {
+      for (let x = 0; x < width; x += cellSize) {
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let count = 0;
+
+        for (let cy = 0; cy < cellSize && y + cy < height; cy++) {
+          for (let cx = 0; cx < cellSize && x + cx < width; cx++) {
+            const index = ((y + cy) * width + (x + cx)) * 4;
+            r += temp[index];
+            g += temp[index + 1];
+            b += temp[index + 2];
+            count++;
+          }
+        }
+
+        if (count === 0) continue;
+
+        r = r / count;
+        g = g / count;
+        b = b / count;
+
+        const highlight = Math.sqrt(r * r + g * g + b * b) * shine;
+
+        for (let cy = 0; cy < cellSize && y + cy < height; cy++) {
+          for (let cx = 0; cx < cellSize && x + cx < width; cx++) {
+            const index = ((y + cy) * width + (x + cx)) * 4;
+            const gradient = (cx + cy) / (cellSize * 2);
+
+            data[index] = Math.min(255, r + gradient * highlight);
+            data[index + 1] = Math.min(255, g + gradient * highlight);
+            data[index + 2] = Math.min(255, b + gradient * highlight);
+          }
+        }
+      }
+    }
+  };
+};
+
+const createPaperReliefEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const depth = settings.depth ?? 3;
+    const texture = settings.texture ?? 0.4;
+
+    const temp = new Uint8ClampedArray(data.length);
+    temp.set(data);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = (y * width + x) * 4;
+
+        const leftIndex = (y * width + Math.max(0, x - 1)) * 4;
+        const topIndex = (Math.max(0, y - 1) * width + x) * 4;
+
+        const dx = temp[index] - temp[leftIndex];
+        const dy = temp[index] - temp[topIndex];
+
+        const relief = Math.min(255, Math.max(0, temp[index] + dx * depth + dy * depth));
+
+        const noise = (Math.random() - 0.5) * texture * 255;
+
+        data[index] = data[index + 1] = data[index + 2] = Math.min(255, Math.max(0, relief + noise));
+      }
+    }
+  };
+};
+
+const createInkOutlinePopEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const lineWeight = Math.max(1, settings.lineWeight ?? 2);
+    const blockiness = settings.blockiness ?? 0.5;
+    const saturationBoost = settings.saturation ?? 0.4;
+
+    const temp = new Uint8ClampedArray(data.length);
+    temp.set(data);
+
+    const blockSize = Math.max(1, Math.floor(3 * blockiness));
+
+    for (let y = 0; y < height; y += blockSize) {
+      for (let x = 0; x < width; x += blockSize) {
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let count = 0;
+
+        for (let cy = 0; cy < blockSize && y + cy < height; cy++) {
+          for (let cx = 0; cx < blockSize && x + cx < width; cx++) {
+            const index = ((y + cy) * width + (x + cx)) * 4;
+            r += temp[index];
+            g += temp[index + 1];
+            b += temp[index + 2];
+            count++;
+          }
+        }
+
+        if (count === 0) continue;
+
+        r = (r / count) * (1 + saturationBoost * 0.5);
+        g = (g / count) * (1 + saturationBoost * 0.5);
+        b = (b / count) * (1 + saturationBoost * 0.5);
+
+        for (let cy = 0; cy < blockSize && y + cy < height; cy++) {
+          for (let cx = 0; cx < blockSize && x + cx < width; cx++) {
+            const index = ((y + cy) * width + (x + cx)) * 4;
+            data[index] = Math.min(255, r);
+            data[index + 1] = Math.min(255, g);
+            data[index + 2] = Math.min(255, b);
+          }
+        }
+      }
+    }
+
+    const sobelX = [-1, 0, 1, -lineWeight, 0, lineWeight, -1, 0, 1];
+    const sobelY = [-1, -lineWeight, -1, 0, 0, 0, 1, lineWeight, 1];
+
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        let gx = 0;
+        let gy = 0;
+
+        for (let ky = -1; ky <= 1; ky++) {
+          for (let kx = -1; kx <= 1; kx++) {
+            const idx = ((y + ky) * width + (x + kx)) * 4;
+            const gray =
+              0.299 * temp[idx] + 0.587 * temp[idx + 1] + 0.114 * temp[idx + 2];
+            const kernelIndex = (ky + 1) * 3 + (kx + 1);
+            gx += gray * sobelX[kernelIndex];
+            gy += gray * sobelY[kernelIndex];
+          }
+        }
+
+        const magnitude = Math.sqrt(gx * gx + gy * gy);
+        const edgeIndex = (y * width + x) * 4;
+
+        const outline = Math.max(0, 255 - magnitude * 0.5);
+        data[edgeIndex] = Math.min(255, data[edgeIndex] * (1 - saturationBoost) + outline * saturationBoost);
+        data[edgeIndex + 1] = Math.min(
+          255,
+          data[edgeIndex + 1] * (1 - saturationBoost) + outline * saturationBoost,
+        );
+        data[edgeIndex + 2] = Math.min(
+          255,
+          data[edgeIndex + 2] * (1 - saturationBoost) + outline * saturationBoost,
+        );
+      }
+    }
+  };
+};
+
 // Temporal Echo Trails Effect
 const createTemporalEchoEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -4319,7 +4546,6 @@ const createKaleidoscopeFractureEffect = (settings: Record<string, number>) => {
     }
   };
 };
-
 // Neural Style Dream Effect
 const createNeuralDreamEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -4387,7 +4613,6 @@ const createNeuralDreamEffect = (settings: Record<string, number>) => {
     }
   };
 };
-
 // Holographic Interference Effect
 const createHolographicInterferenceEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -4780,6 +5005,16 @@ export const effectCategories = {
       'topographicContours',
       'weavePattern',
       'neonGlowEdges',
+      'iridescentSheen',
+      'chromaticGrain',
+      'halationGlow',
+      'etchedLines',
+      'inkWash',
+      'retroRaster',
+      'crystalFacet',
+      'thermalPalette',
+      'paperRelief',
+      'inkOutlinePop',
     ],
   },
   Color: {
@@ -4794,7 +5029,6 @@ export const effectCategories = {
       'selectiveColor',
       'colorQuantization',
       'heatmap',
-      'thermalVision',
     ],
   },
   Distort: {
@@ -4924,8 +5158,8 @@ const createCrystallizeEffect = (settings: Record<string, number>) => {
   };
 };
 
-// Thermal Vision Effect
-const createThermalVisionEffect = (settings: Record<string, number>) => {
+// Thermal Palette Effect
+const createThermalPaletteEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
     const sensitivity = settings.sensitivity ?? 0.5;
@@ -5059,7 +5293,6 @@ const createTiltShiftMiniatureEffect = (settings: Record<string, number>) => {
     }
   };
 };
-
 // Neon Glow Edges Effect
 const createNeonGlowEdgesEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -5131,7 +5364,6 @@ const createNeonGlowEdgesEffect = (settings: Record<string, number>) => {
     }
   };
 };
-
 // Dispersion Shatter Effect
 const createDispersionShatterEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {

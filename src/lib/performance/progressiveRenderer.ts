@@ -1,6 +1,8 @@
 import { applyEffect } from '../effects';
 import Konva from 'konva';
 
+type KonvaImage = Konva.Image & Record<string, unknown>;
+
 export interface ProgressiveRenderOptions {
   previewScale?: number; // Scale factor for preview (0.1 - 0.5)
   enableTransition?: boolean; // Smooth transition from preview to full
@@ -120,7 +122,10 @@ export class ProgressiveRenderer {
       // Apply filter parameters
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
-          (tempImage as any)[key](value);
+          const maybeSetter = (tempImage as KonvaImage)[key];
+          if (typeof maybeSetter === 'function') {
+            (maybeSetter as (input: unknown) => void)(value);
+          }
         });
       }
       
@@ -170,7 +175,10 @@ export class ProgressiveRenderer {
       // Apply filter parameters
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
-          (tempImage as any)[key](value);
+          const maybeSetter = (tempImage as KonvaImage)[key];
+          if (typeof maybeSetter === 'function') {
+            (maybeSetter as (input: unknown) => void)(value);
+          }
         });
       }
       
