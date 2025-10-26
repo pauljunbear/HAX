@@ -1,4 +1,14 @@
-import { getWorkerManager } from './WorkerManager';
+import { WorkerManager, getWorkerManager } from './WorkerManager';
+
+type WorkerManagerLike = Pick<
+  WorkerManager,
+  'applyEffect' | 'generateFrame' | 'generateFrames' | 'processWithOffscreenCanvas'
+>;
+
+interface BatchJobWithResolvers extends BatchJob {
+  resolve: (value: ImageData[]) => void;
+  reject: (reason?: unknown) => void;
+}
 
 export interface BatchOperation {
   id: string;
@@ -33,7 +43,7 @@ export interface OptimizedOperation {
 }
 
 export class BatchProcessor {
-  private processingQueue: BatchJob[] = [];
+  private processingQueue: BatchJobWithResolvers[] = [];
   private isProcessing = false;
   private operationCache = new Map<string, ImageData>();
   private optimizationRules = new Map<string, (ops: BatchOperation[]) => BatchOperation[]>();
@@ -115,13 +125,13 @@ export class BatchProcessor {
    */
   async addJob(job: BatchJob): Promise<ImageData[]> {
     return new Promise((resolve, reject) => {
-      const jobWithResolvers = {
+      const jobWithResolvers: BatchJobWithResolvers = {
         ...job,
         resolve,
         reject
       };
       
-      this.processingQueue.push(jobWithResolvers as any);
+      this.processingQueue.push(jobWithResolvers);
       
       if (!this.isProcessing) {
         this.processQueue();
@@ -139,7 +149,10 @@ export class BatchProcessor {
 
     try {
       while (this.processingQueue.length > 0) {
-        const job = this.processingQueue.shift()!;
+        const job = this.processingQueue.shift();
+        if (!job) {
+          continue;
+        }
         await this.processBatchJob(job);
       }
     } catch (error) {
@@ -152,7 +165,7 @@ export class BatchProcessor {
   /**
    * Process a single batch job
    */
-  private async processBatchJob(job: BatchJob & { resolve: Function; reject: Function }): Promise<void> {
+  private async processBatchJob(job: BatchJobWithResolvers): Promise<void> {
     try {
       const results: ImageData[] = [];
       const totalLayers = job.layers.length;
@@ -202,7 +215,7 @@ export class BatchProcessor {
     optimized.sort((a, b) => b.priority - a.priority);
 
     // Apply optimization rules
-    for (const [ruleType, rule] of this.optimizationRules.entries()) {
+    for (const [, rule] of this.optimizationRules.entries()) {
       optimized = rule(optimized);
     }
 
@@ -346,9 +359,9 @@ export class BatchProcessor {
    * Apply a single operation
    */
   private async applySingleOperation(
-    imageData: ImageData, 
-    operation: BatchOperation, 
-    workerManager: any
+    imageData: ImageData,
+    operation: BatchOperation,
+    workerManager: WorkerManagerLike
   ): Promise<ImageData> {
     // Check individual operation cache
     const opCacheKey = this.generateOperationCacheKey(imageData, operation);
@@ -383,9 +396,9 @@ export class BatchProcessor {
    * Apply multiple compatible operations in a single pass
    */
   private async applyMultipleOperations(
-    imageData: ImageData, 
-    operations: BatchOperation[], 
-    workerManager: any
+    imageData: ImageData,
+    operations: BatchOperation[],
+    workerManager: WorkerManagerLike
   ): Promise<ImageData> {
     // For now, apply operations sequentially
     // In a more advanced implementation, we could combine them into a single shader/filter

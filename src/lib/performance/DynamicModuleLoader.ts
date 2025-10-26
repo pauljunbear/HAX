@@ -3,23 +3,23 @@
  * Loads modules only when needed to reduce initial bundle size
  */
 
-export interface ModuleLoadResult<T = any> {
+export interface ModuleLoadResult<T = unknown> {
   module: T;
   loadTime: number;
   cached: boolean;
 }
 
-export interface LoadableModule {
+export interface LoadableModule<TModule = unknown> {
   id: string;
-  loader: () => Promise<any>;
+  loader: () => Promise<TModule>;
   dependencies?: string[];
   preload?: boolean;
   size?: number; // Estimated size in KB
 }
 
 export class DynamicModuleLoader {
-  private moduleCache = new Map<string, any>();
-  private loadingPromises = new Map<string, Promise<any>>();
+  private moduleCache = new Map<string, unknown>();
+  private loadingPromises = new Map<string, Promise<unknown>>();
   private loadStats = new Map<string, { loadTime: number; loadCount: number }>();
 
   // Module registry with lazy loading definitions
@@ -167,14 +167,14 @@ export class DynamicModuleLoader {
   /**
    * Load a module dynamically
    */
-  async loadModule<T = any>(moduleId: string): Promise<ModuleLoadResult<T>> {
+  async loadModule<T = unknown>(moduleId: string): Promise<ModuleLoadResult<T>> {
     const startTime = performance.now();
 
     // Check cache first
     if (this.moduleCache.has(moduleId)) {
       // Short-circuit without touching loader/spies
       return {
-        module: this.moduleCache.get(moduleId),
+        module: this.moduleCache.get(moduleId) as T,
         loadTime: 0,
         cached: true,
       };
@@ -182,7 +182,11 @@ export class DynamicModuleLoader {
 
     // Check if already loading
     if (this.loadingPromises.has(moduleId)) {
-      const loadedModule = await this.loadingPromises.get(moduleId);
+      const loadingPromise = this.loadingPromises.get(moduleId);
+      if (!loadingPromise) {
+        throw new Error(`Module ${moduleId} is marked as loading but the promise is missing`);
+      }
+      const loadedModule = (await loadingPromise) as T;
       return {
         module: loadedModule,
         loadTime: performance.now() - startTime,
@@ -205,7 +209,7 @@ export class DynamicModuleLoader {
     this.loadingPromises.set(moduleId, loadPromise);
 
     try {
-      const loadedModule = await loadPromise;
+      const loadedModule = (await loadPromise) as T;
       const loadTime = performance.now() - startTime;
 
       // Cache the module
@@ -232,7 +236,7 @@ export class DynamicModuleLoader {
   /**
    * Load multiple modules in parallel
    */
-  async loadModules<T = any>(moduleIds: string[]): Promise<Map<string, ModuleLoadResult<T>>> {
+  async loadModules<T = unknown>(moduleIds: string[]): Promise<Map<string, ModuleLoadResult<T>>> {
     const results = new Map<string, ModuleLoadResult<T>>();
 
     const loadPromises = moduleIds.map(async moduleId => {
@@ -341,10 +345,13 @@ export class DynamicModuleLoader {
   /**
    * Load module using the configured loader
    */
-  private async loadModuleInternal(config: LoadableModule): Promise<any> {
+  private async loadModuleInternal(config: LoadableModule): Promise<unknown> {
     try {
       const loadedModule = await config.loader();
-      return loadedModule.default || loadedModule;
+      if (hasDefaultExport(loadedModule)) {
+        return loadedModule.default ?? loadedModule;
+      }
+      return loadedModule;
     } catch (error) {
       console.error(`Module loading failed for ${config.id}:`, error);
       throw error;
@@ -432,6 +439,10 @@ export class DynamicModuleLoader {
       }
     }
   }
+}
+
+function hasDefaultExport(value: unknown): value is { default: unknown } {
+  return Boolean(value && typeof value === 'object' && 'default' in value);
 }
 
 // Singleton instance

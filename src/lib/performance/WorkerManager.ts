@@ -1,12 +1,28 @@
-import { WorkerMessage, WorkerResponse, EffectParams, FrameGenerationParams } from '../../worker/effectsWorker';
+import {
+  WorkerMessage,
+  WorkerResponse,
+  EffectParams,
+  FrameGenerationParams,
+  OffscreenRenderParams,
+} from '../../worker/effectsWorker';
+
+type WorkerTaskPayload = EffectParams | FrameGenerationParams | OffscreenRenderParams;
+
+interface WorkerTaskResult {
+  imageData: ImageData;
+  frameIndex?: number;
+}
+
+type WorkerResponsePayload = WorkerResponse['payload'];
 
 export interface WorkerTask {
   id: string;
   type: 'APPLY_EFFECT' | 'GENERATE_FRAME' | 'OFFSCREEN_RENDER';
-  payload: EffectParams | FrameGenerationParams | any;
-  resolve: (result: any) => void;
+  payload: WorkerTaskPayload;
+  resolve: (result: WorkerTaskResult) => void;
   reject: (error: Error) => void;
   onProgress?: (progress: number) => void;
+  effectId?: string;
 }
 
 export interface WorkerInstance {
@@ -27,7 +43,12 @@ export class WorkerManager {
   private lastActivityTime = Date.now();
   private warmWorkers = true;
 
-  constructor(maxWorkers = (typeof navigator !== 'undefined' && (navigator as any).hardwareConcurrency) ? (navigator as any).hardwareConcurrency : 4) {
+  constructor(
+    maxWorkers =
+      typeof navigator !== 'undefined' && typeof navigator.hardwareConcurrency === 'number'
+        ? navigator.hardwareConcurrency
+        : 4,
+  ) {
     this.maxWorkers = Math.min(maxWorkers, 8); // Cap at 8 workers
   }
 
@@ -159,13 +180,11 @@ export class WorkerManager {
       }
       // Try to load the external worker file first from public directory
       worker = new Worker('/effectsWorker.js');
-    } catch (error) {
-      // Fallback: Create inline worker
-      const inlineWorkerCode = await this.getInlineWorkerCode();
-      const inlineBlob = new Blob([inlineWorkerCode], { type: 'application/javascript' });
-      const inlineUrl = URL.createObjectURL(inlineBlob);
-      worker = new Worker(inlineUrl);
-      URL.revokeObjectURL(inlineUrl);
+    } catch (workerError) {
+      // Ensure pool is clean
+      this.workers = this.workers.filter(workerInfo => workerInfo.worker !== worker);
+      URL.revokeObjectURL(workerUrl);
+      throw workerError;
     }
 
     const workerInstance: WorkerInstance = {
@@ -175,18 +194,21 @@ export class WorkerManager {
     };
 
     // Set up message handling
-    worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+    worker.onmessage = (
+      event: MessageEvent<WorkerResponse | { id: string; type: 'result'; result: ImageData; frameIndex?: number }>,
+    ) => {
       // Normalize different test mocks that may send { type: 'result', result }
-      const data: any = event.data;
+      const data = event.data;
       if (data && data.type === 'result' && data.result) {
-        this.handleWorkerMessage(workerId, {
+        const normalizedResponse: WorkerResponse = {
           id: data.id,
           type: 'SUCCESS',
-          payload: { imageData: data.result, frameIndex: data.frameIndex }
-        } as unknown as WorkerResponse);
+          payload: { imageData: data.result, frameIndex: data.frameIndex ?? undefined },
+        };
+        this.handleWorkerMessage(workerId, normalizedResponse);
         return;
       }
-      this.handleWorkerMessage(workerId, event.data);
+      this.handleWorkerMessage(workerId, event.data as WorkerResponse);
     };
 
     worker.onerror = (error) => {
@@ -338,7 +360,7 @@ export class WorkerManager {
 
     switch (response.type) {
       case 'PROGRESS':
-        if (task.onProgress) {
+        if (task.onProgress && WorkerManager.isProgressPayload(response.payload)) {
           task.onProgress(response.payload.progress);
         }
         break;
@@ -346,7 +368,11 @@ export class WorkerManager {
       case 'SUCCESS':
         this.activeTasks.delete(response.id);
         this.markWorkerAvailable(workerId);
-        task.resolve(response.payload);
+        if (WorkerManager.isSuccessPayload(response.payload)) {
+          task.resolve(response.payload);
+        } else {
+          task.reject(new Error('Worker returned success without payload'));
+        }
         this.processQueue();
         break;
 
@@ -385,6 +411,14 @@ export class WorkerManager {
     if (worker) {
       worker.busy = false;
     }
+  }
+
+  private static isProgressPayload(payload: WorkerResponsePayload): payload is { progress: number } {
+    return Boolean(payload && typeof payload === 'object' && 'progress' in payload);
+  }
+
+  private static isSuccessPayload(payload: WorkerResponsePayload): payload is WorkerTaskResult {
+    return Boolean(payload && typeof payload === 'object' && 'imageData' in payload);
   }
 
   /**
@@ -465,15 +499,14 @@ export class WorkerManager {
         },
         resolve: (result) => resolve(result.imageData),
         reject,
-        onProgress
+        onProgress,
+        effectId,
       };
       // Drop any queued tasks for the same key that are now outdated
-      this.taskQueue = this.taskQueue.filter(t => {
-        if (t.type !== 'APPLY_EFFECT') return true;
-        // We don't have the key on the task, approximate by effectId on payload
-        const sameKey = (t as any).payload?.effectId === effectId;
-        // Keep only if it's the latest id
-        return !sameKey || this.latestTaskKey.get(key) === t.id;
+      this.taskQueue = this.taskQueue.filter(taskItem => {
+        if (taskItem.type !== 'APPLY_EFFECT') return true;
+        const sameKey = taskItem.effectId === effectId;
+        return !sameKey || this.latestTaskKey.get(key) === taskItem.id;
       });
 
       this.taskQueue.push(task);
@@ -506,7 +539,12 @@ export class WorkerManager {
           width: imageData.width,
           height: imageData.height
         },
-        resolve,
+        resolve: (result) => {
+          resolve({
+            imageData: result.imageData,
+            frameIndex: result.frameIndex ?? frameIndex,
+          });
+        },
         reject
       };
 

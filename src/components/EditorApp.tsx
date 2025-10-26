@@ -1,0 +1,266 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import Head from 'next/head';
+import { useAppStore } from '@/lib/store';
+import ImageEditor from '@/components/ImageEditor';
+import IntroScreen from '@/components/IntroScreen';
+import { motion } from 'framer-motion';
+
+// Import new components
+import AppleStyleLayout from '@/components/AppleStyleLayout';
+import useHistory from '@/hooks/useHistory';
+import useEffectLayers from '@/hooks/useEffectLayers';
+import type { ImageEditorHandle } from './ImageEditor';
+
+export default function EditorApp() {
+  const selectedImage = useAppStore(state => state.selectedImage);
+  const setSelectedImage = useAppStore(state => state.setSelectedImage);
+
+  // This prevents the intro screen from flashing on page load if an image is already selected
+  const [isReady, setIsReady] = useState(false);
+
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const imageEditorRef = useRef<ImageEditorHandle | null>(null);
+
+  // Debug ref connection
+  useEffect(() => {
+    console.log('🔗 imageEditorRef.current updated:', !!imageEditorRef.current);
+    if (imageEditorRef.current) {
+      console.log('🔗 Available methods:', Object.keys(imageEditorRef.current));
+    }
+  }, [selectedImage]);
+  // Initialize history with empty state
+  const { clearHistory } = useHistory({
+    activeEffect: null,
+    effectSettings: {},
+  });
+
+  // Initialize effect layers
+  const {
+    layers: effectLayers,
+    activeLayerId: activeEffectLayerId,
+    activeLayer: activeEffectLayer,
+    addLayer: addEffectLayer,
+    removeLayer: removeEffectLayer,
+    updateLayer,
+    setActiveLayer: setActiveEffectLayer,
+    updateLayerSettings,
+    clearLayers: clearEffectLayers,
+  } = useEffectLayers();
+
+  // Extract activeEffect and effectSettings from the active effect layer
+  const activeEffect = activeEffectLayer?.effectId || null;
+  const effectSettings = activeEffectLayer?.settings || {};
+
+  // Add debugging on component mount
+  useEffect(() => {
+    console.log('Home component mounted');
+  }, []);
+
+  useEffect(() => {
+    setIsReady(true);
+  }, []);
+
+  const handleImageUpload = (file: File) => {
+    // Reset error state
+    setImageError(null);
+    setImageLoading(true);
+
+    console.log('handleImageUpload called with file:', file.name);
+
+    // Reset active effect and clear history when a new image is uploaded
+    clearHistory({ activeEffect: null, effectSettings: {} });
+    clearEffectLayers();
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      const imageDataUrl = e.target?.result as string;
+
+      // Validate the image data
+      if (!imageDataUrl.startsWith('data:image/')) {
+        console.error('Invalid image data format:', imageDataUrl.substring(0, 50));
+        setImageError('Invalid image data format');
+        setImageLoading(false);
+        return;
+      }
+
+      // Test load the image first
+      const testImage = new Image();
+      testImage.onload = () => {
+        console.log('Test image loaded successfully in Home component, setting selectedImage');
+        console.log('Dimensions:', testImage.width, 'x', testImage.height);
+        setSelectedImage(imageDataUrl);
+        setImageLoading(false);
+      };
+
+      testImage.onerror = error => {
+        console.error('Failed to load test image in Home component:', error);
+        setImageError('Failed to load image. Please try another file.');
+        setImageLoading(false);
+      };
+
+      // Set the source to trigger loading
+      testImage.src = imageDataUrl;
+    };
+
+    reader.onerror = () => {
+      setImageError('Failed to read file. Please try another file.');
+      setImageLoading(false);
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageSelect = () => {
+    // This will be called by the AppleStyleLayout
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = e => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        handleImageUpload(file);
+      }
+    };
+    input.click();
+  };
+
+  const handleEffectChange = (effectName: string | null) => {
+    console.log('Effect changed to:', effectName);
+
+    if (effectName) {
+      // Add as a new effect layer
+      addEffectLayer(effectName);
+    } else if (activeEffectLayerId) {
+      // Remove the active layer
+      removeEffectLayer(activeEffectLayerId);
+    }
+  };
+
+  const handleSettingChange = (settingName: string, value: number) => {
+    console.log(`Setting ${settingName} changed to:`, value);
+
+    if (activeEffectLayerId) {
+      updateLayerSettings(activeEffectLayerId, settingName, value);
+    }
+  };
+
+  const handleResetSettings = () => {
+    if (!activeEffectLayerId || !activeEffectLayer) {
+      return;
+    }
+
+    const effect = effectLayers.find(layer => layer.id === activeEffectLayerId);
+    if (!effect) {
+      return;
+    }
+
+    const defaultSettings = Object.fromEntries(
+      Object.entries(effect.settings).map(([key, value]) => [key, value])
+    );
+
+    Object.entries(defaultSettings).forEach(([key, value]) => {
+      updateLayerSettings(activeEffectLayerId, key, value as number);
+    });
+  };
+
+  const handleClearAllEffects = () => {
+    console.log('Clearing all effects');
+    clearEffectLayers();
+  };
+
+  const handleRemoveEffect = (layerId: string) => {
+    console.log(`Removing effect layer: ${layerId}`);
+    removeEffectLayer(layerId);
+  };
+
+  const handleToggleLayerVisibility = (layerId: string) => {
+    console.log(`Toggling visibility for layer: ${layerId}`);
+    // This assumes your useEffectLayers hook has a function like toggleLayerVisibility
+    // If not, you'll need to implement it. For now, let's add it to the hook.
+    const layer = effectLayers.find(l => l.id === layerId);
+    if (layer) {
+      updateLayer(layerId, { ...layer, visible: !layer.visible });
+    }
+  };
+
+  if (!isReady) {
+    return null; // Or a very minimal loader
+  }
+
+  return (
+    <>
+      <Head>
+        <title>HAX - Real-time Image Effects</title>
+        <meta
+          name="description"
+          content="A React-based image editing app with real-time artistic effects."
+        />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+        />
+      </Head>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        {selectedImage ? (
+          <AppleStyleLayout
+            selectedImage={selectedImage}
+            onImageSelect={handleImageSelect}
+            onImageUpload={handleImageUpload}
+            // Effect-related props
+            effectLayers={effectLayers}
+            activeEffect={activeEffectLayerId}
+            effectSettings={effectSettings}
+            onEffectChange={handleEffectChange}
+            onSettingChange={handleSettingChange}
+            onResetSettings={handleResetSettings}
+            onClearAllEffects={handleClearAllEffects}
+            onRemoveEffect={handleRemoveEffect}
+            onSetActiveLayer={setActiveEffectLayer}
+            onToggleLayerVisibility={handleToggleLayerVisibility}
+            onExport={format => {
+              if (!imageEditorRef.current) {
+                return;
+              }
+
+              try {
+                imageEditorRef.current.exportImage(format);
+              } catch (error) {
+                console.error('exportImage failed', error);
+              }
+            }}
+          >
+            <div id="main-content" className="w-full h-full">
+              {imageLoading ? (
+                <div className="h-full w-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-emerald-500 border-gray-200"></div>
+                  <span className="ml-3 text-gray-600">Loading image...</span>
+                </div>
+              ) : (
+                <ImageEditor ref={imageEditorRef} selectedImage={selectedImage} effectLayers={effectLayers} />
+              )}
+              {imageError && (
+                <div
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg"
+                  role="alert"
+                >
+                  <strong className="font-bold">Error: </strong>
+                  <span className="block sm:inline">{imageError}</span>
+                </div>
+              )}
+            </div>
+          </AppleStyleLayout>
+        ) : (
+          <IntroScreen onImageSelect={handleImageSelect} />
+        )}
+      </motion.div>
+    </>
+  );
+}
+

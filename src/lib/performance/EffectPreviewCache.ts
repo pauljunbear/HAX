@@ -1,5 +1,6 @@
-import { applyEffect } from '@/lib/effects';
-import { effectsConfig } from '@/lib/effects';
+import { applyEffect, effectsConfig } from '@/lib/effects';
+
+type KonvaModule = typeof import('konva');
 
 interface CacheEntry {
   imageUrl: string;
@@ -84,12 +85,12 @@ export class EffectPreviewCache {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
           // Apply effect
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const [filterFunc, filterParams] = await applyEffect(effectId, settings as any);
+          const [filterFunc, filterParams] = await applyEffect(effectId, settings);
 
           if (filterFunc) {
             // Apply filter using a temporary Konva stage
-            const Konva: any = await import('konva');
+            const konvaModule: KonvaModule = await import('konva');
+            const Konva = konvaModule.default;
             const stage = new Konva.Stage({
               container: document.createElement('div'),
               width: canvas.width,
@@ -110,8 +111,9 @@ export class EffectPreviewCache {
             image.filters([filterFunc]);
             if (filterParams) {
               Object.entries(filterParams).forEach(([key, value]) => {
-                if (typeof image[key] === 'function') {
-                  image[key](value);
+                const maybeSetter = (image as Record<string, unknown>)[key];
+                if (typeof maybeSetter === 'function') {
+                  (maybeSetter as (input: unknown) => void)(value);
                 }
               });
             }
