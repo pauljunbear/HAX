@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 // Define the structure for effect settings
 interface EffectSetting {
   id: string;
@@ -24,10 +26,38 @@ interface KonvaImageData {
   height: number;
 }
 
+type KonvaFilterFunction = (imageData: KonvaImageData) => void;
+type FilterParams = Record<string, unknown>;
+
 // Use a dynamic import approach for Konva to avoid SSR issues
 // Import Konva only in browser environment
 let Konva: typeof import('konva') | null = null;
 let konvaInitPromise: Promise<typeof import('konva')> | null = null;
+let filtersInitialized = false;
+
+const ensureKonvaFiltersLoaded = async () => {
+  if (filtersInitialized || typeof window === 'undefined') {
+    return;
+  }
+
+  filtersInitialized = true;
+
+  try {
+    await Promise.all([
+      import('konva/lib/filters/Blur'),
+      import('konva/lib/filters/Contrast'),
+      import('konva/lib/filters/HSL'),
+      import('konva/lib/filters/Pixelate'),
+      import('konva/lib/filters/Noise'),
+      import('konva/lib/filters/Grayscale'),
+      import('konva/lib/filters/Sepia'),
+      import('konva/lib/filters/Invert'),
+      import('konva/lib/filters/Enhance'),
+    ]);
+  } catch (error) {
+    console.warn('Some Konva filters failed to load.', error);
+  }
+};
 
 const loadKonva = async () => {
   if (!konvaInitPromise) {
@@ -35,12 +65,191 @@ const loadKonva = async () => {
   }
 
   Konva = await konvaInitPromise;
+  await ensureKonvaFiltersLoaded();
 
   if (Konva && Konva.Filters) {
     // Register custom filters if needed
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     (Konva as unknown as Record<string, unknown>).noop = () => {};
   }
+};
+
+const clamp = (value: number, min: number, max: number) => {
+  if (Number.isNaN(value)) return min;
+  return Math.min(max, Math.max(min, value));
+};
+
+const createPosterizeFallback = (levels: number): KonvaFilterFunction => {
+  const normalizedLevels = clamp(Math.floor(levels), 2, 16);
+  const step = 255 / (normalizedLevels - 1);
+
+  return imageData => {
+    const { data } = imageData;
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = Math.round(Math.round(data[i] / step) * step);
+      data[i + 1] = Math.round(Math.round(data[i + 1] / step) * step);
+      data[i + 2] = Math.round(Math.round(data[i + 2] / step) * step);
+    }
+  };
+};
+
+const createThresholdFallback = (threshold: number): KonvaFilterFunction => {
+  const level = clamp(threshold, 0, 1);
+
+  return imageData => {
+    const { data } = imageData;
+    for (let i = 0; i < data.length; i += 4) {
+      const brightness = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
+      const value = brightness >= level ? 255 : 0;
+      data[i] = value;
+      data[i + 1] = value;
+      data[i + 2] = value;
+    }
+  };
+};
+
+const createBlurFallback = (radius: number): KonvaFilterFunction => {
+  const iterations = clamp(Math.round(radius), 1, 8);
+
+  return imageData => {
+    const { data, width, height } = imageData;
+    if (iterations <= 0 || width === 0 || height === 0) {
+      return;
+    }
+
+    const temp = new Uint8ClampedArray(data);
+
+    for (let iteration = 0; iteration < iterations; iteration++) {
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+
+          let rSum = temp[idx];
+          let gSum = temp[idx + 1];
+          let bSum = temp[idx + 2];
+          let aSum = temp[idx + 3];
+          let count = 1;
+
+          const leftIdx = x > 0 ? idx - 4 : -1;
+          const rightIdx = x < width - 1 ? idx + 4 : -1;
+          const upIdx = y > 0 ? idx - width * 4 : -1;
+          const downIdx = y < height - 1 ? idx + width * 4 : -1;
+
+          if (leftIdx >= 0) {
+            rSum += temp[leftIdx];
+            gSum += temp[leftIdx + 1];
+            bSum += temp[leftIdx + 2];
+            aSum += temp[leftIdx + 3];
+            count++;
+          }
+
+          if (rightIdx >= 0) {
+            rSum += temp[rightIdx];
+            gSum += temp[rightIdx + 1];
+            bSum += temp[rightIdx + 2];
+            aSum += temp[rightIdx + 3];
+            count++;
+          }
+
+          if (upIdx >= 0) {
+            rSum += temp[upIdx];
+            gSum += temp[upIdx + 1];
+            bSum += temp[upIdx + 2];
+            aSum += temp[upIdx + 3];
+            count++;
+          }
+
+          if (downIdx >= 0) {
+            rSum += temp[downIdx];
+            gSum += temp[downIdx + 1];
+            bSum += temp[downIdx + 2];
+            aSum += temp[downIdx + 3];
+            count++;
+          }
+
+          data[idx] = Math.round(rSum / count);
+          data[idx + 1] = Math.round(gSum / count);
+          data[idx + 2] = Math.round(bSum / count);
+          data[idx + 3] = Math.round(aSum / count);
+        }
+      }
+
+      temp.set(data);
+    }
+  };
+};
+
+const screenBlend = (base: number, overlay: number) => 255 - ((255 - base) * (255 - overlay)) / 255;
+
+const overlayBlend = (base: number, overlay: number) =>
+  base < 128 ? (2 * base * overlay) / 255 : 255 - (2 * (255 - base) * (255 - overlay)) / 255;
+
+const softLightBlend = (base: number, overlay: number) => {
+  const normalizedOverlay = overlay / 255;
+  return Math.round(
+    base * (1 - normalizedOverlay) +
+      (base < 128
+        ? (2 * normalizedOverlay - 1) * (base / 255) * base + base
+        : (2 * normalizedOverlay - 1) * (Math.sqrt(base / 255) - base / 255) * 255 + base)
+  );
+};
+
+const createOrtonFallback = (settings: Record<string, number>): KonvaFilterFunction => {
+  const blurRadius = clamp(settings.blur ?? 5, 1, 12);
+  const brightness = clamp(settings.brightness ?? 0.2, 0, 1);
+  const glow = clamp(settings.glow ?? 0.5, 0, 1);
+  const blendMode = Math.round(clamp(settings.blendMode ?? 0, 0, 2));
+  const blurFilter = createBlurFallback(blurRadius);
+
+  return imageData => {
+    const { data, width, height } = imageData;
+    if (width === 0 || height === 0) {
+      return;
+    }
+
+    const original = new Uint8ClampedArray(data);
+    const blurred = new Uint8ClampedArray(data.length);
+    blurred.set(original);
+
+    blurFilter({ data: blurred, width, height });
+
+    const blendChannel = (base: number, overlay: number) => {
+      switch (blendMode) {
+        case 1:
+          return overlayBlend(base, overlay);
+        case 2:
+          return softLightBlend(base, overlay);
+        default:
+          return screenBlend(base, overlay);
+      }
+    };
+
+    const brightnessMultiplier = 1 + brightness * 0.8;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = original[i];
+      const g = original[i + 1];
+      const b = original[i + 2];
+      const a = original[i + 3];
+
+      const blurredR = blurred[i];
+      const blurredG = blurred[i + 1];
+      const blurredB = blurred[i + 2];
+
+      const glowR = blendChannel(r, blurredR);
+      const glowG = blendChannel(g, blurredG);
+      const glowB = blendChannel(b, blurredB);
+
+      const mixedR = clamp(Math.round(r * (1 - glow) + glowR * glow), 0, 255);
+      const mixedG = clamp(Math.round(g * (1 - glow) + glowG * glow), 0, 255);
+      const mixedB = clamp(Math.round(b * (1 - glow) + glowB * glow), 0, 255);
+
+      data[i] = clamp(Math.round(mixedR * brightnessMultiplier), 0, 255);
+      data[i + 1] = clamp(Math.round(mixedG * brightnessMultiplier), 0, 255);
+      data[i + 2] = clamp(Math.round(mixedB * brightnessMultiplier), 0, 255);
+      data[i + 3] = a;
+    }
+  };
 };
 
 // Helper function to calculate average brightness of an area
@@ -79,11 +288,6 @@ function getBrightness(
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
-
-// Define the expected return type for an effect function
-type KonvaFilterFunction = (imageData: KonvaImageData) => void;
-// Type for filter parameters to be set on the node
-type FilterParams = Record<string, any>;
 
 // Update applyEffect signature and logic
 export const applyEffect = async (
@@ -136,11 +340,14 @@ export const applyEffect = async (
         return [Konva.Filters.HSL, { hue: hueDegrees }];
       }
 
-      case 'blur':
-        return [Konva.Filters.Blur, { blurRadius: settings.radius ?? 0 }];
-
-      case 'gaussianBlur':
-        return [Konva.Filters.Blur, { blurRadius: settings.radius ?? 5 }];
+      case 'blur': {
+        const radius = settings.radius ?? settings.value ?? 5;
+        const konvaBlur = Konva.Filters?.Blur;
+        if (konvaBlur) {
+          return [konvaBlur, { blurRadius: radius }];
+        }
+        return [createBlurFallback(radius), null];
+      }
 
       case 'sharpen':
         return [Konva.Filters.Enhance, { enhance: (settings.value ?? 0) * 0.5 }]; // Enhance seems closer to sharpen
@@ -151,11 +358,15 @@ export const applyEffect = async (
       case 'noise':
         return [Konva.Filters.Noise, { noise: settings.value ?? 0.2 }];
 
-      case 'threshold':
-        return [Konva.Filters.Threshold, { threshold: settings.value ?? 0.5 }];
+      case 'threshold': {
+        const value = settings.value ?? 0.5;
+        return [createThresholdFallback(value), null];
+      }
 
-      case 'posterize':
-        return [Konva.Filters.Posterize, { levels: settings.levels ?? 4 }];
+      case 'posterize': {
+        const levels = settings.levels ?? 4;
+        return [createPosterizeFallback(levels), null];
+      }
 
       case 'grayscale':
         return [Konva.Filters.Grayscale, {}];
@@ -517,16 +728,10 @@ export const applyEffect = async (
 
       // Orton Effect Implementation
       case 'orton':
-        // Minimal pixel change via Orton filter to satisfy tests
-        const ortonFallback: OrtonFilter = function ortonFallback(this: Konva.Image, img: ImageData) {
-          const d = img.data;
-          for (let i = 0; i < Math.min(d.length, 400); i += 4) {
-            d[i] = Math.min(255, d[i] + 1);
-            d[i + 1] = Math.min(255, d[i + 1] + 1);
-            d[i + 2] = Math.min(255, d[i + 2] + 1);
-          }
-        };
-        return [Konva?.Filters?.Orton ?? ortonFallback, {}];
+        return [
+          Konva?.Filters?.Orton ?? createOrtonFallback(settings),
+          Konva?.Filters?.Orton ? {} : null,
+        ];
 
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
@@ -2307,7 +2512,14 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
       { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
       { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 1, step: 0.1 },
-      { id: 'color', label: 'Color', min: 0x000000, max: 0xffffff, defaultValue: 0xffffff, step: 1 },
+      {
+        id: 'color',
+        label: 'Color',
+        min: 0x000000,
+        max: 0xffffff,
+        defaultValue: 0xffffff,
+        step: 1,
+      },
       { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
     ],
   },
@@ -2318,7 +2530,14 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
       { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
       { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 1.5, step: 0.1 },
-      { id: 'color', label: 'Color', min: 0x000000, max: 0xffffff, defaultValue: 0xffffff, step: 1 },
+      {
+        id: 'color',
+        label: 'Color',
+        min: 0x000000,
+        max: 0xffffff,
+        defaultValue: 0xffffff,
+        step: 1,
+      },
       { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
     ],
   },
@@ -2329,7 +2548,14 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
       { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
       { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 1, step: 0.1 },
-      { id: 'color', label: 'Color', min: 0x000000, max: 0xffffff, defaultValue: 0xffffff, step: 1 },
+      {
+        id: 'color',
+        label: 'Color',
+        min: 0x000000,
+        max: 0xffffff,
+        defaultValue: 0xffffff,
+        step: 1,
+      },
       { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
     ],
   },
@@ -2340,7 +2566,14 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
       { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
       { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 2, step: 0.1 },
-      { id: 'color', label: 'Color', min: 0x000000, max: 0xffffff, defaultValue: 0xffffff, step: 1 },
+      {
+        id: 'color',
+        label: 'Color',
+        min: 0x000000,
+        max: 0xffffff,
+        defaultValue: 0xffffff,
+        step: 1,
+      },
       { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
     ],
   },
@@ -2351,7 +2584,14 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
       { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
       { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 3, step: 0.1 },
-      { id: 'color', label: 'Color', min: 0x000000, max: 0xffffff, defaultValue: 0xffffff, step: 1 },
+      {
+        id: 'color',
+        label: 'Color',
+        min: 0x000000,
+        max: 0xffffff,
+        defaultValue: 0xffffff,
+        step: 1,
+      },
       { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
     ],
   },
@@ -2362,7 +2602,14 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
       { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
       { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 1, step: 0.1 },
-      { id: 'color', label: 'Color', min: 0x000000, max: 0xffffff, defaultValue: 0xffffff, step: 1 },
+      {
+        id: 'color',
+        label: 'Color',
+        min: 0x000000,
+        max: 0xffffff,
+        defaultValue: 0xffffff,
+        step: 1,
+      },
       { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
     ],
   },
@@ -3802,72 +4049,90 @@ const createVoronoiEffect = (settings: Record<string, number>) => {
     }
   };
 };
-// 13. Ink Bleed Implementation (Simplified)
+// 13. Ink Bleed Implementation (Enhanced)
 const createInkBleedEffect = (settings: Record<string, number>) => {
+  const baseRadius = clamp(settings.amount ?? 6, 1, 12);
+  const intensityThreshold = clamp(settings.intensity ?? 0.45, 0.05, 0.95);
+  const bleedStrength = clamp(settings.strength ?? 0.65, 0.1, 0.95);
+  const softness = clamp(settings.softness ?? 0.35, 0, 1);
+
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const amount = Math.max(1, Math.floor(settings.amount ?? 5)); // Bleed radius
-    const intensityThreshold = settings.intensity ?? 0.3; // Only dark pixels bleed significantly
+    if (width === 0 || height === 0) {
+      return;
+    }
 
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
-    const outputData = new Uint8ClampedArray(data.length); // Use output buffer
+    const source = new Uint8ClampedArray(data);
+    const output = new Uint8ClampedArray(data.length);
+    output.set(source);
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const index = (y * width + x) * 4;
-        const r = tempData[index];
-        const g = tempData[index + 1];
-        const b = tempData[index + 2];
+        const r = source[index];
+        const g = source[index + 1];
+        const b = source[index + 2];
+        const a = source[index + 3];
+
         const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
-        // Determine bleed factor (darker pixels bleed more)
-        const bleedFactor =
-          brightness < intensityThreshold
-            ? (intensityThreshold - brightness) / intensityThreshold
-            : 0;
+        if (brightness < intensityThreshold) {
+          const strength = (intensityThreshold - brightness) / intensityThreshold;
+          const localRadius = Math.max(1, Math.round(baseRadius * (0.5 + strength)));
 
-        if (bleedFactor > 0) {
-          let sumR = 0,
-            sumG = 0,
-            sumB = 0,
-            sumA = 0;
-          let count = 0;
-          const bleedRadius = Math.floor(amount * bleedFactor); // Bleed radius depends on darkness
+          for (let dy = -localRadius; dy <= localRadius; dy++) {
+            const ny = y + dy;
+            if (ny < 0 || ny >= height) continue;
 
-          // Average neighbor pixels within bleed radius (Read from tempData)
-          for (let dy = -bleedRadius; dy <= bleedRadius; dy++) {
-            for (let dx = -bleedRadius; dx <= bleedRadius; dx++) {
+            for (let dx = -localRadius; dx <= localRadius; dx++) {
               const nx = x + dx;
-              const ny = y + dy;
-              if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                const nIndex = (ny * width + nx) * 4;
-                sumR += tempData[nIndex];
-                sumG += tempData[nIndex + 1];
-                sumB += tempData[nIndex + 2];
-                sumA += tempData[nIndex + 3];
-                count++;
-              }
+              if (nx < 0 || nx >= width) continue;
+
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              if (distance > localRadius) continue;
+
+              const falloff = 1 - distance / (localRadius + 0.0001);
+              const weight = bleedStrength * strength * falloff;
+              if (weight <= 0) continue;
+
+              const neighborIndex = (ny * width + nx) * 4;
+              output[neighborIndex] = clamp(
+                output[neighborIndex] * (1 - weight) + r * weight,
+                0,
+                255
+              );
+              output[neighborIndex + 1] = clamp(
+                output[neighborIndex + 1] * (1 - weight) + g * weight,
+                0,
+                255
+              );
+              output[neighborIndex + 2] = clamp(
+                output[neighborIndex + 2] * (1 - weight) + b * weight,
+                0,
+                255
+              );
+              output[neighborIndex + 3] = a;
             }
           }
-          if (count > 0) {
-            // Write averaged color to outputData
-            outputData[index] = sumR / count;
-            outputData[index + 1] = sumG / count;
-            outputData[index + 2] = sumB / count;
-            outputData[index + 3] = sumA / count;
-          }
-        } else {
-          // If pixel doesn't bleed, copy original color to outputData
-          outputData[index] = tempData[index];
-          outputData[index + 1] = tempData[index + 1];
-          outputData[index + 2] = tempData[index + 2];
-          outputData[index + 3] = tempData[index + 3];
+
+          const soften = softness * strength;
+          output[index] = clamp(output[index] * (1 - soften) + r * (1 + soften * 0.6), 0, 255);
+          output[index + 1] = clamp(
+            output[index + 1] * (1 - soften) + g * (1 + soften * 0.6),
+            0,
+            255
+          );
+          output[index + 2] = clamp(
+            output[index + 2] * (1 - soften) + b * (1 + soften * 0.6),
+            0,
+            255
+          );
+          output[index + 3] = a;
         }
       }
     }
-    // Copy the result back to the original data array
-    data.set(outputData);
+
+    data.set(output);
   };
 };
 // 18. Pixel Explosion Implementation (Revised output buffer handling)
@@ -4132,7 +4397,8 @@ const createIridescentSheenEffect = (settings: Record<string, number>) => {
 
       const hueOffset = (Math.sin(luminance * Math.PI * 2) * hueShift) / 180;
 
-      const q = luminance < 0.5 ? luminance * (1 + contrast) : luminance + contrast - luminance * contrast;
+      const q =
+        luminance < 0.5 ? luminance * (1 + contrast) : luminance + contrast - luminance * contrast;
       const p = 2 * luminance - q;
 
       const hue2rgb = (t: number) => {
@@ -4198,8 +4464,14 @@ const createHalationGlowEffect = (settings: Record<string, number>) => {
               const falloff = (1 - distance / radius) * strength;
 
               data[targetIndex] = Math.min(255, data[targetIndex] + temp[index] * falloff);
-              data[targetIndex + 1] = Math.min(255, data[targetIndex + 1] + temp[index + 1] * falloff);
-              data[targetIndex + 2] = Math.min(255, data[targetIndex + 2] + temp[index + 2] * falloff);
+              data[targetIndex + 1] = Math.min(
+                255,
+                data[targetIndex + 1] + temp[index + 1] * falloff
+              );
+              data[targetIndex + 2] = Math.min(
+                255,
+                data[targetIndex + 2] + temp[index + 2] * falloff
+              );
             }
           }
         }
@@ -4243,7 +4515,10 @@ const createEtchedLinesEffect = (settings: Record<string, number>) => {
         const base = (temp[etchedIndex] + temp[etchedIndex + 1] + temp[etchedIndex + 2]) / 3;
         const etched = base * (0.5 + line * 0.5) + magnitude * 0.2;
 
-        data[etchedIndex] = data[etchedIndex + 1] = data[etchedIndex + 2] = Math.max(0, Math.min(255, etched));
+        data[etchedIndex] =
+          data[etchedIndex + 1] =
+          data[etchedIndex + 2] =
+            Math.max(0, Math.min(255, etched));
       }
     }
   };
@@ -4294,7 +4569,10 @@ const createRetroRasterEffect = (settings: Record<string, number>) => {
         const luminance = (temp[srcIndex] + temp[srcIndex + 1] + temp[srcIndex + 2]) / 3;
         const tinted = luminance * contrast + temp[srcIndex] * (1 - contrast);
 
-        data[dstIndex] = data[dstIndex + 1] = data[dstIndex + 2] = Math.max(0, Math.min(255, tinted));
+        data[dstIndex] =
+          data[dstIndex + 1] =
+          data[dstIndex + 2] =
+            Math.max(0, Math.min(255, tinted));
       }
     }
   };
@@ -4372,7 +4650,10 @@ const createPaperReliefEffect = (settings: Record<string, number>) => {
 
         const noise = (Math.random() - 0.5) * texture * 255;
 
-        data[index] = data[index + 1] = data[index + 2] = Math.min(255, Math.max(0, relief + noise));
+        data[index] =
+          data[index + 1] =
+          data[index + 2] =
+            Math.min(255, Math.max(0, relief + noise));
       }
     }
   };
@@ -4435,8 +4716,7 @@ const createInkOutlinePopEffect = (settings: Record<string, number>) => {
         for (let ky = -1; ky <= 1; ky++) {
           for (let kx = -1; kx <= 1; kx++) {
             const idx = ((y + ky) * width + (x + kx)) * 4;
-            const gray =
-              0.299 * temp[idx] + 0.587 * temp[idx + 1] + 0.114 * temp[idx + 2];
+            const gray = 0.299 * temp[idx] + 0.587 * temp[idx + 1] + 0.114 * temp[idx + 2];
             const kernelIndex = (ky + 1) * 3 + (kx + 1);
             gx += gray * sobelX[kernelIndex];
             gy += gray * sobelY[kernelIndex];
@@ -4447,14 +4727,17 @@ const createInkOutlinePopEffect = (settings: Record<string, number>) => {
         const edgeIndex = (y * width + x) * 4;
 
         const outline = Math.max(0, 255 - magnitude * 0.5);
-        data[edgeIndex] = Math.min(255, data[edgeIndex] * (1 - saturationBoost) + outline * saturationBoost);
+        data[edgeIndex] = Math.min(
+          255,
+          data[edgeIndex] * (1 - saturationBoost) + outline * saturationBoost
+        );
         data[edgeIndex + 1] = Math.min(
           255,
-          data[edgeIndex + 1] * (1 - saturationBoost) + outline * saturationBoost,
+          data[edgeIndex + 1] * (1 - saturationBoost) + outline * saturationBoost
         );
         data[edgeIndex + 2] = Math.min(
           255,
-          data[edgeIndex + 2] * (1 - saturationBoost) + outline * saturationBoost,
+          data[edgeIndex + 2] * (1 - saturationBoost) + outline * saturationBoost
         );
       }
     }

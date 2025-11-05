@@ -1,6 +1,13 @@
 'use client';
 
-import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+  useCallback,
+} from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from '@/hooks/useImage';
 import { applyEffect } from '@/lib/effects';
@@ -226,10 +233,7 @@ export type ImageEditorHandle = {
 };
 
 const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
-  (
-    { selectedImage, effectLayers, onExportComplete },
-    ref
-  ) => {
+  ({ selectedImage, effectLayers, onExportComplete }, ref) => {
     const stageRef = useRef<Konva.Stage | null>(null);
     const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
     const imageUrlToUse = selectedImage ?? uploadedImageUrl ?? '';
@@ -394,32 +398,55 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         exportImage: (format?: string) => {
           exportWithFormat((format as 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4') || 'png');
         },
-        reset: () => {
-        },
+        reset: () => {},
         getStage: () => stageRef.current,
       };
     }, [exportWithFormat]);
 
-    // Browser detection and container sizing
     useEffect(() => {
-      const updateContainerDimensions = () => {
-        if (typeof window !== 'undefined' && containerRef.current) {
-          // Use the actual container dimensions
-          const rect = containerRef.current.getBoundingClientRect();
-          setContainerDimensions({
-            width: rect.width,
-            height: rect.height,
-          });
-        }
+      const container = containerRef.current;
+      if (!container) {
+        return;
+      }
+
+      const updateDimensions = () => {
+        const rect = container.getBoundingClientRect();
+        setContainerDimensions({
+          width: rect.width,
+          height: rect.height,
+        });
       };
 
-      updateContainerDimensions();
-      window.addEventListener('resize', updateContainerDimensions);
+      updateDimensions();
 
+      if (typeof ResizeObserver !== 'undefined') {
+        const observer = new ResizeObserver(entries => {
+          const entry = entries.find(e => e.target === container);
+          if (!entry) return;
+          const { width, height } = entry.contentRect;
+          setContainerDimensions({ width, height });
+        });
+
+        observer.observe(container);
+        return () => {
+          observer.disconnect();
+        };
+      }
+
+      window.addEventListener('resize', updateDimensions);
       return () => {
-        window.removeEventListener('resize', updateContainerDimensions);
+        window.removeEventListener('resize', updateDimensions);
       };
     }, []);
+
+    useEffect(() => {
+      if (!image) return;
+      const node = stageRef.current?.findOne<Konva.Image>('Image');
+      if (!node) return;
+
+      node.clearCache();
+      void applyEffectsToNode(node);
+    }, [applyEffectsToNode, containerDimensions.height, containerDimensions.width, image]);
 
     // Apply effects function
     // Apply effects with adjustable quality (pixelRatio) so we can render
@@ -452,7 +479,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
     }, [effectLayers, image]);
 
     // Handle file upload
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
@@ -470,101 +497,85 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
       }
     };
 
-    // Zoom handlers
-    const fitToScreen = useCallback(() => {
-      const stage = stageRef.current;
-      const currentImage = stage?.findOne<Konva.Image>('Image');
-      if (!stage || !currentImage || !image) {
-        return;
-      }
-
-      const stageWidth = containerRef.current?.getBoundingClientRect().width ?? image.width;
-      const stageHeight = containerRef.current?.getBoundingClientRect().height ?? image.height;
-
-      const scale = Math.min(stageWidth / image.width, stageHeight / image.height);
-
-      stage.width(stageWidth);
-      stage.height(stageHeight);
-      stage.scale({ x: scale, y: scale });
-      stage.position({
-        x: (stageWidth - image.width * scale) / 2,
-        y: (stageHeight - image.height * scale) / 2,
-      });
-      stage.batchDraw();
-    }, [image]);
-
     useEffect(() => {
-      fitToScreen();
-    }, [fitToScreen]);
+      const stage = stageRef.current;
+      if (!stage) return;
 
-  return (
-    <div
-      ref={containerRef}
-      className="w-full h-full flex flex-col items-center justify-center relative"
-      style={{ background: 'transparent', border: 'none', margin: 0, padding: 0 }}
-    >
-      <input
-        type="file"
-        accept="image/*"
-        data-testid="file-input"
-        className="hidden"
-        onChange={handleFileChange}
-      />
+      stage.scale({ x: 1, y: 1 });
+      stage.position({ x: 0, y: 0 });
+      stage.batchDraw();
+    }, [containerDimensions.width, containerDimensions.height, image]);
 
-      {/* Canvas Area (always rendered for tests) */}
+    return (
       <div
-        className="w-full h-full flex items-center justify-center"
-        style={{ background: 'transparent', border: 'none', margin: 0, padding: '32px' }}
+        ref={containerRef}
+        className="w-full h-full flex flex-col items-center justify-center relative"
+        style={{ background: 'transparent', border: 'none', margin: 0, padding: 0 }}
       >
-        {(() => {
-          const stageWidth = Math.max(1, containerDimensions.width - 64);
-          const stageHeight = Math.max(1, containerDimensions.height - 64);
-          const imageScale = image ? Math.min(stageWidth / image.width, stageHeight / image.height) : 1;
-          const displayWidth = image ? image.width * imageScale : 0;
-          const displayHeight = image ? image.height * imageScale : 0;
-          const imageX = image ? (stageWidth - displayWidth) / 2 : 0;
-          const imageY = image ? (stageHeight - displayHeight) / 2 : 0;
+        <input
+          type="file"
+          accept="image/*"
+          data-testid="file-input"
+          className="hidden"
+          onChange={handleFileChange}
+        />
 
-          return (
-            <div style={{ position: 'relative' }}>
-              <Stage
-                ref={stageRef}
-                data-testid="stage"
-                width={stageWidth}
-                height={stageHeight}
-                style={{
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  margin: 0,
-                  padding: 0,
-                  display: 'block',
-                }}
-              >
-                <Layer data-testid="layer">
-                  {image && (
-                    <KonvaImage
-                      data-testid="image"
-                      image={image}
-                      width={displayWidth}
-                      height={displayHeight}
-                      x={imageX}
-                      y={imageY}
-                      listening={false}
-                      perfectDrawEnabled={false}
-                      filters={[]}
-                      ref={node => {
-                        if (node) {
-                          void applyEffectsToNode(node);
-                        }
-                      }}
-                    />
-                  )}
-                </Layer>
-              </Stage>
-            </div>
-          );
-        })()}
-      </div>
+        {/* Canvas Area (always rendered for tests) */}
+        <div
+          className="w-full h-full flex items-center justify-center"
+          style={{ background: 'transparent', border: 'none', margin: 0, padding: '32px' }}
+        >
+          {(() => {
+            const stageWidth = Math.max(1, containerDimensions.width - 64);
+            const stageHeight = Math.max(1, containerDimensions.height - 64);
+            const imageScale = image
+              ? Math.min(stageWidth / image.width, stageHeight / image.height)
+              : 1;
+            const displayWidth = image ? image.width * imageScale : 0;
+            const displayHeight = image ? image.height * imageScale : 0;
+            const imageX = image ? (stageWidth - displayWidth) / 2 : 0;
+            const imageY = image ? (stageHeight - displayHeight) / 2 : 0;
+
+            return (
+              <div style={{ position: 'relative' }}>
+                <Stage
+                  ref={stageRef}
+                  data-testid="stage"
+                  width={stageWidth}
+                  height={stageHeight}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    margin: 0,
+                    padding: 0,
+                    display: 'block',
+                  }}
+                >
+                  <Layer data-testid="layer">
+                    {image && (
+                      <KonvaImage
+                        data-testid="image"
+                        image={image}
+                        width={displayWidth}
+                        height={displayHeight}
+                        x={imageX}
+                        y={imageY}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                        filters={[]}
+                        ref={node => {
+                          if (node) {
+                            void applyEffectsToNode(node);
+                          }
+                        }}
+                      />
+                    )}
+                  </Layer>
+                </Stage>
+              </div>
+            );
+          })()}
+        </div>
 
         {error && (
           <div
