@@ -12,8 +12,11 @@ import {
   Monitor,
   X,
   ChevronRight,
+  Wand2,
+  Paintbrush,
 } from 'lucide-react';
 import { useTheme } from '@/lib/themes';
+import { SelectionType, MaskData } from './SelectionTool';
 
 interface EffectLayer {
   id: string;
@@ -37,6 +40,22 @@ interface AppleControlsPanelProps {
   hasImage?: boolean;
   isCollapsed: boolean;
   onToggle: () => void;
+  // Selection/Mask props
+  selectionType?: SelectionType;
+  onSelectionTypeChange?: (type: SelectionType) => void;
+  tolerance?: number;
+  onToleranceChange?: (value: number) => void;
+  contiguous?: boolean;
+  onContiguousChange?: (value: boolean) => void;
+  brushSize?: number;
+  onBrushSizeChange?: (value: number) => void;
+  brushMode?: 'add' | 'subtract';
+  onBrushModeChange?: (mode: 'add' | 'subtract') => void;
+  currentMask?: MaskData | null;
+  onClearMask?: () => void;
+  onInvertMask?: () => void;
+  onRemoveBackground?: () => void;
+  onExportSVG?: (type: 'traced' | 'embedded') => void;
 }
 
 // Custom Hex Color Input Component
@@ -123,10 +142,27 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   onNewImage,
   hasImage = false,
   isCollapsed,
-  onToggle,
+  // Selection/Mask props
+  selectionType,
+  onSelectionTypeChange,
+  tolerance = 32,
+  onToleranceChange,
+  contiguous = true,
+  onContiguousChange,
+  brushSize = 20,
+  onBrushSizeChange,
+  brushMode = 'add',
+  onBrushModeChange,
+  currentMask,
+  onClearMask,
+  onInvertMask,
+  onRemoveBackground,
+  onExportSVG,
 }) => {
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'settings' | 'layers' | 'export'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'layers' | 'export' | 'selection'>('settings');
+  const [showSVGExportMenu, setShowSVGExportMenu] = useState(false);
+  const hasMask = currentMask && currentMask.mask.some(v => v > 0);
 
   // Get the active layer with null checking
   const activeLayer = effectLayers?.find(layer => layer.id === activeEffect);
@@ -139,8 +175,9 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
       currentValue: effectSettings[setting.id] ?? setting.defaultValue,
     })) || [];
 
-  const tabs: Array<{ id: 'settings' | 'layers' | 'export' | 'new'; label: string; icon: any }> = [
-    { id: 'settings', label: 'Settings', icon: Settings },
+  const tabs: Array<{ id: 'settings' | 'layers' | 'export' | 'selection' | 'new'; label: string; icon: React.ComponentType<{ className?: string }> | (() => JSX.Element) }> = [
+    { id: 'settings', label: 'Effects', icon: Settings },
+    { id: 'selection', label: 'Extract', icon: Wand2 },
     { id: 'layers', label: 'Layers', icon: Layers },
     { id: 'export', label: 'Export', icon: Download },
     {
@@ -207,12 +244,12 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                   onNewImage?.();
                   // Don't change active tab for action buttons
                 } else {
-                  setActiveTab(tab.id as 'settings' | 'layers' | 'export');
+                  setActiveTab(tab.id as 'settings' | 'layers' | 'export' | 'selection');
                 }
               }}
               className={`
                 glass-button ${tab.id === 'new' ? 'px-2 py-1.5 flex-shrink-0' : 'px-2.5 py-1.5 flex-1 min-w-0'} text-xs font-medium transition-all rounded-lg
-                ${activeTab === (tab.id as 'settings' | 'layers' | 'export') && tab.id !== 'new' ? 'glass-active' : ''}
+                ${activeTab === (tab.id as 'settings' | 'layers' | 'export' | 'selection') && tab.id !== 'new' ? 'glass-active' : ''}
               `}
             >
               {tab.label}
@@ -496,6 +533,232 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                   );
                 })}
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'selection' && (
+            <motion.div
+              key="selection"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-4"
+            >
+              {!hasImage ? (
+                <div className="text-center text-xs text-gray-500 py-12">
+                  Upload an image to use extraction tools
+                </div>
+              ) : (
+                <>
+                  {/* Tool Selection */}
+                  <div className="glass-card rounded-xl p-4">
+                    <h3 className="text-sm font-semibold mb-3">Selection Tools</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => onSelectionTypeChange?.('magicWand')}
+                        className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
+                          selectionType === 'magicWand'
+                            ? 'glass-active'
+                            : 'glass-button'
+                        }`}
+                      >
+                        <Wand2 className="w-5 h-5" />
+                        <span className="text-xs">Magic Wand</span>
+                      </button>
+                      <button
+                        onClick={() => onSelectionTypeChange?.('brushMask')}
+                        className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
+                          selectionType === 'brushMask'
+                            ? 'glass-active'
+                            : 'glass-button'
+                        }`}
+                      >
+                        <Paintbrush className="w-5 h-5" />
+                        <span className="text-xs">Brush Mask</span>
+                      </button>
+                    </div>
+                    
+                    {/* Deselect button */}
+                    <button
+                      onClick={() => onSelectionTypeChange?.(null)}
+                      className={`w-full mt-2 py-2 px-3 text-xs font-medium rounded-lg transition-all ${
+                        selectionType === null
+                          ? 'glass-active'
+                          : 'glass-button'
+                      }`}
+                    >
+                      {selectionType ? 'Deactivate Tool' : 'No Tool Active'}
+                    </button>
+                  </div>
+
+                  {/* Magic Wand Settings */}
+                  {selectionType === 'magicWand' && (
+                    <div className="glass-card rounded-xl p-4">
+                      <h4 className="text-xs font-medium mb-3">Magic Wand Settings</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span>Tolerance</span>
+                            <span className="font-mono">{tolerance}</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="255"
+                            value={tolerance}
+                            onChange={(e) => onToleranceChange?.(parseInt(e.target.value))}
+                            className="w-full h-2 rounded-lg appearance-none cursor-pointer slider"
+                          />
+                        </div>
+                        <label className="flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={contiguous}
+                            onChange={(e) => onContiguousChange?.(e.target.checked)}
+                            className="w-4 h-4 rounded"
+                          />
+                          Contiguous (connected only)
+                        </label>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-2">
+                        Click on the image to select similar colors
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Brush Mask Settings */}
+                  {selectionType === 'brushMask' && (
+                    <div className="glass-card rounded-xl p-4">
+                      <h4 className="text-xs font-medium mb-3">Brush Settings</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span>Brush Size</span>
+                            <span className="font-mono">{brushSize}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="5"
+                            max="100"
+                            value={brushSize}
+                            onChange={(e) => onBrushSizeChange?.(parseInt(e.target.value))}
+                            className="w-full h-2 rounded-lg appearance-none cursor-pointer slider"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => onBrushModeChange?.('add')}
+                            className={`flex-1 py-2 px-3 text-xs font-medium rounded-lg transition-all ${
+                              brushMode === 'add'
+                                ? 'bg-green-500/20 text-green-600 border border-green-500/30'
+                                : 'glass-button'
+                            }`}
+                          >
+                            + Add
+                          </button>
+                          <button
+                            onClick={() => onBrushModeChange?.('subtract')}
+                            className={`flex-1 py-2 px-3 text-xs font-medium rounded-lg transition-all ${
+                              brushMode === 'subtract'
+                                ? 'bg-red-500/20 text-red-600 border border-red-500/30'
+                                : 'glass-button'
+                            }`}
+                          >
+                            − Subtract
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-2">
+                        Paint on the image to create a mask. Hold Alt to subtract.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Mask Operations */}
+                  {hasMask && (
+                    <div className="glass-card rounded-xl p-4">
+                      <h4 className="text-xs font-medium mb-3">Mask Operations</h4>
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <button
+                          onClick={onInvertMask}
+                          className="py-2 px-3 text-xs font-medium rounded-lg glass-button"
+                        >
+                          Invert Mask
+                        </button>
+                        <button
+                          onClick={onClearMask}
+                          className="py-2 px-3 text-xs font-medium rounded-lg glass-button"
+                        >
+                          Clear Mask
+                        </button>
+                      </div>
+                      <button
+                        onClick={onRemoveBackground}
+                        className="w-full py-2.5 px-3 text-xs font-medium rounded-lg bg-purple-500 text-white hover:bg-purple-600 transition-colors"
+                      >
+                        Remove Background
+                      </button>
+                    </div>
+                  )}
+
+                  {/* SVG Export */}
+                  {hasMask && (
+                    <div className="glass-card rounded-xl p-4">
+                      <h4 className="text-xs font-medium mb-3">Export as SVG</h4>
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowSVGExportMenu(!showSVGExportMenu)}
+                          className="w-full py-2.5 px-3 text-xs font-medium rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 transition-colors flex items-center justify-center"
+                        >
+                          <Download className="w-4 h-4 mr-1.5" />
+                          Export Selection as SVG
+                          <ChevronRight className={`w-4 h-4 ml-1.5 transition-transform ${showSVGExportMenu ? 'rotate-90' : ''}`} />
+                        </button>
+                        
+                        {showSVGExportMenu && (
+                          <div className="mt-2 rounded-lg overflow-hidden border border-gray-200/20">
+                            <button
+                              onClick={() => {
+                                onExportSVG?.('traced');
+                                setShowSVGExportMenu(false);
+                              }}
+                              className="w-full py-2.5 px-3 text-xs text-left glass-button border-b border-gray-200/10"
+                            >
+                              <div className="font-medium">Traced SVG (Vector)</div>
+                              <div className="text-[10px] text-gray-500 mt-0.5">Best for simple illustrations</div>
+                            </button>
+                            <button
+                              onClick={() => {
+                                onExportSVG?.('embedded');
+                                setShowSVGExportMenu(false);
+                              }}
+                              className="w-full py-2.5 px-3 text-xs text-left glass-button"
+                            >
+                              <div className="font-medium">Embedded PNG in SVG</div>
+                              <div className="text-[10px] text-gray-500 mt-0.5">Preserves detail, works in Figma</div>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-2">
+                        SVG will be copied to clipboard for pasting into Figma
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Tips */}
+                  <div className="text-xs text-gray-500 p-3 rounded-lg glass-card">
+                    <p className="font-medium mb-1">Tips:</p>
+                    <ul className="list-disc pl-4 space-y-0.5 text-[10px]">
+                      <li>Magic Wand: Click to select similar colors</li>
+                      <li>Brush: Paint to create custom mask</li>
+                      <li>Use [ and ] to adjust brush size</li>
+                      <li>Hold Alt to switch to subtract mode</li>
+                    </ul>
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

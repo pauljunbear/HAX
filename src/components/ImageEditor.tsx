@@ -8,11 +8,13 @@ import React, {
   useImperativeHandle,
   useCallback,
 } from 'react';
-import { Stage, Layer, Image as KonvaImage } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Line, Circle } from 'react-konva';
 import useImage from '@/hooks/useImage';
 import { applyEffect } from '@/lib/effects';
 import { EffectLayer } from './EffectLayers';
 import Konva from 'konva';
+import { SelectionType, MaskData } from './SelectionTool';
+import { magicWandSelect, getMaskOutline } from '@/lib/imageProcessing/magicWand';
 
 type FilterParams = Record<string, unknown>;
 type FilterResult = [((imageData: ImageData) => void) | null, FilterParams | null];
@@ -30,6 +32,14 @@ interface ImageEditorProps {
   selectedImage?: string | null;
   effectLayers?: EffectLayer[];
   onExportComplete?: () => void;
+  // Selection props
+  selectionType?: SelectionType;
+  tolerance?: number;
+  contiguous?: boolean;
+  brushSize?: number;
+  brushMode?: 'add' | 'subtract';
+  currentMask?: MaskData | null;
+  onMaskChange?: (mask: MaskData | null) => void;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -233,7 +243,19 @@ export type ImageEditorHandle = {
 };
 
 const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
-  ({ selectedImage, effectLayers, onExportComplete }, ref) => {
+  ({ 
+    selectedImage, 
+    effectLayers, 
+    onExportComplete,
+    // Selection props
+    selectionType,
+    tolerance = 32,
+    contiguous = true,
+    brushSize = 20,
+    brushMode = 'add',
+    currentMask,
+    onMaskChange,
+  }, ref) => {
     const stageRef = useRef<Konva.Stage | null>(null);
     const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
     const imageUrlToUse = selectedImage ?? uploadedImageUrl ?? '';
@@ -242,6 +264,13 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
     const [error, setError] = useState<string | null>(null);
     const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
     const effectCacheRef = useRef<Map<string, FilterResult>>(new Map());
+    
+    // Selection state
+    const [maskOutlines, setMaskOutlines] = useState<number[][]>([]);
+    const [isDrawingBrush, setIsDrawingBrush] = useState(false);
+    const [brushPoints, setBrushPoints] = useState<number[]>([]);
+    const [mousePos, setMousePos] = useState<{x: number, y: number} | null>(null);
+    const originalImageRef = useRef<HTMLCanvasElement | null>(null);
 
     const applyEffectsToNode = useCallback(
       async (node: Konva.Image | null, pixelRatio: number = 1) => {
@@ -478,6 +507,203 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
       }, 180) as unknown as number;
     }, [effectLayers, image]);
 
+    // Cache original image data for selection tools
+    useEffect(() => {
+      if (!image) {
+        originalImageRef.current = null;
+        return;
+      }
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(image, 0, 0);
+        originalImageRef.current = canvas;
+      }
+    }, [image]);
+
+    // Get original image data for selection tools
+    const getOriginalImageData = useCallback((): ImageData | null => {
+      if (!originalImageRef.current) return null;
+      const ctx = originalImageRef.current.getContext('2d');
+      if (!ctx) return null;
+      return ctx.getImageData(0, 0, originalImageRef.current.width, originalImageRef.current.height);
+    }, []);
+
+    // Calculate image position and scale
+    const getImageTransform = useCallback(() => {
+      if (!image || !containerRef.current) {
+        return { x: 0, y: 0, scale: 1, width: 0, height: 0 };
+      }
+      const stageWidth = Math.max(1, containerDimensions.width - 64);
+      const stageHeight = Math.max(1, containerDimensions.height - 64);
+      const scale = Math.min(stageWidth / image.width, stageHeight / image.height);
+      const displayWidth = image.width * scale;
+      const displayHeight = image.height * scale;
+      const x = (stageWidth - displayWidth) / 2;
+      const y = (stageHeight - displayHeight) / 2;
+      return { x, y, scale, width: displayWidth, height: displayHeight };
+    }, [image, containerDimensions]);
+
+    // Handle magic wand click
+    const handleMagicWandClick = useCallback((stageX: number, stageY: number) => {
+      const imageData = getOriginalImageData();
+      if (!imageData) return;
+
+      const transform = getImageTransform();
+      
+      // Convert stage coordinates to image coordinates
+      const imageX = Math.floor((stageX - transform.x) / transform.scale);
+      const imageY = Math.floor((stageY - transform.y) / transform.scale);
+
+      // Check bounds
+      if (imageX < 0 || imageX >= imageData.width || imageY < 0 || imageY >= imageData.height) {
+        return;
+      }
+
+      // Perform magic wand selection
+      const result = magicWandSelect(imageData, imageX, imageY, tolerance, contiguous);
+      
+      // Get outlines for visualization
+      const outlines = getMaskOutline(result.mask, result.width, result.height);
+      
+      // Scale outlines to stage coordinates
+      const scaledOutlines = outlines.map(outline => {
+        const scaled: number[] = [];
+        for (let i = 0; i < outline.length; i += 2) {
+          scaled.push(outline[i] * transform.scale + transform.x);
+          scaled.push(outline[i + 1] * transform.scale + transform.y);
+        }
+        return scaled;
+      });
+      
+      setMaskOutlines(scaledOutlines);
+      
+      // Update mask
+      const selectedPixels = result.mask.filter(v => v > 0).length;
+      console.log(`Magic wand selected ${selectedPixels} pixels`);
+      
+      onMaskChange?.({
+        mask: result.mask,
+        width: result.width,
+        height: result.height,
+      });
+    }, [getOriginalImageData, getImageTransform, tolerance, contiguous, onMaskChange]);
+
+    // Handle brush stroke
+    const handleBrushStroke = useCallback((stageX: number, stageY: number) => {
+      const imageData = getOriginalImageData();
+      if (!imageData || !onMaskChange) return;
+
+      const transform = getImageTransform();
+      
+      // Convert to image coordinates
+      const imageX = Math.floor((stageX - transform.x) / transform.scale);
+      const imageY = Math.floor((stageY - transform.y) / transform.scale);
+
+      // Get or create mask
+      let mask: Uint8ClampedArray;
+      if (currentMask && currentMask.width === imageData.width && currentMask.height === imageData.height) {
+        mask = new Uint8ClampedArray(currentMask.mask);
+      } else {
+        mask = new Uint8ClampedArray(imageData.width * imageData.height);
+      }
+
+      // Calculate brush radius in image coordinates
+      const brushRadiusImg = Math.max(1, Math.floor(brushSize / (2 * transform.scale)));
+
+      // Draw circle on mask
+      for (let dy = -brushRadiusImg; dy <= brushRadiusImg; dy++) {
+        for (let dx = -brushRadiusImg; dx <= brushRadiusImg; dx++) {
+          const px = imageX + dx;
+          const py = imageY + dy;
+          
+          if (px >= 0 && px < imageData.width && py >= 0 && py < imageData.height) {
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist <= brushRadiusImg) {
+              const idx = py * imageData.width + px;
+              mask[idx] = brushMode === 'add' ? 255 : 0;
+            }
+          }
+        }
+      }
+
+      // Update outlines
+      const outlines = getMaskOutline(mask, imageData.width, imageData.height);
+      const scaledOutlines = outlines.map(outline => {
+        const scaled: number[] = [];
+        for (let i = 0; i < outline.length; i += 2) {
+          scaled.push(outline[i] * transform.scale + transform.x);
+          scaled.push(outline[i + 1] * transform.scale + transform.y);
+        }
+        return scaled;
+      });
+      setMaskOutlines(scaledOutlines);
+
+      onMaskChange({
+        mask,
+        width: imageData.width,
+        height: imageData.height,
+      });
+    }, [getOriginalImageData, getImageTransform, brushSize, brushMode, currentMask, onMaskChange]);
+
+    // Stage mouse handlers
+    const handleStageMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (!selectionType) return;
+      
+      const stage = e.target.getStage();
+      const pos = stage?.getPointerPosition();
+      if (!pos) return;
+
+      if (selectionType === 'magicWand') {
+        handleMagicWandClick(pos.x, pos.y);
+      } else if (selectionType === 'brushMask') {
+        setIsDrawingBrush(true);
+        setBrushPoints([pos.x, pos.y]);
+        handleBrushStroke(pos.x, pos.y);
+      }
+    }, [selectionType, handleMagicWandClick, handleBrushStroke]);
+
+    const handleStageMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+      const stage = e.target.getStage();
+      const pos = stage?.getPointerPosition();
+      if (!pos) return;
+      
+      setMousePos(pos);
+      
+      if (isDrawingBrush && selectionType === 'brushMask') {
+        setBrushPoints(prev => [...prev, pos.x, pos.y]);
+        handleBrushStroke(pos.x, pos.y);
+      }
+    }, [isDrawingBrush, selectionType, handleBrushStroke]);
+
+    const handleStageMouseUp = useCallback(() => {
+      setIsDrawingBrush(false);
+      setBrushPoints([]);
+    }, []);
+
+    // Update outlines when mask changes externally
+    useEffect(() => {
+      if (!currentMask || !image) {
+        setMaskOutlines([]);
+        return;
+      }
+      
+      const transform = getImageTransform();
+      const outlines = getMaskOutline(currentMask.mask, currentMask.width, currentMask.height);
+      const scaledOutlines = outlines.map(outline => {
+        const scaled: number[] = [];
+        for (let i = 0; i < outline.length; i += 2) {
+          scaled.push(outline[i] * transform.scale + transform.x);
+          scaled.push(outline[i + 1] * transform.scale + transform.y);
+        }
+        return scaled;
+      });
+      setMaskOutlines(scaledOutlines);
+    }, [currentMask, image, getImageTransform]);
+
     // Handle file upload
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -549,6 +775,15 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
                     margin: 0,
                     padding: 0,
                     display: 'block',
+                    cursor: selectionType === 'magicWand' ? 'crosshair' : 
+                            selectionType === 'brushMask' ? 'none' : 'default',
+                  }}
+                  onMouseDown={handleStageMouseDown}
+                  onMouseMove={handleStageMouseMove}
+                  onMouseUp={handleStageMouseUp}
+                  onMouseLeave={() => {
+                    setMousePos(null);
+                    handleStageMouseUp();
                   }}
                 >
                   <Layer data-testid="layer">
@@ -568,6 +803,47 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
                             void applyEffectsToNode(node);
                           }
                         }}
+                      />
+                    )}
+                  </Layer>
+                  
+                  {/* Selection overlay layer */}
+                  <Layer>
+                    {/* Render mask outlines */}
+                    {maskOutlines.map((outline, index) => (
+                      <Line
+                        key={`mask-outline-${index}`}
+                        points={outline}
+                        stroke="#00FFFF"
+                        strokeWidth={2}
+                        dash={[5, 5]}
+                        closed={true}
+                        listening={false}
+                      />
+                    ))}
+                    
+                    {/* Brush stroke preview */}
+                    {isDrawingBrush && brushPoints.length >= 2 && (
+                      <Line
+                        points={brushPoints}
+                        stroke={brushMode === 'add' ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)'}
+                        strokeWidth={brushSize}
+                        lineCap="round"
+                        lineJoin="round"
+                        listening={false}
+                      />
+                    )}
+                    
+                    {/* Brush cursor */}
+                    {selectionType === 'brushMask' && mousePos && (
+                      <Circle
+                        x={mousePos.x}
+                        y={mousePos.y}
+                        radius={brushSize / 2}
+                        stroke={brushMode === 'add' ? '#00FF00' : '#FF0000'}
+                        strokeWidth={1}
+                        dash={[3, 3]}
+                        listening={false}
                       />
                     )}
                   </Layer>
