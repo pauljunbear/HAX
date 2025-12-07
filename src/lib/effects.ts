@@ -1228,8 +1228,12 @@ const createHalftoneEffect = (settings: Record<string, number>) => {
     const width = imageData.width;
     const height = imageData.height;
 
-    const dotSize = settings.dotSize || 4;
-    const spacing = settings.spacing || 5;
+    // Map 1-10 to more dramatic ranges: dotSize 2-20, spacing 4-30
+    const dotSizeInput = settings.dotSize || 4;
+    const spacingInput = settings.spacing || 5;
+
+    const dotSize = Math.floor(2 + ((dotSizeInput - 1) / 9) * 18); // 2 to 20
+    const spacing = Math.floor(4 + ((spacingInput - 1) / 14) * 26); // 4 to 30
     const angle = (settings.angle || 45) * (Math.PI / 180);
 
     const tempCanvas = document.createElement('canvas');
@@ -1238,11 +1242,16 @@ const createHalftoneEffect = (settings: Record<string, number>) => {
     const ctx = tempCanvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.fillStyle = 'white';
+    // Cream paper background instead of pure white
+    ctx.fillStyle = '#faf8f5';
     ctx.fillRect(0, 0, width, height);
 
     const cosAngle = Math.cos(angle);
     const sinAngle = Math.sin(angle);
+
+    // Store original data for color sampling
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
 
     for (let y = 0; y < height; y += spacing) {
       for (let x = 0; x < width; x += spacing) {
@@ -1259,17 +1268,18 @@ const createHalftoneEffect = (settings: Record<string, number>) => {
         if (centerX < 0 || centerX >= width || centerY < 0 || centerY >= height) continue;
 
         const originalIndex = (Math.floor(centerY) * width + Math.floor(centerX)) * 4;
-        const r = imageData.data[originalIndex];
-        const g = imageData.data[originalIndex + 1];
-        const b = imageData.data[originalIndex + 2];
-        const brightness = (r + g + b) / (3 * 255);
+        const r = tempData[originalIndex];
+        const g = tempData[originalIndex + 1];
+        const b = tempData[originalIndex + 2];
+        const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
 
         const radius = (1 - brightness) * dotSize;
 
-        if (radius > 0.5) {
+        if (radius > 0.8) {
           ctx.beginPath();
           ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI, false);
-          ctx.fillStyle = 'black';
+          // Ink color - very dark blue-black for newspaper look
+          ctx.fillStyle = '#0a0a12';
           ctx.fill();
         }
       }
@@ -1611,48 +1621,101 @@ const createCrosshatchEffect = (settings: Record<string, number>) => {
     const data = imageData.data;
     const width = imageData.width;
     const height = imageData.height;
-    const spacing = settings.spacing ?? 5;
+    // Map 2-10 to actual spacing of 3-25 pixels
+    const spacingInput = settings.spacing ?? 5;
+    const spacing = Math.floor(3 + ((spacingInput - 2) / 8) * 22); // 3 to 25
     const strength = settings.strength ?? 0.5;
-    const lineOpacity = 1 - strength; // Darker lines for higher strength
 
-    // Create a white background copy
+    // Create output with paper-colored background
     const outputData = new Uint8ClampedArray(data.length);
+    const paperR = 252,
+      paperG = 250,
+      paperB = 245; // Warm paper color
+
     for (let i = 0; i < outputData.length; i += 4) {
-      outputData[i] = outputData[i + 1] = outputData[i + 2] = 255;
-      outputData[i + 3] = data[i + 3]; // Preserve alpha
+      outputData[i] = paperR;
+      outputData[i + 1] = paperG;
+      outputData[i + 2] = paperB;
+      outputData[i + 3] = data[i + 3];
     }
 
-    // Draw diagonal lines based on original brightness
+    // Line thickness based on strength
+    const lineThickness = 0.5 + strength * 1.5; // 0.5 to 2.0 pixels
+
+    // Four hatch angles for rich crosshatching
+    const angles = [
+      45 * (Math.PI / 180), // Main diagonal
+      135 * (Math.PI / 180), // Cross diagonal
+      90 * (Math.PI / 180), // Vertical (for very dark areas)
+      0 * (Math.PI / 180), // Horizontal (for very dark areas)
+    ];
+
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const index = (y * width + x) * 4;
         const r = data[index],
           g = data[index + 1],
           b = data[index + 2];
-        const brightness = (r + g + b) / (3 * 255); // 0 (black) to 1 (white)
+        const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
         const darkness = 1 - brightness;
 
-        const angle1 = 45 * (Math.PI / 180);
-        const angle2 = 135 * (Math.PI / 180);
+        // Ink color varies slightly with original color (subtle sepia/blue tones)
+        const inkR = Math.floor(20 + (1 - r / 255) * 15);
+        const inkG = Math.floor(15 + (1 - g / 255) * 10);
+        const inkB = Math.floor(30 + (1 - b / 255) * 20);
 
-        // Check if pixel falls on a line for angle 1
-        if (
-          Math.abs(x * Math.cos(angle1) + y * Math.sin(angle1)) % spacing <
-          darkness * (spacing / 2)
-        ) {
-          outputData[index] = outputData[index + 1] = outputData[index + 2] = 0; // Draw black line segment
+        let totalInk = 0;
+
+        // First angle: appears for darkness > 0.15
+        if (darkness > 0.15) {
+          const lineVal = Math.abs(x * Math.cos(angles[0]) + y * Math.sin(angles[0])) % spacing;
+          if (lineVal < lineThickness * (darkness - 0.15) * 2) {
+            totalInk += 0.8;
+          }
         }
-        // Check if pixel falls on a line for angle 2 (crosshatch)
-        if (
-          darkness > 0.5 &&
-          Math.abs(x * Math.cos(angle2) + y * Math.sin(angle2)) % spacing <
-            (darkness - 0.5) * spacing
-        ) {
-          outputData[index] = outputData[index + 1] = outputData[index + 2] = 0; // Draw second set of lines for darker areas
+
+        // Second angle (crosshatch): appears for darkness > 0.35
+        if (darkness > 0.35) {
+          const lineVal = Math.abs(x * Math.cos(angles[1]) + y * Math.sin(angles[1])) % spacing;
+          if (lineVal < lineThickness * (darkness - 0.35) * 2.5) {
+            totalInk += 0.7;
+          }
         }
+
+        // Third angle: appears for darkness > 0.55
+        if (darkness > 0.55) {
+          const lineVal =
+            Math.abs(x * Math.cos(angles[2]) + y * Math.sin(angles[2])) % (spacing * 0.7);
+          if (lineVal < lineThickness * (darkness - 0.55) * 2) {
+            totalInk += 0.6;
+          }
+        }
+
+        // Fourth angle: appears for darkness > 0.75 (very dark areas)
+        if (darkness > 0.75) {
+          const lineVal =
+            Math.abs(x * Math.cos(angles[3]) + y * Math.sin(angles[3])) % (spacing * 0.7);
+          if (lineVal < lineThickness * (darkness - 0.75) * 3) {
+            totalInk += 0.5;
+          }
+        }
+
+        // Apply ink with strength modulation
+        if (totalInk > 0) {
+          const inkAmount = Math.min(1, totalInk * strength * 1.5);
+          outputData[index] = Math.floor(paperR * (1 - inkAmount) + inkR * inkAmount);
+          outputData[index + 1] = Math.floor(paperG * (1 - inkAmount) + inkG * inkAmount);
+          outputData[index + 2] = Math.floor(paperB * (1 - inkAmount) + inkB * inkAmount);
+        }
+
+        // Add subtle paper texture
+        const noise = (Math.random() - 0.5) * 6;
+        outputData[index] = Math.max(0, Math.min(255, outputData[index] + noise));
+        outputData[index + 1] = Math.max(0, Math.min(255, outputData[index + 1] + noise));
+        outputData[index + 2] = Math.max(0, Math.min(255, outputData[index + 2] + noise));
       }
     }
-    // Copy result back
+
     data.set(outputData);
   };
 };
@@ -2079,56 +2142,170 @@ const createColorQuantizationEffect = (settings: Record<string, number>) => {
 const createAsciiArtEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const scale = Math.max(1, Math.floor(settings.scale ?? 5)); // Size of the 'character' block
+    // Map scale 1-10 to actual cell sizes 3-40 for more dramatic range
+    const scaleInput = settings.scale ?? 5;
+    const cellSize = Math.max(3, Math.floor(3 + (scaleInput - 1) * 4.1)); // 3 to ~40 pixels
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
 
-    // Simple character set based on brightness (dark to light)
-    const chars = [' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'];
-    const numChars = chars.length;
+    // Dither patterns that simulate ASCII character density (from sparse to dense)
+    // Each pattern is an 8x8 matrix representing fill percentage
+    const patterns = [
+      // 0: Empty (space) - ~0% fill
+      [
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+      ],
+      // 1: Dot pattern (.) - ~6% fill
+      [
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+      ],
+      // 2: Colon pattern (:) - ~12% fill
+      [
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+      ],
+      // 3: Dash pattern (-) - ~18% fill
+      [
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 1, 1, 1, 1, 1, 0],
+        [0, 1, 1, 1, 1, 1, 1, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+      ],
+      // 4: Plus pattern (+) - ~28% fill
+      [
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+      ],
+      // 5: Asterisk pattern (*) - ~38% fill
+      [
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [1, 0, 0, 1, 1, 0, 0, 1],
+        [0, 1, 0, 1, 1, 0, 1, 0],
+        [0, 0, 1, 1, 1, 1, 0, 0],
+        [0, 0, 1, 1, 1, 1, 0, 0],
+        [0, 1, 0, 1, 1, 0, 1, 0],
+        [1, 0, 0, 1, 1, 0, 0, 1],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+      ],
+      // 6: Hash pattern (#) - ~50% fill
+      [
+        [0, 1, 1, 0, 0, 1, 1, 0],
+        [0, 1, 1, 0, 0, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [0, 1, 1, 0, 0, 1, 1, 0],
+        [0, 1, 1, 0, 0, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [0, 1, 1, 0, 0, 1, 1, 0],
+        [0, 1, 1, 0, 0, 1, 1, 0],
+      ],
+      // 7: Percent pattern (%) - ~62% fill
+      [
+        [1, 1, 1, 0, 0, 0, 1, 1],
+        [1, 1, 1, 0, 0, 1, 1, 0],
+        [1, 1, 1, 0, 1, 1, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 1, 1, 0, 1, 1, 1, 0],
+        [1, 1, 0, 0, 1, 1, 1, 0],
+        [1, 0, 0, 0, 1, 1, 1, 0],
+      ],
+      // 8: At pattern (@) - ~75% fill
+      [
+        [0, 1, 1, 1, 1, 1, 1, 0],
+        [1, 1, 0, 0, 0, 0, 1, 1],
+        [1, 0, 1, 1, 1, 0, 1, 1],
+        [1, 0, 1, 0, 1, 0, 1, 1],
+        [1, 0, 1, 1, 1, 1, 1, 1],
+        [1, 0, 1, 1, 1, 0, 0, 0],
+        [1, 1, 0, 0, 0, 1, 1, 0],
+        [0, 1, 1, 1, 1, 1, 0, 0],
+      ],
+      // 9: Block pattern (█) - ~95% fill
+      [
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 0, 0, 1, 1, 1],
+      ],
+    ];
+    const numPatterns = patterns.length;
 
-    for (let y = 0; y < height; y += scale) {
-      for (let x = 0; x < width; x += scale) {
-        let sumR = 0,
-          sumG = 0,
-          sumB = 0;
+    for (let y = 0; y < height; y += cellSize) {
+      for (let x = 0; x < width; x += cellSize) {
+        let sumBrightness = 0;
         let count = 0;
 
-        // Average color in the block
-        for (let sy = 0; sy < scale && y + sy < height; sy++) {
-          for (let sx = 0; sx < scale && x + sx < width; sx++) {
+        // Calculate average brightness in the cell
+        for (let sy = 0; sy < cellSize && y + sy < height; sy++) {
+          for (let sx = 0; sx < cellSize && x + sx < width; sx++) {
             const index = ((y + sy) * width + (x + sx)) * 4;
-            sumR += tempData[index];
-            sumG += tempData[index + 1];
-            sumB += tempData[index + 2];
+            const brightness =
+              0.299 * tempData[index] +
+              0.587 * tempData[index + 1] +
+              0.114 * tempData[index + 2];
+            sumBrightness += brightness;
             count++;
           }
         }
 
         if (count > 0) {
-          const avgR = sumR / count;
-          const avgG = sumG / count;
-          const avgB = sumB / count;
-          const brightness = (0.299 * avgR + 0.587 * avgG + 0.114 * avgB) / 255;
+          const avgBrightness = sumBrightness / count / 255;
+          // Map brightness to pattern index (inverted: dark = more fill)
+          const patternIndex = Math.min(
+            numPatterns - 1,
+            Math.floor((1 - avgBrightness) * numPatterns)
+          );
+          const pattern = patterns[patternIndex];
 
-          // Map brightness to a character index (crude)
-          const charIndex = Math.min(numChars - 1, Math.floor(brightness * numChars));
-
-          // Instead of drawing char, use brightness to determine fill level (dither-like)
-          const fillLevel = charIndex / (numChars - 1);
-          const threshold = 0.5; // Dither threshold
-
-          for (let sy = 0; sy < scale && y + sy < height; sy++) {
-            for (let sx = 0; sx < scale && x + sx < width; sx++) {
+          // Apply pattern to each pixel in the cell
+          for (let sy = 0; sy < cellSize && y + sy < height; sy++) {
+            for (let sx = 0; sx < cellSize && x + sx < width; sx++) {
               const index = ((y + sy) * width + (x + sx)) * 4;
-              // Basic dither pattern or just block color based on 'char brightness'
-              const pixelVal = fillLevel > threshold ? 255 : 0; // Simple thresholding for now
-              // A better approach might involve actual dither patterns based on charIndex
+              // Map cell position to 8x8 pattern
+              const patternY = Math.floor((sy / cellSize) * 8) % 8;
+              const patternX = Math.floor((sx / cellSize) * 8) % 8;
+              const filled = pattern[patternY][patternX];
+
+              // Black on white for classic ASCII look
+              const pixelVal = filled ? 0 : 255;
               data[index] = pixelVal;
               data[index + 1] = pixelVal;
               data[index + 2] = pixelVal;
-              // Keep original alpha maybe? data[index + 3] = tempData[index + 3];
             }
           }
         }
@@ -2811,8 +2988,8 @@ export const effectsConfig: Record<string, EffectConfig> = {
     label: 'Halftone',
     category: 'Artistic',
     settings: [
-      { id: 'dotSize', label: 'Dot Size', min: 1, max: 10, defaultValue: 4, step: 1 },
-      { id: 'spacing', label: 'Spacing', min: 1, max: 15, defaultValue: 5, step: 1 },
+      { id: 'dotSize', label: 'Dot Size', min: 1, max: 10, defaultValue: 3, step: 1 },
+      { id: 'spacing', label: 'Spacing', min: 1, max: 10, defaultValue: 4, step: 1 },
       { id: 'angle', label: 'Angle', min: 0, max: 180, defaultValue: 45, step: 5 },
     ],
   },
@@ -3019,15 +3196,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         label: 'Line Spacing',
         min: 2,
         max: 10,
-        defaultValue: 5,
+        defaultValue: 4,
         step: 1,
       },
       {
         id: 'strength',
-        label: 'Line Strength',
-        min: 0.1,
+        label: 'Line Density',
+        min: 0.2,
         max: 1,
-        defaultValue: 0.5,
+        defaultValue: 0.6,
         step: 0.05,
       },
     ],
@@ -3222,8 +3399,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     label: 'ASCII Art',
     category: 'Artistic',
     settings: [
-      // ASCII settings might be complex (charset, scale), placeholder for now
-      { id: 'scale', label: 'Scale', min: 1, max: 10, defaultValue: 5, step: 1 },
+      { id: 'scale', label: 'Cell Size', min: 1, max: 10, defaultValue: 3, step: 1 },
     ],
   },
 
@@ -3559,13 +3735,13 @@ export const effectsConfig: Record<string, EffectConfig> = {
     label: 'Neon Glow Edges',
     category: 'Artistic',
     settings: [
-      { id: 'glowWidth', label: 'Glow Radius', min: 1, max: 10, defaultValue: 5, step: 1 },
+      { id: 'glowWidth', label: 'Glow Size', min: 1, max: 10, defaultValue: 4, step: 1 },
       {
         id: 'glowIntensity',
         label: 'Glow Brightness',
-        min: 0.1,
+        min: 0.2,
         max: 1,
-        defaultValue: 0.5,
+        defaultValue: 0.6,
         step: 0.05,
       },
     ],
@@ -3607,7 +3783,9 @@ export const effectsConfig: Record<string, EffectConfig> = {
   weavePattern: {
     label: 'Weave Pattern',
     category: 'Artistic',
-    settings: [{ id: 'weaveSize', label: 'Weave Size', min: 4, max: 16, defaultValue: 8, step: 2 }],
+    settings: [
+      { id: 'weaveSize', label: 'Thread Size', min: 4, max: 16, defaultValue: 8, step: 1 },
+    ],
   },
   bioluminescence: {
     label: 'Bioluminescence',
@@ -3616,12 +3794,12 @@ export const effectsConfig: Record<string, EffectConfig> = {
       {
         id: 'glowIntensity',
         label: 'Glow Intensity',
-        min: 0.1,
+        min: 0.2,
         max: 1,
-        defaultValue: 0.5,
+        defaultValue: 0.6,
         step: 0.05,
       },
-      { id: 'glowSpread', label: 'Glow Spread', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'glowSpread', label: 'Glow Spread', min: 0.1, max: 1, defaultValue: 0.4, step: 0.05 },
     ],
   },
 
@@ -5490,31 +5668,91 @@ const createThermalPaletteEffect = (settings: Record<string, number>) => {
 const createPaperCutArtEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const layers = Math.floor(settings.layers ?? 5);
-    const threshold = 1 / layers;
+    // Map 3-8 to actual 3-12 layers for more range
+    const layersInput = Math.floor(settings.layers ?? 5);
+    const layers = Math.floor(3 + ((layersInput - 3) / 5) * 9); // 3 to 12
 
+    const tempData = new Uint8ClampedArray(data.length);
+
+    // Define paper layer colors (from light to dark, warm paper tones)
+    const paperColors = [
+      { r: 255, g: 252, b: 245 }, // Lightest cream
+      { r: 245, g: 235, b: 220 },
+      { r: 230, g: 215, b: 195 },
+      { r: 210, g: 190, b: 165 },
+      { r: 185, g: 160, b: 135 },
+      { r: 160, g: 130, b: 105 },
+      { r: 135, g: 100, b: 75 },
+      { r: 110, g: 75, b: 55 },
+      { r: 85, g: 55, b: 40 },
+      { r: 65, g: 40, b: 30 },
+      { r: 45, g: 28, b: 22 },
+      { r: 30, g: 18, b: 15 }, // Darkest
+    ];
+
+    // First pass: assign layers
+    const layerMap = new Uint8Array(width * height);
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
 
       const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-      const layer = Math.floor(brightness * layers) / layers;
-
-      // Create paper-like layers with slight color variations
-      const paperColor = 255 - layer * 200;
-      data[i] = paperColor;
-      data[i + 1] = paperColor - 10; // Slight warm tint
-      data[i + 2] = paperColor - 20;
+      const layerIdx = Math.min(layers - 1, Math.floor((1 - brightness) * layers));
+      layerMap[i / 4] = layerIdx;
     }
 
-    // Add paper texture
-    for (let i = 0; i < data.length; i += 4) {
-      const noise = (Math.random() - 0.5) * 10;
-      data[i] = Math.max(0, Math.min(255, data[i] + noise));
-      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
-      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+    // Second pass: apply colors and detect edges for shadow effect
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const currentLayer = layerMap[y * width + x];
+
+        // Get paper color for this layer
+        const colorIdx = Math.floor((currentLayer / layers) * (paperColors.length - 1));
+        const color = paperColors[colorIdx];
+
+        // Check for layer edge (shadow detection)
+        let isShadowEdge = false;
+        let shadowIntensity = 0;
+
+        // Look at neighbors to detect if we're at a layer boundary
+        for (let dy = -2; dy <= 0; dy++) {
+          for (let dx = -2; dx <= 0; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+              const neighborLayer = layerMap[ny * width + nx];
+              if (neighborLayer < currentLayer) {
+                isShadowEdge = true;
+                shadowIntensity = Math.max(
+                  shadowIntensity,
+                  (currentLayer - neighborLayer) / layers
+                );
+              }
+            }
+          }
+        }
+
+        // Apply color with shadow
+        const shadowDarken = isShadowEdge ? 1 - shadowIntensity * 0.4 : 1;
+        tempData[i] = Math.floor(color.r * shadowDarken);
+        tempData[i + 1] = Math.floor(color.g * shadowDarken);
+        tempData[i + 2] = Math.floor(color.b * shadowDarken);
+        tempData[i + 3] = 255;
+      }
     }
+
+    // Add paper fiber texture
+    for (let i = 0; i < tempData.length; i += 4) {
+      const noise = (Math.random() - 0.5) * 12;
+      tempData[i] = Math.max(0, Math.min(255, tempData[i] + noise));
+      tempData[i + 1] = Math.max(0, Math.min(255, tempData[i + 1] + noise));
+      tempData[i + 2] = Math.max(0, Math.min(255, tempData[i + 2] + noise));
+    }
+
+    data.set(tempData);
   };
 };
 
@@ -5580,11 +5818,14 @@ const createTiltShiftMiniatureEffect = (settings: Record<string, number>) => {
 const createNeonGlowEdgesEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const glowWidth = Math.max(1, settings.glowWidth ?? 5);
+    // Map 1-10 to actual glow radius of 5-50 pixels
+    const glowInput = settings.glowWidth ?? 5;
+    const glowRadius = Math.floor(5 + (glowInput - 1) * 5); // 5 to 50
     const glowIntensity = settings.glowIntensity ?? 0.5;
 
-    // Edge detection
+    // Edge detection with Sobel
     const edges = new Uint8ClampedArray(width * height);
+    const edgeHue = new Float32Array(width * height); // Store hue from original color
     const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
     const kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
 
@@ -5592,6 +5833,9 @@ const createNeonGlowEdgesEffect = (settings: Record<string, number>) => {
       for (let x = 1; x < width - 1; x++) {
         let gx = 0,
           gy = 0;
+        let avgR = 0,
+          avgG = 0,
+          avgB = 0;
 
         for (let ky = -1; ky <= 1; ky++) {
           for (let kx = -1; kx <= 1; kx++) {
@@ -5600,49 +5844,91 @@ const createNeonGlowEdgesEffect = (settings: Record<string, number>) => {
             const kernelIdx = (ky + 1) * 3 + (kx + 1);
             gx += val * kernelX[kernelIdx];
             gy += val * kernelY[kernelIdx];
+            avgR += data[idx];
+            avgG += data[idx + 1];
+            avgB += data[idx + 2];
           }
         }
 
-        edges[y * width + x] = Math.min(255, Math.sqrt(gx * gx + gy * gy));
+        const edgeVal = Math.min(255, Math.sqrt(gx * gx + gy * gy));
+        edges[y * width + x] = edgeVal;
+
+        // Calculate hue from original colors for neon tinting
+        avgR /= 9;
+        avgG /= 9;
+        avgB /= 9;
+        const max = Math.max(avgR, avgG, avgB);
+        const min = Math.min(avgR, avgG, avgB);
+        let h = 0;
+        if (max !== min) {
+          const d = max - min;
+          if (max === avgR) h = ((avgG - avgB) / d + (avgG < avgB ? 6 : 0)) / 6;
+          else if (max === avgG) h = ((avgB - avgR) / d + 2) / 6;
+          else h = ((avgR - avgG) / d + 4) / 6;
+        }
+        edgeHue[y * width + x] = h;
       }
     }
 
-    // Create neon glow
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = 0;
-      data[i + 1] = 0;
-      data[i + 2] = 0;
-    }
+    // Create glow accumulator
+    const glowAccum = new Float32Array(width * height * 3);
+    const step = glowRadius > 25 ? 2 : 1;
 
-    // Apply glow
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
+    // Apply glow from edges
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
         const edgeStrength = edges[y * width + x];
 
-        if (edgeStrength > 30) {
-          // Choose neon color based on position
-          const hue = ((x + y) / (width + height)) * 360;
-          const { r, g, b } = hslToRgb(hue / 360, 1, 0.5);
+        if (edgeStrength > 20) {
+          // Neon color based on original image hue + some variation
+          const baseHue = edgeHue[y * width + x];
+          const hue = (baseHue + (x * 0.001 + y * 0.001)) % 1;
+          const { r, g, b } = hslToRgb(hue, 1, 0.55);
 
-          // Draw glow
-          for (let dy = -glowWidth; dy <= glowWidth; dy++) {
-            for (let dx = -glowWidth; dx <= glowWidth; dx++) {
-              const ny = Math.max(0, Math.min(height - 1, y + dy));
-              const nx = Math.max(0, Math.min(width - 1, x + dx));
-              const dist = Math.sqrt(dx * dx + dy * dy);
+          const normalizedEdge = edgeStrength / 255;
 
-              if (dist <= glowWidth) {
-                const falloff = 1 - dist / glowWidth;
-                const intensity = falloff * glowIntensity * (edgeStrength / 255);
-                const idx = (ny * width + nx) * 4;
+          for (let dy = -glowRadius; dy <= glowRadius; dy += step) {
+            for (let dx = -glowRadius; dx <= glowRadius; dx += step) {
+              const ny = y + dy;
+              const nx = x + dx;
 
-                data[idx] = Math.min(255, data[idx] + r * intensity * 255);
-                data[idx + 1] = Math.min(255, data[idx + 1] + g * intensity * 255);
-                data[idx + 2] = Math.min(255, data[idx + 2] + b * intensity * 255);
+              if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist <= glowRadius) {
+                  // Gaussian falloff for softer glow
+                  const sigma = glowRadius * 0.35;
+                  const falloff = Math.exp(-(dist * dist) / (2 * sigma * sigma));
+                  const intensity = falloff * glowIntensity * normalizedEdge * 2.5;
+
+                  const accIdx = (ny * width + nx) * 3;
+                  glowAccum[accIdx] += r * intensity;
+                  glowAccum[accIdx + 1] += g * intensity;
+                  glowAccum[accIdx + 2] += b * intensity;
+                }
               }
             }
           }
         }
+      }
+    }
+
+    // Darken background and apply accumulated glow
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const accIdx = (y * width + x) * 3;
+
+        // Dark background with slight original image tint
+        const bgFactor = 0.08;
+        data[idx] = data[idx] * bgFactor + glowAccum[accIdx] * 255;
+        data[idx + 1] = data[idx + 1] * bgFactor + glowAccum[accIdx + 1] * 255;
+        data[idx + 2] = data[idx + 2] * bgFactor + glowAccum[accIdx + 2] * 255;
+
+        // Clamp
+        data[idx] = Math.min(255, data[idx]);
+        data[idx + 1] = Math.min(255, data[idx + 1]);
+        data[idx + 2] = Math.min(255, data[idx + 2]);
       }
     }
   };
@@ -5798,7 +6084,9 @@ const createTopographicContoursEffect = (settings: Record<string, number>) => {
 const createWeavePatternEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const weaveSize = Math.floor(settings.weaveSize ?? 8);
+    // Map 4-16 input to 8-60 pixel weave size
+    const sizeInput = settings.weaveSize ?? 8;
+    const weaveSize = Math.floor(8 + ((sizeInput - 4) / 12) * 52); // 8 to 60
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
@@ -5807,20 +6095,59 @@ const createWeavePatternEffect = (settings: Record<string, number>) => {
       for (let x = 0; x < width; x++) {
         const idx = (y * width + x) * 4;
 
-        // Create weave pattern
-        const xPattern = Math.floor(x / weaveSize) % 2;
-        const yPattern = Math.floor(y / weaveSize) % 2;
-        const isWarp = (xPattern + yPattern) % 2 === 0;
+        // Position within current weave cell
+        const cellX = x % weaveSize;
+        const cellY = y % weaveSize;
 
-        // Apply texture based on weave direction
-        const brightness = isWarp ? 1.1 : 0.9;
+        // Which thread are we on?
+        const xThread = Math.floor(x / weaveSize) % 2;
+        const yThread = Math.floor(y / weaveSize) % 2;
+        const isWarp = (xThread + yThread) % 2 === 0;
 
-        data[idx] = Math.min(255, tempData[idx] * brightness);
-        data[idx + 1] = Math.min(255, tempData[idx + 1] * brightness);
-        data[idx + 2] = Math.min(255, tempData[idx + 2] * brightness);
+        // Create thread edge darkening (simulate 3D thread overlap)
+        const edgeDist = Math.min(cellX, weaveSize - cellX - 1, cellY, weaveSize - cellY - 1);
+        const edgeFactor = Math.min(1, edgeDist / (weaveSize * 0.3));
 
-        // Add fabric texture
-        const noise = (Math.random() - 0.5) * 5;
+        // Thread highlight/shadow based on weave direction
+        let brightness: number;
+        if (isWarp) {
+          // Warp threads (horizontal) - lit from top-left
+          const highlight = (cellX / weaveSize) * 0.3 + 0.85;
+          brightness = highlight * edgeFactor + (1 - edgeFactor) * 0.5;
+        } else {
+          // Weft threads (vertical) - slightly darker, different angle
+          const shadow = 1 - (cellY / weaveSize) * 0.25;
+          brightness = shadow * 0.85 * edgeFactor + (1 - edgeFactor) * 0.4;
+        }
+
+        // Add thread texture lines
+        const threadLine = isWarp
+          ? Math.sin((cellY / weaveSize) * Math.PI * 4) * 0.1
+          : Math.sin((cellX / weaveSize) * Math.PI * 4) * 0.1;
+
+        brightness = brightness + threadLine;
+
+        // Apply color with fabric desaturation
+        const r = tempData[idx];
+        const g = tempData[idx + 1];
+        const b = tempData[idx + 2];
+
+        // Slight desaturation for fabric look
+        const gray = r * 0.299 + g * 0.587 + b * 0.114;
+        const saturation = 0.7;
+
+        data[idx] = Math.min(255, Math.max(0, (r * saturation + gray * (1 - saturation)) * brightness));
+        data[idx + 1] = Math.min(
+          255,
+          Math.max(0, (g * saturation + gray * (1 - saturation)) * brightness)
+        );
+        data[idx + 2] = Math.min(
+          255,
+          Math.max(0, (b * saturation + gray * (1 - saturation)) * brightness)
+        );
+
+        // Subtle fabric grain noise
+        const noise = (Math.random() - 0.5) * 8;
         data[idx] = Math.max(0, Math.min(255, data[idx] + noise));
         data[idx + 1] = Math.max(0, Math.min(255, data[idx + 1] + noise));
         data[idx + 2] = Math.max(0, Math.min(255, data[idx + 2] + noise));
@@ -5839,60 +6166,123 @@ const createBioluminescenceEffect = (settings: Record<string, number>) => {
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
 
-    // First pass: identify bright regions
+    // First pass: identify bright/saturated regions that will glow
     const glowMap = new Float32Array(width * height);
+    const colorMap: Array<{ r: number; g: number; b: number }> = new Array(width * height);
+
+    // Brightness threshold scales with intensity - lower intensity = more selective glow
+    const brightnessThreshold = 0.3 + (1 - glowIntensity) * 0.4; // 0.3 to 0.7
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const idx = (y * width + x) * 4;
-        const brightness =
-          (tempData[idx] * 0.299 + tempData[idx + 1] * 0.587 + tempData[idx + 2] * 0.114) / 255;
+        const r = tempData[idx];
+        const g = tempData[idx + 1];
+        const b = tempData[idx + 2];
+        const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
 
-        // Only bright areas glow
-        if (brightness > 0.6) {
-          glowMap[y * width + x] = (brightness - 0.6) * 2.5;
+        // Calculate color saturation - saturated colors also glow
+        const maxC = Math.max(r, g, b);
+        const minC = Math.min(r, g, b);
+        const saturation = maxC > 0 ? (maxC - minC) / maxC : 0;
+
+        // Areas glow based on brightness OR saturation
+        const glowFactor =
+          brightness > brightnessThreshold
+            ? (brightness - brightnessThreshold) / (1 - brightnessThreshold)
+            : 0;
+        const satGlow = saturation > 0.3 ? saturation * 0.5 : 0;
+
+        const combinedGlow = Math.min(1, glowFactor + satGlow);
+        glowMap[y * width + x] = combinedGlow;
+
+        // Store original color for the glow tint
+        colorMap[y * width + x] = { r, g, b };
+      }
+    }
+
+    // Darkness factor - more spread = darker background for more contrast
+    const darknessFactor = 0.05 + (1 - glowSpread) * 0.15; // 0.05 to 0.2
+
+    // Create dark background
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = tempData[i] * darknessFactor;
+      data[i + 1] = tempData[i + 1] * darknessFactor;
+      data[i + 2] = tempData[i + 2] * (darknessFactor + 0.03); // Slight blue tint
+    }
+
+    // Map spread 0-1 to actual radius 5-60 pixels
+    const glowRadius = Math.ceil(5 + glowSpread * 55);
+    // Use step size for performance on large radii
+    const step = glowRadius > 30 ? 2 : 1;
+
+    // Create a glow accumulator for additive blending
+    const glowAccum = new Float32Array(width * height * 3);
+
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const glowValue = glowMap[y * width + x];
+
+        if (glowValue > 0.1) {
+          const srcColor = colorMap[y * width + x];
+
+          // Create bioluminescent color shift - push towards cyan/blue-green
+          const glowR = srcColor.r * 0.3 + 20;
+          const glowG = srcColor.g * 0.8 + srcColor.b * 0.3 + 100;
+          const glowB = srcColor.b * 0.7 + srcColor.g * 0.4 + 80;
+
+          for (let dy = -glowRadius; dy <= glowRadius; dy += step) {
+            for (let dx = -glowRadius; dx <= glowRadius; dx += step) {
+              const ny = y + dy;
+              const nx = x + dx;
+
+              if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist <= glowRadius) {
+                  // Gaussian falloff
+                  const sigma = glowRadius * 0.4;
+                  const falloff = Math.exp(-(dist * dist) / (2 * sigma * sigma));
+                  const glowAmount = glowValue * falloff * glowIntensity * 2;
+
+                  const accIdx = (ny * width + nx) * 3;
+                  glowAccum[accIdx] += glowR * glowAmount;
+                  glowAccum[accIdx + 1] += glowG * glowAmount;
+                  glowAccum[accIdx + 2] += glowB * glowAmount;
+                }
+              }
+            }
+          }
         }
       }
     }
 
-    // Create dark background
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = tempData[i] * 0.1;
-      data[i + 1] = tempData[i + 1] * 0.1;
-      data[i + 2] = tempData[i + 2] * 0.15; // Slight blue tint
-    }
-
-    // Apply glow
-    const glowRadius = Math.ceil(glowSpread * 10);
-
+    // Apply accumulated glow
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const glowValue = glowMap[y * width + x];
+        const idx = (y * width + x) * 4;
+        const accIdx = (y * width + x) * 3;
 
-        if (glowValue > 0) {
-          for (let dy = -glowRadius; dy <= glowRadius; dy++) {
-            for (let dx = -glowRadius; dx <= glowRadius; dx++) {
-              const ny = Math.max(0, Math.min(height - 1, y + dy));
-              const nx = Math.max(0, Math.min(width - 1, x + dx));
-              const dist = Math.sqrt(dx * dx + dy * dy);
+        data[idx] = Math.min(255, data[idx] + glowAccum[accIdx]);
+        data[idx + 1] = Math.min(255, data[idx + 1] + glowAccum[accIdx + 1]);
+        data[idx + 2] = Math.min(255, data[idx + 2] + glowAccum[accIdx + 2]);
+      }
+    }
 
-              if (dist <= glowRadius) {
-                const falloff = Math.exp(-(dist * dist) / (glowRadius * glowRadius * 0.5));
-                const idx = (ny * width + nx) * 4;
+    // Add subtle pulsing particles effect at high intensity
+    if (glowIntensity > 0.6) {
+      const particleCount = Math.floor((glowIntensity - 0.6) * 500);
+      for (let i = 0; i < particleCount; i++) {
+        const px = Math.floor(Math.random() * width);
+        const py = Math.floor(Math.random() * height);
+        const glowVal = glowMap[py * width + px];
 
-                // Bioluminescent blue-green glow
-                data[idx] = Math.min(255, data[idx] + glowValue * falloff * glowIntensity * 100);
-                data[idx + 1] = Math.min(
-                  255,
-                  data[idx + 1] + glowValue * falloff * glowIntensity * 255
-                );
-                data[idx + 2] = Math.min(
-                  255,
-                  data[idx + 2] + glowValue * falloff * glowIntensity * 200
-                );
-              }
-            }
-          }
+        if (glowVal > 0.2) {
+          const idx = (py * width + px) * 4;
+          const sparkle = 50 + Math.random() * 100;
+          data[idx] = Math.min(255, data[idx] + sparkle * 0.3);
+          data[idx + 1] = Math.min(255, data[idx + 1] + sparkle);
+          data[idx + 2] = Math.min(255, data[idx + 2] + sparkle * 0.8);
         }
       }
     }

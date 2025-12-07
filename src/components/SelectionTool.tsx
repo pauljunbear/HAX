@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Stage, Layer, Rect, Ellipse, Line, Transformer } from 'react-konva';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Layer, Rect, Ellipse, Line, Transformer } from 'react-konva';
+import Konva from 'konva';
+import { magicWandSelect, getMaskOutline } from '@/lib/imageProcessing/magicWand';
 
-export type SelectionType = 'rectangle' | 'ellipse' | 'freehand' | null;
+export type SelectionType = 'rectangle' | 'ellipse' | 'freehand' | 'magicWand' | 'brushMask' | null;
 export type SelectionData = {
   type: SelectionType;
   points?: number[];  // For freehand
@@ -12,7 +14,16 @@ export type SelectionData = {
   width?: number;     // For rectangle, ellipse
   height?: number;    // For rectangle, ellipse
   id: string;
+  mask?: Uint8ClampedArray; // For magic wand selections
+  maskWidth?: number;
+  maskHeight?: number;
 };
+
+export interface MaskData {
+  mask: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
 
 interface SelectionToolProps {
   stageWidth: number;
@@ -24,25 +35,47 @@ interface SelectionToolProps {
   selectedId: string | null;
   onDeleteSelection: (id: string) => void;
   isActive: boolean;
+  // Magic wand props
+  tolerance?: number;
+  contiguous?: boolean;
+  getImageData?: () => ImageData | null;
+  imageOffset?: { x: number; y: number };
+  imageScale?: number;
+  // Brush mask props
+  brushSize?: number;
+  brushMode?: 'add' | 'subtract';
+  onMaskUpdate?: (mask: MaskData | null) => void;
+  currentMask?: MaskData | null;
 }
 
 const SelectionTool: React.FC<SelectionToolProps> = ({
-  stageWidth,
-  stageHeight,
   selectionType,
   onSelectionComplete,
   existingSelections,
   onSelectExisting,
   selectedId,
   onDeleteSelection,
-  isActive
+  isActive,
+  // Magic wand props
+  tolerance = 32,
+  contiguous = true,
+  getImageData,
+  imageOffset = { x: 0, y: 0 },
+  imageScale = 1,
+  // Brush mask props
+  brushSize = 20,
+  brushMode = 'add',
+  onMaskUpdate,
+  currentMask,
 }) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
   const [selection, setSelection] = useState<Partial<SelectionData> | null>(null);
   const [points, setPoints] = useState<number[]>([]);
-  const layerRef = useRef<any>(null);
-  const transformerRef = useRef<any>(null);
+  const [magicWandOutlines, setMagicWandOutlines] = useState<number[][]>([]);
+  const [brushPoints, setBrushPoints] = useState<number[]>([]);
+  const layerRef = useRef<Konva.Layer | null>(null);
+  const transformerRef = useRef<Konva.Transformer | null>(null);
   
   // Handle key events for deleting selections
   useEffect(() => {
@@ -79,96 +112,112 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
     }
   }, [selectedId, existingSelections]);
 
-  const handleMouseDown = (e: any) => {
-    if (!isActive || !selectionType) return;
+  // Handle magic wand click
+  const handleMagicWandClick = useCallback((stageX: number, stageY: number) => {
+    if (!getImageData) return;
     
-    // Clicked on stage
-    const pos = e.target.getStage().getPointerPosition();
-    
-    // If we clicked on an existing selection, don't start drawing
-    if (e.target !== e.target.getStage()) {
+    const imageData = getImageData();
+    if (!imageData) return;
+
+    // Convert stage coordinates to image coordinates
+    const imageX = Math.floor((stageX - imageOffset.x) / imageScale);
+    const imageY = Math.floor((stageY - imageOffset.y) / imageScale);
+
+    // Check if click is within image bounds
+    if (imageX < 0 || imageX >= imageData.width || imageY < 0 || imageY >= imageData.height) {
       return;
     }
 
-    setIsDrawing(true);
-    setStartPoint({ x: pos.x, y: pos.y });
+    // Perform magic wand selection
+    const result = magicWandSelect(imageData, imageX, imageY, tolerance, contiguous);
     
-    if (selectionType === 'freehand') {
-      setPoints([pos.x, pos.y]);
-    } else if (selectionType === 'rectangle' || selectionType === 'ellipse') {
-      setSelection({
-        type: selectionType,
-        x: pos.x,
-        y: pos.y,
-        width: 0,
-        height: 0
-      });
-    }
-  };
-
-  const handleMouseMove = (e: any) => {
-    if (!isDrawing || !isActive || !selectionType) return;
+    // Get outline for visualization
+    const outlines = getMaskOutline(result.mask, result.width, result.height);
     
-    const pos = e.target.getStage().getPointerPosition();
-    
-    if (selectionType === 'freehand') {
-      setPoints([...points, pos.x, pos.y]);
-    } else if (selectionType === 'rectangle' || selectionType === 'ellipse') {
-      setSelection({
-        ...selection,
-        width: pos.x - startPoint.x,
-        height: pos.y - startPoint.y,
-      });
-    }
-  };
-
-  const handleMouseUp = () => {
-    if (!isDrawing || !isActive || !selectionType) return;
-    
-    setIsDrawing(false);
-    
-    // Complete the selection
-    if (selectionType === 'freehand' && points.length >= 4) {
-      // Add a unique ID
-      const id = `selection-${Date.now()}`;
-      onSelectionComplete({ type: 'freehand', points, id });
-      setPoints([]);
-    } else if ((selectionType === 'rectangle' || selectionType === 'ellipse') && selection) {
-      // Only create selection if it has a minimum size
-      if (Math.abs(selection.width || 0) > 10 && Math.abs(selection.height || 0) > 10) {
-        // Normalize negative width/height
-        let x = selection.x || 0;
-        let y = selection.y || 0;
-        let width = selection.width || 0;
-        let height = selection.height || 0;
-        
-        if (width < 0) {
-          x += width;
-          width = Math.abs(width);
-        }
-        
-        if (height < 0) {
-          y += height;
-          height = Math.abs(height);
-        }
-        
-        // Add a unique ID
-        const id = `selection-${Date.now()}`;
-        onSelectionComplete({ 
-          type: selectionType, 
-          x, 
-          y, 
-          width, 
-          height, 
-          id 
-        });
+    // Convert outline coordinates back to stage coordinates
+    const scaledOutlines = outlines.map(outline => {
+      const scaled: number[] = [];
+      for (let i = 0; i < outline.length; i += 2) {
+        scaled.push(outline[i] * imageScale + imageOffset.x);
+        scaled.push(outline[i + 1] * imageScale + imageOffset.y);
       }
-      
-      setSelection(null);
+      return scaled;
+    });
+    
+    setMagicWandOutlines(scaledOutlines);
+
+    // Create selection data with mask
+    const id = `selection-${Date.now()}`;
+    const selectionData: SelectionData = {
+      type: 'magicWand',
+      id,
+      mask: result.mask,
+      maskWidth: result.width,
+      maskHeight: result.height,
+      x: result.bounds.minX * imageScale + imageOffset.x,
+      y: result.bounds.minY * imageScale + imageOffset.y,
+      width: (result.bounds.maxX - result.bounds.minX + 1) * imageScale,
+      height: (result.bounds.maxY - result.bounds.minY + 1) * imageScale,
+    };
+
+    onSelectionComplete(selectionData);
+    
+    // Also update the mask for export
+    if (onMaskUpdate) {
+      onMaskUpdate({
+        mask: result.mask,
+        width: result.width,
+        height: result.height,
+      });
     }
-  };
+  }, [getImageData, imageOffset, imageScale, tolerance, contiguous, onSelectionComplete, onMaskUpdate]);
+
+  // Handle brush mask stroke
+  const handleBrushStroke = useCallback((x: number, y: number) => {
+    if (!getImageData || !onMaskUpdate) return;
+
+    const imageData = getImageData();
+    if (!imageData) return;
+
+    // Convert to image coordinates
+    const imageX = Math.floor((x - imageOffset.x) / imageScale);
+    const imageY = Math.floor((y - imageOffset.y) / imageScale);
+
+    // Initialize or get current mask
+    let mask = currentMask?.mask;
+    if (!mask || currentMask?.width !== imageData.width || currentMask?.height !== imageData.height) {
+      mask = new Uint8ClampedArray(imageData.width * imageData.height);
+    } else {
+      mask = new Uint8ClampedArray(mask);
+    }
+
+    // Calculate brush radius in image coordinates
+    const brushRadiusImg = Math.max(1, Math.floor(brushSize / (2 * imageScale)));
+
+    // Draw circle on mask
+    for (let dy = -brushRadiusImg; dy <= brushRadiusImg; dy++) {
+      for (let dx = -brushRadiusImg; dx <= brushRadiusImg; dx++) {
+        const px = imageX + dx;
+        const py = imageY + dy;
+        
+        if (px >= 0 && px < imageData.width && py >= 0 && py < imageData.height) {
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist <= brushRadiusImg) {
+            const idx = py * imageData.width + px;
+            mask[idx] = brushMode === 'add' ? 255 : 0;
+          }
+        }
+      }
+    }
+
+    onMaskUpdate({
+      mask,
+      width: imageData.width,
+      height: imageData.height,
+    });
+  }, [getImageData, imageOffset, imageScale, brushSize, brushMode, currentMask, onMaskUpdate]);
   
-  const handleTransformEnd = (e: any) => {
+  const handleTransformEnd = (e: Konva.KonvaEventObject<Event>) => {
     // Get the transformed node
     const node = e.target;
     const id = node.id();
@@ -305,6 +354,47 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
           stroke="#00FFFF"
           strokeWidth={2}
           closed={false}
+        />
+      )}
+      
+      {/* Magic wand selection outlines */}
+      {magicWandOutlines.map((outline, index) => (
+        <Line
+          key={`magicwand-outline-${index}`}
+          points={outline}
+          stroke="#00FFFF"
+          strokeWidth={2}
+          dash={[5, 5]}
+          closed={true}
+          listening={false}
+        />
+      ))}
+      
+      {/* Brush stroke preview */}
+      {isDrawing && selectionType === 'brushMask' && brushPoints.length >= 2 && (
+        <Line
+          points={brushPoints}
+          stroke={brushMode === 'add' ? '#00FF00' : '#FF0000'}
+          strokeWidth={brushSize}
+          lineCap="round"
+          lineJoin="round"
+          opacity={0.5}
+          listening={false}
+        />
+      )}
+      
+      {/* Brush cursor indicator */}
+      {selectionType === 'brushMask' && !isDrawing && (
+        <Ellipse
+          x={0}
+          y={0}
+          radiusX={brushSize / 2}
+          radiusY={brushSize / 2}
+          stroke={brushMode === 'add' ? '#00FF00' : '#FF0000'}
+          strokeWidth={1}
+          dash={[3, 3]}
+          listening={false}
+          visible={false}
         />
       )}
       
