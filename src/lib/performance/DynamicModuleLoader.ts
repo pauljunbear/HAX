@@ -89,17 +89,6 @@ export class DynamicModuleLoader {
       },
     ],
 
-    // Particle systems
-    [
-      'tsparticles',
-      {
-        id: 'tsparticles',
-        loader: () => import('tsparticles-engine'),
-        size: 180, // ~180KB
-        preload: false,
-      },
-    ],
-
     // Advanced export formats
     [
       'gif-encoder',

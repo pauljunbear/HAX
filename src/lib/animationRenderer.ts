@@ -2,12 +2,7 @@ import GIF from 'gif.js';
 import { applyEffect } from './effects';
 import { AnimationConfig } from './animationConfig';
 import Konva from 'konva';
-import {
-  VideoExporter,
-  VideoExportOptions,
-  downloadVideoBlob,
-  estimateVideoSize,
-} from './export/videoExporter';
+import { VideoExporter, downloadVideoBlob, estimateVideoSize } from './export/videoExporter';
 import {
   GifOptimizer,
   GifOptimizationOptions,
@@ -22,15 +17,6 @@ export interface AnimationOptions {
   width: number;
   height: number;
   onProgress?: (progress: number) => void;
-  // Overlay options
-  overlayProps?: {
-    effectType: 'stars' | 'bubbles' | 'network' | 'snow' | 'confetti' | 'fireflies';
-    opacity: number;
-    particleCount: number;
-    color: string;
-    speed: number;
-    interactive: boolean;
-  };
 }
 
 export interface AnimationFrame {
@@ -53,18 +39,6 @@ export async function renderAnimationFrames(
   animationConfig: AnimationConfig,
   options: AnimationOptions
 ): Promise<AnimationFrame[]> {
-  // Check if this is a generative overlay effect
-  const isOverlayEffect = effectId.startsWith('generative');
-
-  if (isOverlayEffect) {
-    return renderOverlayAnimationFrames(
-      baseImage,
-      effectId,
-      baseSettings,
-      animationConfig,
-      options
-    );
-  }
   const frames: AnimationFrame[] = [];
   const frameCount = Math.floor((options.duration / 1000) * options.frameRate);
   const frameDelay = 1000 / options.frameRate;
@@ -131,8 +105,9 @@ export async function renderAnimationFrames(
         if (filterParams) {
           console.log(`Frame ${i}: Applying filter parameters:`, filterParams);
           for (const [key, value] of Object.entries(filterParams)) {
-            if (typeof (konvaImage as any)[key] === 'function') {
-              (konvaImage as any)[key](value);
+            const konvaNode = konvaImage as unknown as Record<string, unknown>;
+            if (typeof konvaNode[key] === 'function') {
+              (konvaNode[key] as (v: unknown) => void)(value);
             }
           }
         }
@@ -171,20 +146,6 @@ export async function renderAnimationFrames(
 
         if (!hasContent) {
           console.warn(`Frame ${i}: Generated frame appears to be empty/black`);
-        }
-
-        // TODO: Add overlay rendering for animated exports
-        // Currently overlays are not captured in animated exports due to complexity
-        // of frame-by-frame particle system rendering. Future enhancement needed.
-        if (options.overlayProps) {
-          // For now, add a simple placeholder overlay effect
-          await renderSimpleOverlayEffect(
-            ctx,
-            options.overlayProps,
-            progress,
-            options.width,
-            options.height
-          );
         }
 
         frames.push({
@@ -264,7 +225,7 @@ export async function exportAsGif(
         `Creating optimized GIF with quality ${optimizedSettings.quality}, estimated size: ${optimizedSettings.estimatedSizeKB}KB`
       );
 
-      // @ts-ignore - gif.js types are not perfect
+      // @ts-expect-error - gif.js types are not perfect
       const gif = new GIF({
         quality: optimizedSettings.quality,
         workers: Math.min(optimizedSettings.workers, 4), // Cap workers for browser compatibility
@@ -300,7 +261,7 @@ export async function exportAsGif(
         resolve(blob);
       });
 
-      gif.on('error', (error: any) => {
+      gif.on('error', (error: Error) => {
         console.error('GIF error:', error);
         const err = new Error(error.message || 'GIF generation failed');
         if (options.onError) {
@@ -470,210 +431,6 @@ export function downloadVideo(
   downloadVideoBlob(blob, filename);
 }
 
-// Simple overlay effect renderer for animations (placeholder implementation)
-async function renderSimpleOverlayEffect(
-  ctx: CanvasRenderingContext2D,
-  overlayProps: NonNullable<AnimationOptions['overlayProps']>,
-  progress: number,
-  width: number,
-  height: number
-) {
-  ctx.save();
-  ctx.globalAlpha = overlayProps.opacity;
-
-  // Parse color
-  const color = overlayProps.color;
-  const particleCount = Math.floor(overlayProps.particleCount * 0.3); // Reduced for performance
-
-  // Set color and style
-  ctx.fillStyle = color;
-  ctx.strokeStyle = color;
-
-  // Create deterministic but varied particles based on frame progress
-  const seed = Math.floor(progress * 1000);
-
-  for (let i = 0; i < particleCount; i++) {
-    // Pseudo-random values based on particle index and animation progress
-    const particleSeed = seed + i * 123;
-    const x = (Math.sin(particleSeed * 0.01) * 0.5 + 0.5) * width;
-    const y = (Math.cos(particleSeed * 0.007) * 0.5 + 0.5) * height;
-
-    // Animation offset based on progress
-    const animOffset = progress * overlayProps.speed * 100;
-
-    switch (overlayProps.effectType) {
-      case 'stars':
-        // Draw simple star points
-        const starSize = 2 + Math.sin(particleSeed * 0.1 + animOffset * 0.05) * 1;
-        ctx.fillRect(x - starSize / 2, y - starSize / 2, starSize, starSize);
-        // Add twinkle effect with cross pattern
-        if (Math.sin(animOffset * 0.1 + particleSeed) > 0.5) {
-          ctx.fillRect(x - starSize, y - 0.5, starSize * 2, 1);
-          ctx.fillRect(x - 0.5, y - starSize, 1, starSize * 2);
-        }
-        break;
-
-      case 'bubbles':
-        // Draw circles moving upward
-        const bubbleY = (y + animOffset * 2) % height;
-        const bubbleSize = 3 + Math.sin(particleSeed * 0.1) * 2;
-        ctx.globalAlpha =
-          overlayProps.opacity * (0.3 + Math.sin(animOffset * 0.1 + particleSeed) * 0.3);
-        ctx.beginPath();
-        ctx.arc(x, bubbleY, bubbleSize, 0, Math.PI * 2);
-        ctx.stroke();
-        break;
-
-      case 'network':
-        // Draw connected dots
-        const nodeSize = 2;
-        ctx.fillRect(x - nodeSize / 2, y - nodeSize / 2, nodeSize, nodeSize);
-        // Draw lines to nearby particles (simplified)
-        if (i % 3 === 0 && i < particleCount - 1) {
-          const nextX = (Math.sin((seed + (i + 1) * 123) * 0.01) * 0.5 + 0.5) * width;
-          const nextY = (Math.cos((seed + (i + 1) * 123) * 0.007) * 0.5 + 0.5) * height;
-          const distance = Math.sqrt((nextX - x) ** 2 + (nextY - y) ** 2);
-          if (distance < 100) {
-            ctx.globalAlpha = overlayProps.opacity * 0.3;
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(nextX, nextY);
-            ctx.stroke();
-          }
-        }
-        break;
-
-      case 'snow':
-        // Draw falling snowflakes
-        const snowY = (y + animOffset * 3) % (height + 20);
-        const snowSize = 1 + Math.sin(particleSeed * 0.1) * 1.5;
-        const snowX = x + Math.sin(animOffset * 0.02 + particleSeed) * 10; // Wobble
-        ctx.fillRect(snowX - snowSize / 2, snowY - snowSize / 2, snowSize, snowSize);
-        break;
-
-      case 'confetti':
-        // Draw colorful falling shapes
-        const confettiY = (y + animOffset * 4) % (height + 20);
-        const rotation = animOffset * 0.1 + particleSeed;
-        ctx.save();
-        ctx.translate(x, confettiY);
-        ctx.rotate(rotation);
-        ctx.fillStyle = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'][i % 6];
-        if (i % 3 === 0) {
-          // Rectangle
-          ctx.fillRect(-2, -2, 4, 4);
-        } else {
-          // Triangle
-          ctx.beginPath();
-          ctx.moveTo(0, -3);
-          ctx.lineTo(-3, 3);
-          ctx.lineTo(3, 3);
-          ctx.closePath();
-          ctx.fill();
-        }
-        ctx.restore();
-        break;
-
-      case 'fireflies':
-        // Draw glowing dots with varying opacity
-        const glowIntensity = 0.5 + Math.sin(animOffset * 0.2 + particleSeed * 0.5) * 0.5;
-        ctx.globalAlpha = overlayProps.opacity * glowIntensity;
-        ctx.fillStyle = '#ffff88';
-        const fireflySize = 2 + glowIntensity;
-        ctx.beginPath();
-        ctx.arc(x, y, fireflySize, 0, Math.PI * 2);
-        ctx.fill();
-        // Add glow effect
-        ctx.globalAlpha = overlayProps.opacity * glowIntensity * 0.3;
-        ctx.beginPath();
-        ctx.arc(x, y, fireflySize * 2, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-    }
-  }
-
-  ctx.restore();
-}
-
-// Dedicated function for rendering overlay-only animations
-async function renderOverlayAnimationFrames(
-  baseImage: HTMLImageElement,
-  effectId: string,
-  baseSettings: Record<string, number>,
-  animationConfig: AnimationConfig,
-  options: AnimationOptions
-): Promise<AnimationFrame[]> {
-  const frames: AnimationFrame[] = [];
-  const frameCount = Math.floor((options.duration / 1000) * options.frameRate);
-  const frameDelay = 1000 / options.frameRate;
-
-  // Get the preset (use first one for now)
-  const preset = animationConfig.animationPresets?.[0];
-  if (!preset) {
-    throw new Error('No animation preset available for overlay effect');
-  }
-
-  // Extract overlay type from effect ID
-  const overlayType = effectId.replace('generative', '').toLowerCase() as
-    | 'stars'
-    | 'bubbles'
-    | 'network'
-    | 'snow'
-    | 'confetti'
-    | 'fireflies';
-
-  for (let i = 0; i < frameCount; i++) {
-    const progress = i / (frameCount - 1);
-
-    // Calculate animated settings
-    const animatedSettings = { ...baseSettings };
-    for (const [param, curve] of Object.entries(preset.parameterCurves)) {
-      animatedSettings[param] = curve(progress);
-    }
-
-    // Create frame canvas
-    const frameCanvas = document.createElement('canvas');
-    frameCanvas.width = options.width;
-    frameCanvas.height = options.height;
-    const ctx = frameCanvas.getContext('2d');
-
-    if (ctx) {
-      // Clear canvas to transparent (remove black background)
-      ctx.clearRect(0, 0, options.width, options.height);
-
-      // Draw the base image
-      ctx.drawImage(baseImage, 0, 0, options.width, options.height);
-
-      // Create overlay props from animated settings
-      const overlayProps = {
-        effectType: overlayType,
-        opacity: baseSettings.opacity || 0.6, // Use layer opacity, not animated
-        particleCount: baseSettings.particleCount || 50,
-        color: baseSettings.color
-          ? `#${Math.floor(baseSettings.color).toString(16).padStart(6, '0')}`
-          : '#ffffff',
-        speed: animatedSettings.speed || baseSettings.speed || 1, // Use animated speed
-        interactive: (baseSettings.interactive || 1) > 0.5,
-      };
-
-      // Render the overlay effect
-      await renderSimpleOverlayEffect(ctx, overlayProps, progress, options.width, options.height);
-
-      frames.push({
-        canvas: frameCanvas,
-        delay: frameDelay,
-      });
-    }
-
-    // Report progress
-    if (options.onProgress) {
-      options.onProgress((i + 1) / frameCount);
-    }
-  }
-
-  return frames;
-}
-
 // Render animation frames with multiple effect layers
 export async function renderMultiLayerAnimationFrames(
   baseImage: HTMLImageElement,
@@ -718,8 +475,8 @@ export async function renderMultiLayerAnimationFrames(
       layer.add(konvaImage);
 
       // Apply all effect layers in sequence
-      const filters: any[] = [];
-      const combinedFilterParams: Record<string, any> = {};
+      const filters: ((imageData: ImageData) => void)[] = [];
+      const combinedFilterParams: Record<string, unknown> = {};
 
       for (const effectLayer of effectLayers) {
         const { effectId, settings, animationConfig } = effectLayer;
@@ -772,8 +529,9 @@ export async function renderMultiLayerAnimationFrames(
 
         // Set combined filter parameters
         for (const [key, value] of Object.entries(combinedFilterParams)) {
-          if (typeof (konvaImage as any)[key] === 'function') {
-            (konvaImage as any)[key](value);
+          const konvaNode = konvaImage as unknown as Record<string, unknown>;
+          if (typeof konvaNode[key] === 'function') {
+            (konvaNode[key] as (v: unknown) => void)(value);
           }
         }
       }

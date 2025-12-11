@@ -50,7 +50,7 @@ export const animatedEffects: Record<string, AnimationConfig> = {
             // Sine wave for pulsing effect
             return 0.3 + Math.sin(progress * Math.PI * 4) * 0.2;
           },
-          distortion: progress => {
+          distortion: () => {
             // Random glitches
             return Math.random() * 0.5 + 0.1;
           },
@@ -88,7 +88,7 @@ export const animatedEffects: Record<string, AnimationConfig> = {
         duration: 2000,
         frameRate: 24,
         parameterCurves: {
-          amount: progress => Math.random() * 20,
+          amount: () => Math.random() * 20,
           frequency: progress => 3 + Math.sin(progress * Math.PI * 2) * 2,
         },
       },
@@ -150,109 +150,6 @@ export const animatedEffects: Record<string, AnimationConfig> = {
             // Rotate through segment counts
             return 3 + (Math.floor(progress * 8) % 8);
           },
-        },
-      },
-    ],
-  },
-
-  // Generative Overlay Effects
-  generativeStars: {
-    supportsAnimation: true,
-    defaultDuration: 3000,
-    defaultFrameRate: 30,
-    animatedParameters: ['speed'],
-    animationPresets: [
-      {
-        name: 'Twinkling Stars',
-        duration: 3000,
-        frameRate: 30,
-        parameterCurves: {
-          speed: progress => 1 + Math.sin(progress * Math.PI * 2) * 0.5, // Vary twinkle speed
-        },
-      },
-    ],
-  },
-
-  generativeBubbles: {
-    supportsAnimation: true,
-    defaultDuration: 4000,
-    defaultFrameRate: 24,
-    animatedParameters: ['speed'],
-    animationPresets: [
-      {
-        name: 'Rising Bubbles',
-        duration: 4000,
-        frameRate: 24,
-        parameterCurves: {
-          speed: progress => 1.5 + Math.sin(progress * Math.PI) * 0.5, // Vary float speed
-        },
-      },
-    ],
-  },
-
-  generativeNetwork: {
-    supportsAnimation: true,
-    defaultDuration: 3000,
-    defaultFrameRate: 30,
-    animatedParameters: ['speed'],
-    animationPresets: [
-      {
-        name: 'Network Pulse',
-        duration: 3000,
-        frameRate: 30,
-        parameterCurves: {
-          speed: progress => 1 + Math.sin(progress * Math.PI * 4) * 0.3, // Pulsing movement
-        },
-      },
-    ],
-  },
-
-  generativeSnow: {
-    supportsAnimation: true,
-    defaultDuration: 5000,
-    defaultFrameRate: 24,
-    animatedParameters: ['speed'],
-    animationPresets: [
-      {
-        name: 'Falling Snow',
-        duration: 5000,
-        frameRate: 24,
-        parameterCurves: {
-          speed: progress => 2 + Math.sin(progress * Math.PI * 2) * 0.5, // Vary fall speed
-        },
-      },
-    ],
-  },
-
-  generativeConfetti: {
-    supportsAnimation: true,
-    defaultDuration: 3000,
-    defaultFrameRate: 30,
-    animatedParameters: ['speed'],
-    animationPresets: [
-      {
-        name: 'Confetti Shower',
-        duration: 3000,
-        frameRate: 30,
-        parameterCurves: {
-          speed: progress => 3 + Math.sin(progress * Math.PI) * 1, // Burst and settle
-        },
-      },
-    ],
-  },
-
-  generativeFireflies: {
-    supportsAnimation: true,
-    defaultDuration: 4000,
-    defaultFrameRate: 30,
-    animatedParameters: ['speed'],
-    animationPresets: [
-      {
-        name: 'Dancing Fireflies',
-        duration: 4000,
-        frameRate: 30,
-        parameterCurves: {
-          speed: progress => 0.8 + Math.sin(progress * Math.PI * 3) * 0.4, // Organic movement
         },
       },
     ],
@@ -359,7 +256,7 @@ export const animatedEffects: Record<string, AnimationConfig> = {
         duration: 3000,
         frameRate: 30,
         parameterCurves: {
-          cReal: progress => -0.7269,
+          cReal: () => -0.7269,
           cImag: progress => 0.1889 + Math.sin(progress * Math.PI * 4) * 0.05,
           zoom: progress => 1 + Math.sin(progress * Math.PI * 2) * 0.8,
         },
@@ -486,7 +383,7 @@ export const animatedEffects: Record<string, AnimationConfig> = {
         duration: 5000,
         frameRate: 30,
         parameterCurves: {
-          segments: progress => 8,
+          segments: () => 8,
           twist: progress => progress * 3 + Math.sin(progress * Math.PI * 6) * 0.5,
           zoom: progress => 0.8 + Math.abs(Math.sin(progress * Math.PI * 2)) * 1.5,
           time: progress => progress * 15,
@@ -548,9 +445,9 @@ export const animatedEffects: Record<string, AnimationConfig> = {
         duration: 6000,
         frameRate: 24,
         parameterCurves: {
-          feedRate: progress => 0.055,
+          feedRate: () => 0.055,
           killRate: progress => 0.045 + Math.sin(progress * Math.PI * 4) * 0.02,
-          iterations: progress => 100,
+          iterations: () => 100,
         },
       },
       {

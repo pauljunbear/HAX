@@ -706,18 +706,6 @@ export const applyEffect = async (
       case 'fractalMirror':
         return [createFractalMirrorEffect(settings), {}];
 
-      // Generative Overlay Effects - return overlay marker for orchestrator
-      case 'generativeStars':
-      case 'generativeBubbles':
-      case 'generativeNetwork':
-      case 'generativeSnow':
-      case 'generativeConfetti':
-      case 'generativeFireflies': {
-        const overlayType = (effectName.replace('generative', '') || '').toLowerCase();
-        const overlayResult: GenerativeOverlayResult = { overlayType, settings };
-        return [null, overlayResult];
-      }
-
       // 3D Effects - DISABLED due to poor user experience
       case 'threeDPlane':
       case 'threeDCube':
@@ -1242,16 +1230,22 @@ const createHalftoneEffect = (settings: Record<string, number>) => {
     const ctx = tempCanvas.getContext('2d');
     if (!ctx) return;
 
-    // Cream paper background instead of pure white
-    ctx.fillStyle = '#faf8f5';
-    ctx.fillRect(0, 0, width, height);
+    // Keep canvas transparent - don't fill with background color
+    // This preserves PNG transparency
 
     const cosAngle = Math.cos(angle);
     const sinAngle = Math.sin(angle);
 
-    // Store original data for color sampling
+    // Store original data for color sampling and alpha preservation
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
+
+    // Create an alpha mask canvas to track which pixels should be visible
+    const alphaCanvas = document.createElement('canvas');
+    alphaCanvas.width = width;
+    alphaCanvas.height = height;
+    const alphaCtx = alphaCanvas.getContext('2d');
+    if (!alphaCtx) return;
 
     for (let y = 0; y < height; y += spacing) {
       for (let x = 0; x < width; x += spacing) {
@@ -1271,26 +1265,72 @@ const createHalftoneEffect = (settings: Record<string, number>) => {
         const r = tempData[originalIndex];
         const g = tempData[originalIndex + 1];
         const b = tempData[originalIndex + 2];
-        const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+        const alpha = tempData[originalIndex + 3];
 
+        // Skip fully transparent pixels - preserve PNG transparency
+        if (alpha === 0) continue;
+
+        const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
         const radius = (1 - brightness) * dotSize;
 
         if (radius > 0.8) {
           ctx.beginPath();
           ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI, false);
           // Ink color - very dark blue-black for newspaper look
-          ctx.fillStyle = '#0a0a12';
+          // Use the original alpha value to preserve transparency
+          ctx.fillStyle = `rgba(10, 10, 18, ${alpha / 255})`;
           ctx.fill();
         }
+
+        // Draw cream/paper color in the alpha mask for visible areas
+        // This creates the paper background only where the image exists
+        alphaCtx.beginPath();
+        alphaCtx.arc(centerX, centerY, spacing / 2, 0, 2 * Math.PI, false);
+        alphaCtx.fillStyle = `rgba(250, 248, 245, ${alpha / 255})`;
+        alphaCtx.fill();
       }
     }
 
+    // Get the paper background data
+    const paperData = alphaCtx.getImageData(0, 0, width, height).data;
     const halftoneData = ctx.getImageData(0, 0, width, height).data;
+
     for (let i = 0; i < data.length; i += 4) {
-      data[i] = halftoneData[i];
-      data[i + 1] = halftoneData[i + 1];
-      data[i + 2] = halftoneData[i + 2];
-      data[i + 3] = halftoneData[i + 3];
+      const originalAlpha = tempData[i + 3];
+
+      // Only apply effect where original image had content
+      if (originalAlpha > 0) {
+        // Blend paper background with halftone dots
+        const paperR = paperData[i];
+        const paperG = paperData[i + 1];
+        const paperB = paperData[i + 2];
+        const paperA = paperData[i + 3];
+
+        const dotR = halftoneData[i];
+        const dotG = halftoneData[i + 1];
+        const dotB = halftoneData[i + 2];
+        const dotA = halftoneData[i + 3];
+
+        // If there's a dot, use dot color, otherwise use paper color
+        if (dotA > 0) {
+          data[i] = dotR;
+          data[i + 1] = dotG;
+          data[i + 2] = dotB;
+          data[i + 3] = originalAlpha;
+        } else if (paperA > 0) {
+          data[i] = paperR;
+          data[i + 1] = paperG;
+          data[i + 2] = paperB;
+          data[i + 3] = originalAlpha;
+        } else {
+          // Fallback to cream paper color for visible pixels
+          data[i] = 250;
+          data[i + 1] = 248;
+          data[i + 2] = 245;
+          data[i + 3] = originalAlpha;
+        }
+      }
+      // Transparent pixels (originalAlpha === 0) are left unchanged
     }
   };
 };
@@ -2275,9 +2315,7 @@ const createAsciiArtEffect = (settings: Record<string, number>) => {
           for (let sx = 0; sx < cellSize && x + sx < width; sx++) {
             const index = ((y + sy) * width + (x + sx)) * 4;
             const brightness =
-              0.299 * tempData[index] +
-              0.587 * tempData[index + 1] +
-              0.114 * tempData[index + 2];
+              0.299 * tempData[index] + 0.587 * tempData[index + 1] + 0.114 * tempData[index + 2];
             sumBrightness += brightness;
             count++;
           }
@@ -2681,115 +2719,6 @@ export const getEffectSettings = (effectId: string | null): EffectSetting[] => {
 };
 // Define all available effects with their settings
 export const effectsConfig: Record<string, EffectConfig> = {
-  // Generative overlays for Particles orchestrator
-  generativeStars: {
-    label: 'Stars',
-    category: 'Generative Overlay',
-    settings: [
-      { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
-      { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
-      { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 1, step: 0.1 },
-      {
-        id: 'color',
-        label: 'Color',
-        min: 0x000000,
-        max: 0xffffff,
-        defaultValue: 0xffffff,
-        step: 1,
-      },
-      { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
-    ],
-  },
-  generativeBubbles: {
-    label: 'Bubbles',
-    category: 'Generative Overlay',
-    settings: [
-      { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
-      { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
-      { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 1.5, step: 0.1 },
-      {
-        id: 'color',
-        label: 'Color',
-        min: 0x000000,
-        max: 0xffffff,
-        defaultValue: 0xffffff,
-        step: 1,
-      },
-      { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
-    ],
-  },
-  generativeNetwork: {
-    label: 'Network',
-    category: 'Generative Overlay',
-    settings: [
-      { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
-      { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
-      { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 1, step: 0.1 },
-      {
-        id: 'color',
-        label: 'Color',
-        min: 0x000000,
-        max: 0xffffff,
-        defaultValue: 0xffffff,
-        step: 1,
-      },
-      { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
-    ],
-  },
-  generativeSnow: {
-    label: 'Snow',
-    category: 'Generative Overlay',
-    settings: [
-      { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
-      { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
-      { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 2, step: 0.1 },
-      {
-        id: 'color',
-        label: 'Color',
-        min: 0x000000,
-        max: 0xffffff,
-        defaultValue: 0xffffff,
-        step: 1,
-      },
-      { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
-    ],
-  },
-  generativeConfetti: {
-    label: 'Confetti',
-    category: 'Generative Overlay',
-    settings: [
-      { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
-      { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
-      { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 3, step: 0.1 },
-      {
-        id: 'color',
-        label: 'Color',
-        min: 0x000000,
-        max: 0xffffff,
-        defaultValue: 0xffffff,
-        step: 1,
-      },
-      { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
-    ],
-  },
-  generativeFireflies: {
-    label: 'Fireflies',
-    category: 'Generative Overlay',
-    settings: [
-      { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
-      { id: 'particleCount', label: 'Particles', min: 10, max: 100, defaultValue: 50, step: 5 },
-      { id: 'speed', label: 'Speed', min: 0.5, max: 3, defaultValue: 1, step: 0.1 },
-      {
-        id: 'color',
-        label: 'Color',
-        min: 0x000000,
-        max: 0xffffff,
-        defaultValue: 0xffffff,
-        step: 1,
-      },
-      { id: 'interactive', label: 'Interactive', min: 0, max: 1, defaultValue: 1, step: 1 },
-    ],
-  },
   // Basic Adjustments
   brightness: {
     label: 'Brightness',
@@ -3398,9 +3327,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
   asciiArt: {
     label: 'ASCII Art',
     category: 'Artistic',
-    settings: [
-      { id: 'scale', label: 'Cell Size', min: 1, max: 10, defaultValue: 3, step: 1 },
-    ],
+    settings: [{ id: 'scale', label: 'Cell Size', min: 1, max: 10, defaultValue: 3, step: 1 }],
   },
 
   // 4. Edge Detection (Sobel)
@@ -4070,14 +3997,8 @@ const createCircuitBoardEffect = (settings: Record<string, number>) => {
     }
     // --- End Edge Detection ---
 
-    // Set background in outputData
-    const bgColor = [5, 10, 5, 255]; // Dark green background
-    for (let i = 0; i < outputData.length; i += 4) {
-      outputData[i] = bgColor[0];
-      outputData[i + 1] = bgColor[1];
-      outputData[i + 2] = bgColor[2];
-      outputData[i + 3] = bgColor[3];
-    }
+    // Copy original image data to outputData (preserves background/transparency)
+    outputData.set(data);
 
     // Draw circuit lines with glow onto outputData
     const traceColor = [100, 255, 100, 255]; // Light green for traces (RGBA)
@@ -5542,18 +5463,6 @@ export const effectCategories = {
     description: 'Mathematical and fractal patterns',
     effects: ['mandelbrot', 'juliaSet', 'voronoi'],
   },
-  'Generative Overlay': {
-    icon: '✨',
-    description: 'Animated particle overlays',
-    effects: [
-      'generativeStars',
-      'generativeBubbles',
-      'generativeNetwork',
-      'generativeSnow',
-      'generativeConfetti',
-      'generativeFireflies',
-    ],
-  },
   // 3D Effects category intentionally omitted in UI categories for now
 };
 
@@ -6063,16 +5972,19 @@ const createTopographicContoursEffect = (settings: Record<string, number>) => {
       }
 
       if (isContour) {
+        // Draw contour lines in dark color
         tempData[i] = 0;
         tempData[i + 1] = 0;
         tempData[i + 2] = 0;
-        tempData[i + 3] = 255;
+        tempData[i + 3] = data[i + 3]; // Preserve original alpha
       } else {
-        const color = 255 - level * 200;
-        tempData[i] = color;
-        tempData[i + 1] = color - 20;
-        tempData[i + 2] = color - 40;
-        tempData[i + 3] = 255;
+        // Preserve original image colors with subtle tint based on elevation
+        const tintStrength = 0.3;
+        const elevationTint = level * 40; // Subtle warm tint based on elevation
+        tempData[i] = Math.min(255, data[i] + elevationTint * tintStrength);
+        tempData[i + 1] = Math.min(255, data[i + 1] + elevationTint * 0.5 * tintStrength);
+        tempData[i + 2] = data[i + 2];
+        tempData[i + 3] = data[i + 3]; // Preserve original alpha
       }
     }
 
@@ -6136,7 +6048,10 @@ const createWeavePatternEffect = (settings: Record<string, number>) => {
         const gray = r * 0.299 + g * 0.587 + b * 0.114;
         const saturation = 0.7;
 
-        data[idx] = Math.min(255, Math.max(0, (r * saturation + gray * (1 - saturation)) * brightness));
+        data[idx] = Math.min(
+          255,
+          Math.max(0, (r * saturation + gray * (1 - saturation)) * brightness)
+        );
         data[idx + 1] = Math.min(
           255,
           Math.max(0, (g * saturation + gray * (1 - saturation)) * brightness)
