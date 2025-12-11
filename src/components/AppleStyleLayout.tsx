@@ -5,7 +5,6 @@ import { Sun, Moon, Menu } from 'lucide-react';
 import AppleEffectsBrowser from './AppleEffectsBrowser';
 import AppleControlsPanel from './AppleControlsPanel';
 import { useTheme } from '@/lib/themes';
-import { SelectionType, MaskData } from './SelectionTool';
 
 interface EffectLayer {
   id: string;
@@ -31,22 +30,6 @@ interface AppleStyleLayoutProps {
   onSetActiveLayer?: (layerId: string) => void;
   onToggleLayerVisibility?: (layerId: string) => void;
   onExport?: (format: string) => void;
-  // Selection/Mask props
-  selectionType?: SelectionType;
-  onSelectionTypeChange?: (type: SelectionType) => void;
-  tolerance?: number;
-  onToleranceChange?: (value: number) => void;
-  contiguous?: boolean;
-  onContiguousChange?: (value: boolean) => void;
-  brushSize?: number;
-  onBrushSizeChange?: (value: number) => void;
-  brushMode?: 'add' | 'subtract';
-  onBrushModeChange?: (mode: 'add' | 'subtract') => void;
-  currentMask?: MaskData | null;
-  onClearMask?: () => void;
-  onInvertMask?: () => void;
-  onRemoveBackground?: () => void;
-  onExportSVG?: (type: 'traced' | 'embedded') => void;
 }
 
 const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
@@ -65,22 +48,6 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
   onSetActiveLayer,
   onToggleLayerVisibility,
   onExport,
-  // Selection/Mask props
-  selectionType,
-  onSelectionTypeChange,
-  tolerance,
-  onToleranceChange,
-  contiguous,
-  onContiguousChange,
-  brushSize,
-  onBrushSizeChange,
-  brushMode,
-  onBrushModeChange,
-  currentMask,
-  onClearMask,
-  onInvertMask,
-  onRemoveBackground,
-  onExportSVG,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { theme, toggleTheme } = useTheme();
@@ -193,22 +160,6 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
             onExport={onExport}
             onNewImage={handleImageSelect}
             hasImage={!!selectedImage}
-            // Selection/Mask props
-            selectionType={selectionType}
-            onSelectionTypeChange={onSelectionTypeChange}
-            tolerance={tolerance}
-            onToleranceChange={onToleranceChange}
-            contiguous={contiguous}
-            onContiguousChange={onContiguousChange}
-            brushSize={brushSize}
-            onBrushSizeChange={onBrushSizeChange}
-            brushMode={brushMode}
-            onBrushModeChange={onBrushModeChange}
-            currentMask={currentMask}
-            onClearMask={onClearMask}
-            onInvertMask={onInvertMask}
-            onRemoveBackground={onRemoveBackground}
-            onExportSVG={onExportSVG}
           />
         </div>
       </div>
@@ -236,22 +187,6 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
                 onExport={onExport}
                 onNewImage={handleImageSelect}
                 hasImage={!!selectedImage}
-                // Selection/Mask props
-                selectionType={selectionType}
-                onSelectionTypeChange={onSelectionTypeChange}
-                tolerance={tolerance}
-                onToleranceChange={onToleranceChange}
-                contiguous={contiguous}
-                onContiguousChange={onContiguousChange}
-                brushSize={brushSize}
-                onBrushSizeChange={onBrushSizeChange}
-                brushMode={brushMode}
-                onBrushModeChange={onBrushModeChange}
-                currentMask={currentMask}
-                onClearMask={onClearMask}
-                onInvertMask={onInvertMask}
-                onRemoveBackground={onRemoveBackground}
-                onExportSVG={onExportSVG}
               />
             </div>
           </div>

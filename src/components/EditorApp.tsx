@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useAppStore } from '@/lib/store';
 import ImageEditor from '@/components/ImageEditor';
@@ -12,8 +12,6 @@ import AppleStyleLayout from '@/components/AppleStyleLayout';
 import useHistory from '@/hooks/useHistory';
 import useEffectLayers from '@/hooks/useEffectLayers';
 import type { ImageEditorHandle } from './ImageEditor';
-import { SelectionType, MaskData } from './SelectionTool';
-import { invertMask, applyMaskToImage, exportToSVG, downloadSVG, copySVGToClipboard } from '@/lib/imageProcessing';
 
 export default function EditorApp() {
   const selectedImage = useAppStore(state => state.selectedImage);
@@ -25,14 +23,6 @@ export default function EditorApp() {
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const imageEditorRef = useRef<ImageEditorHandle | null>(null);
-
-  // Selection/Mask state
-  const [selectionType, setSelectionType] = useState<SelectionType>(null);
-  const [tolerance, setTolerance] = useState(32);
-  const [contiguous, setContiguous] = useState(true);
-  const [brushSize, setBrushSize] = useState(20);
-  const [brushMode, setBrushMode] = useState<'add' | 'subtract'>('add');
-  const [currentMask, setCurrentMask] = useState<MaskData | null>(null);
 
   // Debug ref connection
   useEffect(() => {
@@ -195,104 +185,6 @@ export default function EditorApp() {
     }
   };
 
-  // Selection/Mask handlers
-  const handleClearMask = useCallback(() => {
-    setCurrentMask(null);
-  }, []);
-
-  const handleInvertMask = useCallback(() => {
-    if (!currentMask) return;
-    const inverted = invertMask(currentMask.mask);
-    setCurrentMask({
-      mask: inverted,
-      width: currentMask.width,
-      height: currentMask.height,
-    });
-  }, [currentMask]);
-
-  const handleRemoveBackground = useCallback(() => {
-    if (!currentMask || !selectedImage) {
-      console.log('Cannot remove background: no mask or image');
-      return;
-    }
-    
-    // Load the original image
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    
-    img.onload = () => {
-      // Create canvas with original image dimensions
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
-      // Apply mask to make unselected areas transparent
-      const maskedImageData = applyMaskToImage(imageData, currentMask.mask, true);
-      
-      // Put the masked image back
-      ctx.putImageData(maskedImageData, 0, 0);
-      
-      // Create a new image from the masked canvas
-      const maskedDataUrl = canvas.toDataURL('image/png');
-      setSelectedImage(maskedDataUrl);
-      
-      // Clear the mask
-      setCurrentMask(null);
-    };
-    
-    img.src = selectedImage;
-  }, [currentMask, selectedImage, setSelectedImage]);
-
-  const handleExportSVG = useCallback(async (type: 'traced' | 'embedded') => {
-    if (!currentMask || !selectedImage) {
-      console.log('Cannot export SVG: no mask or image');
-      return;
-    }
-
-    // Load the original image to get its data
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    
-    img.onload = async () => {
-      // Create canvas with original image dimensions
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      
-      // Make sure mask matches image dimensions
-      let maskToUse = currentMask.mask;
-      if (currentMask.width !== img.width || currentMask.height !== img.height) {
-        console.log('Mask dimensions mismatch, using as-is');
-      }
-      
-      // Export to SVG
-      const result = exportToSVG(imageData, maskToUse, type);
-      
-      // Download the SVG
-      const filename = `extracted-${Date.now()}.svg`;
-      downloadSVG(result.svg, filename);
-      
-      // Also copy to clipboard for Figma
-      const copied = await copySVGToClipboard(result.svg);
-      if (copied) {
-        console.log('SVG copied to clipboard - paste directly into Figma!');
-        alert('SVG exported and copied to clipboard! You can paste it directly into Figma.');
-      }
-    };
-    
-    img.src = selectedImage;
-  }, [currentMask, selectedImage]);
-
   if (!isReady) {
     return null; // Or a very minimal loader
   }
@@ -310,11 +202,7 @@ export default function EditorApp() {
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
         />
       </Head>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
         {selectedImage ? (
           <AppleStyleLayout
             selectedImage={selectedImage}
@@ -342,22 +230,6 @@ export default function EditorApp() {
                 console.error('exportImage failed', error);
               }
             }}
-            // Selection/Mask props
-            selectionType={selectionType}
-            onSelectionTypeChange={setSelectionType}
-            tolerance={tolerance}
-            onToleranceChange={setTolerance}
-            contiguous={contiguous}
-            onContiguousChange={setContiguous}
-            brushSize={brushSize}
-            onBrushSizeChange={setBrushSize}
-            brushMode={brushMode}
-            onBrushModeChange={setBrushMode}
-            currentMask={currentMask}
-            onClearMask={handleClearMask}
-            onInvertMask={handleInvertMask}
-            onRemoveBackground={handleRemoveBackground}
-            onExportSVG={handleExportSVG}
           >
             <div id="main-content" className="w-full h-full">
               {imageLoading ? (
@@ -366,17 +238,10 @@ export default function EditorApp() {
                   <span className="ml-3 text-gray-600">Loading image...</span>
                 </div>
               ) : (
-                <ImageEditor 
-                  ref={imageEditorRef} 
-                  selectedImage={selectedImage} 
+                <ImageEditor
+                  ref={imageEditorRef}
+                  selectedImage={selectedImage}
                   effectLayers={effectLayers}
-                  selectionType={selectionType}
-                  tolerance={tolerance}
-                  contiguous={contiguous}
-                  brushSize={brushSize}
-                  brushMode={brushMode}
-                  currentMask={currentMask}
-                  onMaskChange={setCurrentMask}
                 />
               )}
               {imageError && (
@@ -397,4 +262,3 @@ export default function EditorApp() {
     </>
   );
 }
-
