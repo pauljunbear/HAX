@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig, getEffectCategory } from '@/lib/effects';
 import { Settings, Download, Layers, FileImage, Film, Monitor, X } from 'lucide-react';
@@ -24,6 +24,7 @@ interface AppleControlsPanelProps {
   onRemoveEffect?: (layerId: string) => void;
   onSetActiveLayer?: (layerId: string) => void;
   onToggleLayerVisibility?: (layerId: string) => void;
+  onReorderLayers?: (fromIndex: number, toIndex: number) => void;
   onNewImage?: () => void;
   hasImage?: boolean;
   isCollapsed: boolean;
@@ -111,12 +112,15 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   onRemoveEffect,
   onSetActiveLayer,
   onToggleLayerVisibility,
+  onReorderLayers,
   onNewImage,
   hasImage = false,
   isCollapsed,
 }) => {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState<'settings' | 'layers' | 'export'>('settings');
+  const dragFromIndexRef = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Get the active layer with null checking
   const activeLayer = effectLayers?.find(layer => layer.id === activeEffect);
@@ -366,9 +370,45 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                       <div
                         key={layer.id}
                         onClick={() => onSetActiveLayer?.(layer.id)}
+                        draggable={!!onReorderLayers}
+                        onDragStart={e => {
+                          if (!onReorderLayers) return;
+                          dragFromIndexRef.current = index;
+                          setDragOverIndex(null);
+                          e.dataTransfer.effectAllowed = 'move';
+                          // Some browsers require data to be set for drag to start.
+                          e.dataTransfer.setData('text/plain', layer.id);
+                        }}
+                        onDragOver={e => {
+                          if (!onReorderLayers) return;
+                          e.preventDefault();
+                          if (dragOverIndex !== index) {
+                            setDragOverIndex(index);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          if (!onReorderLayers) return;
+                          if (dragOverIndex === index) {
+                            setDragOverIndex(null);
+                          }
+                        }}
+                        onDrop={e => {
+                          if (!onReorderLayers) return;
+                          e.preventDefault();
+                          const fromIndex = dragFromIndexRef.current;
+                          dragFromIndexRef.current = null;
+                          setDragOverIndex(null);
+                          if (fromIndex === null || fromIndex === index) return;
+                          onReorderLayers(fromIndex, index);
+                        }}
+                        onDragEnd={() => {
+                          dragFromIndexRef.current = null;
+                          setDragOverIndex(null);
+                        }}
                         className={`
                           p-3 rounded-xl cursor-pointer transition-all glass-effect-button
                           ${isActive ? 'glass-active' : ''}
+                          ${dragOverIndex === index ? 'ring-2 ring-black/30' : ''}
                         `}
                       >
                         <div className="flex items-center justify-between">

@@ -29,6 +29,7 @@ interface AppleStyleLayoutProps {
   onRemoveEffect?: (layerId: string) => void;
   onSetActiveLayer?: (layerId: string) => void;
   onToggleLayerVisibility?: (layerId: string) => void;
+  onReorderLayers?: (fromIndex: number, toIndex: number) => void;
   onExport?: (format: string) => void;
 }
 
@@ -47,6 +48,7 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
   onRemoveEffect,
   onSetActiveLayer,
   onToggleLayerVisibility,
+  onReorderLayers,
   onExport,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -162,6 +164,7 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
             onRemoveEffect={onRemoveEffect}
             onSetActiveLayer={onSetActiveLayer}
             onToggleLayerVisibility={onToggleLayerVisibility}
+            onReorderLayers={onReorderLayers}
             onExport={onExport}
             onNewImage={handleImageSelect}
             hasImage={!!selectedImage}
@@ -189,6 +192,7 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
                 onRemoveEffect={onRemoveEffect}
                 onSetActiveLayer={onSetActiveLayer}
                 onToggleLayerVisibility={onToggleLayerVisibility}
+                onReorderLayers={onReorderLayers}
                 onExport={onExport}
                 onNewImage={handleImageSelect}
                 hasImage={!!selectedImage}

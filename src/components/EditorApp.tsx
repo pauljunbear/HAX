@@ -45,6 +45,7 @@ export default function EditorApp() {
     addLayer: addEffectLayer,
     removeLayer: removeEffectLayer,
     updateLayer,
+    reorderLayers,
     setActiveLayer: setActiveEffectLayer,
     updateLayerSettings,
     clearLayers: clearEffectLayers,
@@ -219,6 +220,7 @@ export default function EditorApp() {
             onRemoveEffect={handleRemoveEffect}
             onSetActiveLayer={setActiveEffectLayer}
             onToggleLayerVisibility={handleToggleLayerVisibility}
+            onReorderLayers={reorderLayers}
             onExport={format => {
               if (!imageEditorRef.current) {
                 return;
