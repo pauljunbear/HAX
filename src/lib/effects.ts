@@ -2,6 +2,9 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
+// Import optimized blur utilities for performance
+import { separableGaussianBlur, stackBlur, getBufferPool } from './performance';
+
 // Define the structure for effect settings
 interface EffectSetting {
   id: string;
@@ -31,32 +34,40 @@ type FilterParams = Record<string, unknown>;
 
 // Use a dynamic import approach for Konva to avoid SSR issues
 // Import Konva only in browser environment
-let Konva: typeof import('konva') | null = null;
+type KonvaModule = typeof import('konva') & { Filters: Record<string, KonvaFilterFunction> };
+let Konva: KonvaModule | null = null;
 let konvaInitPromise: Promise<typeof import('konva')> | null = null;
-let filtersInitialized = false;
+let filtersInitPromise: Promise<void> | null = null;
 
 const ensureKonvaFiltersLoaded = async () => {
-  if (filtersInitialized || typeof window === 'undefined') {
+  if (typeof window === 'undefined') {
     return;
   }
 
-  filtersInitialized = true;
-
-  try {
-    await Promise.all([
-      import('konva/lib/filters/Blur'),
-      import('konva/lib/filters/Contrast'),
-      import('konva/lib/filters/HSL'),
-      import('konva/lib/filters/Pixelate'),
-      import('konva/lib/filters/Noise'),
-      import('konva/lib/filters/Grayscale'),
-      import('konva/lib/filters/Sepia'),
-      import('konva/lib/filters/Invert'),
-      import('konva/lib/filters/Enhance'),
-    ]);
-  } catch (error) {
-    console.warn('Some Konva filters failed to load.', error);
+  if (filtersInitPromise) {
+    return filtersInitPromise;
   }
+
+  filtersInitPromise = (async () => {
+    try {
+      await Promise.all([
+        import('konva/lib/filters/Blur'),
+        import('konva/lib/filters/Brighten'),
+        import('konva/lib/filters/Contrast'),
+        import('konva/lib/filters/HSL'),
+        import('konva/lib/filters/Pixelate'),
+        import('konva/lib/filters/Noise'),
+        import('konva/lib/filters/Grayscale'),
+        import('konva/lib/filters/Sepia'),
+        import('konva/lib/filters/Invert'),
+        import('konva/lib/filters/Enhance'),
+      ]);
+    } catch (error) {
+      console.warn('Some Konva filters failed to load.', error);
+    }
+  })();
+
+  return filtersInitPromise;
 };
 
 const loadKonva = async () => {
@@ -64,7 +75,7 @@ const loadKonva = async () => {
     konvaInitPromise = import('konva');
   }
 
-  Konva = await konvaInitPromise;
+  Konva = (await konvaInitPromise) as unknown as KonvaModule;
   await ensureKonvaFiltersLoaded();
 
   if (Konva && Konva.Filters) {
@@ -109,73 +120,17 @@ const createThresholdFallback = (threshold: number): KonvaFilterFunction => {
 };
 
 const createBlurFallback = (radius: number): KonvaFilterFunction => {
-  const iterations = clamp(Math.round(radius), 1, 8);
+  const clampedRadius = clamp(Math.round(radius), 1, 100);
 
   return imageData => {
     const { data, width, height } = imageData;
-    if (iterations <= 0 || width === 0 || height === 0) {
+    if (clampedRadius <= 0 || width === 0 || height === 0) {
       return;
     }
 
-    const temp = new Uint8ClampedArray(data);
-
-    for (let iteration = 0; iteration < iterations; iteration++) {
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const idx = (y * width + x) * 4;
-
-          let rSum = temp[idx];
-          let gSum = temp[idx + 1];
-          let bSum = temp[idx + 2];
-          let aSum = temp[idx + 3];
-          let count = 1;
-
-          const leftIdx = x > 0 ? idx - 4 : -1;
-          const rightIdx = x < width - 1 ? idx + 4 : -1;
-          const upIdx = y > 0 ? idx - width * 4 : -1;
-          const downIdx = y < height - 1 ? idx + width * 4 : -1;
-
-          if (leftIdx >= 0) {
-            rSum += temp[leftIdx];
-            gSum += temp[leftIdx + 1];
-            bSum += temp[leftIdx + 2];
-            aSum += temp[leftIdx + 3];
-            count++;
-          }
-
-          if (rightIdx >= 0) {
-            rSum += temp[rightIdx];
-            gSum += temp[rightIdx + 1];
-            bSum += temp[rightIdx + 2];
-            aSum += temp[rightIdx + 3];
-            count++;
-          }
-
-          if (upIdx >= 0) {
-            rSum += temp[upIdx];
-            gSum += temp[upIdx + 1];
-            bSum += temp[upIdx + 2];
-            aSum += temp[upIdx + 3];
-            count++;
-          }
-
-          if (downIdx >= 0) {
-            rSum += temp[downIdx];
-            gSum += temp[downIdx + 1];
-            bSum += temp[downIdx + 2];
-            aSum += temp[downIdx + 3];
-            count++;
-          }
-
-          data[idx] = Math.round(rSum / count);
-          data[idx + 1] = Math.round(gSum / count);
-          data[idx + 2] = Math.round(bSum / count);
-          data[idx + 3] = Math.round(aSum / count);
-        }
-      }
-
-      temp.set(data);
-    }
+    // Use optimized separable blur for better performance
+    // This is O(n²×2r) instead of O(n²×r²)
+    stackBlur(data, width, height, clampedRadius);
   };
 };
 
@@ -195,11 +150,10 @@ const softLightBlend = (base: number, overlay: number) => {
 };
 
 const createOrtonFallback = (settings: Record<string, number>): KonvaFilterFunction => {
-  const blurRadius = clamp(settings.blur ?? 5, 1, 12);
+  const blurRadius = clamp(settings.blur ?? 5, 1, 50);
   const brightness = clamp(settings.brightness ?? 0.2, 0, 1);
   const glow = clamp(settings.glow ?? 0.5, 0, 1);
   const blendMode = Math.round(clamp(settings.blendMode ?? 0, 0, 2));
-  const blurFilter = createBlurFallback(blurRadius);
 
   return imageData => {
     const { data, width, height } = imageData;
@@ -207,47 +161,56 @@ const createOrtonFallback = (settings: Record<string, number>): KonvaFilterFunct
       return;
     }
 
-    const original = new Uint8ClampedArray(data);
-    const blurred = new Uint8ClampedArray(data.length);
-    blurred.set(original);
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const blurred = pool.acquire(data.length);
 
-    blurFilter({ data: blurred, width, height });
+    try {
+      original.set(data);
+      blurred.set(data);
 
-    const blendChannel = (base: number, overlay: number) => {
-      switch (blendMode) {
-        case 1:
-          return overlayBlend(base, overlay);
-        case 2:
-          return softLightBlend(base, overlay);
-        default:
-          return screenBlend(base, overlay);
+      // Use optimized separable blur
+      stackBlur(blurred, width, height, blurRadius);
+
+      const blendChannel = (base: number, overlay: number) => {
+        switch (blendMode) {
+          case 1:
+            return overlayBlend(base, overlay);
+          case 2:
+            return softLightBlend(base, overlay);
+          default:
+            return screenBlend(base, overlay);
+        }
+      };
+
+      const brightnessMultiplier = 1 + brightness * 0.8;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = original[i];
+        const g = original[i + 1];
+        const b = original[i + 2];
+        const a = original[i + 3];
+
+        const blurredR = blurred[i];
+        const blurredG = blurred[i + 1];
+        const blurredB = blurred[i + 2];
+
+        const glowR = blendChannel(r, blurredR);
+        const glowG = blendChannel(g, blurredG);
+        const glowB = blendChannel(b, blurredB);
+
+        const mixedR = clamp(Math.round(r * (1 - glow) + glowR * glow), 0, 255);
+        const mixedG = clamp(Math.round(g * (1 - glow) + glowG * glow), 0, 255);
+        const mixedB = clamp(Math.round(b * (1 - glow) + glowB * glow), 0, 255);
+
+        data[i] = clamp(Math.round(mixedR * brightnessMultiplier), 0, 255);
+        data[i + 1] = clamp(Math.round(mixedG * brightnessMultiplier), 0, 255);
+        data[i + 2] = clamp(Math.round(mixedB * brightnessMultiplier), 0, 255);
+        data[i + 3] = a;
       }
-    };
-
-    const brightnessMultiplier = 1 + brightness * 0.8;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = original[i];
-      const g = original[i + 1];
-      const b = original[i + 2];
-      const a = original[i + 3];
-
-      const blurredR = blurred[i];
-      const blurredG = blurred[i + 1];
-      const blurredB = blurred[i + 2];
-
-      const glowR = blendChannel(r, blurredR);
-      const glowG = blendChannel(g, blurredG);
-      const glowB = blendChannel(b, blurredB);
-
-      const mixedR = clamp(Math.round(r * (1 - glow) + glowR * glow), 0, 255);
-      const mixedG = clamp(Math.round(g * (1 - glow) + glowG * glow), 0, 255);
-      const mixedB = clamp(Math.round(b * (1 - glow) + glowB * glow), 0, 255);
-
-      data[i] = clamp(Math.round(mixedR * brightnessMultiplier), 0, 255);
-      data[i + 1] = clamp(Math.round(mixedG * brightnessMultiplier), 0, 255);
-      data[i + 2] = clamp(Math.round(mixedB * brightnessMultiplier), 0, 255);
-      data[i + 3] = a;
+    } finally {
+      pool.release(original);
+      pool.release(blurred);
     }
   };
 };
@@ -317,19 +280,22 @@ export const applyEffect = async (
   try {
     switch (effectName) {
       case 'brightness': {
-        const brightnessValue = settings.value ?? 0;
+        // Convert from percentage (-100 to 100) to Konva range (-1 to 1)
+        const brightnessValue = (settings.value ?? 0) / 100;
         console.log(`Applying brightness: ${brightnessValue}`);
         return [Konva.Filters.Brighten, { brightness: brightnessValue }];
       }
 
       case 'contrast': {
+        // Contrast already uses -100 to 100 range
         const contrastValue = settings.value ?? 0;
         console.log(`Applying contrast: ${contrastValue}`);
         return [Konva.Filters.Contrast, { contrast: contrastValue }];
       }
 
       case 'saturation': {
-        const scaledSaturation = settings.value !== undefined ? settings.value : 0;
+        // Convert from percentage (-100 to 100) to Konva range (-10 to 10)
+        const scaledSaturation = (settings.value ?? 0) / 10;
         console.log(`Applying saturation: ${scaledSaturation}`);
         return [Konva.Filters.HSL, { saturation: scaledSaturation }];
       }
@@ -371,8 +337,14 @@ export const applyEffect = async (
       case 'grayscale':
         return [Konva.Filters.Grayscale, {}];
 
+      case 'blackAndWhite':
+        return [createBlackAndWhiteEffect(settings), {}];
+
       case 'sepia':
         return [Konva.Filters.Sepia, {}];
+
+      case 'unifiedMono':
+        return [createUnifiedMonoEffect(settings), {}];
 
       case 'invert':
         return [Konva.Filters.Invert, {}];
@@ -380,12 +352,18 @@ export const applyEffect = async (
       // Keep custom filters for ones Konva doesn't have built-in
       case 'pencilSketch':
         return [createPencilSketchEffect(settings), {}];
+      case 'unifiedSketch':
+        return [createUnifiedSketchEffect(settings), {}];
       case 'halftone':
         return [createHalftoneEffect(settings), {}];
+      case 'unifiedPattern':
+        return [createUnifiedPatternEffect(settings), {}];
       case 'duotone':
         return [createDuotoneEffect(settings), {}];
       case 'bloom':
         return [createBloomEffect(settings), {}];
+      case 'unifiedGlow':
+        return [createUnifiedGlowEffect(settings), {}];
       case 'oilPainting': // Kuwahara
         return [createKuwaharaEffect(settings), {}];
       case 'geometric':
@@ -514,6 +492,34 @@ export const applyEffect = async (
         return [createWeavePatternEffect(settings), {}];
       case 'bioluminescence':
         return [createBioluminescenceEffect(settings), {}];
+
+      // --- NEW POPULAR EFFECTS ---
+      case 'watercolor':
+        return [createWatercolorEffect(settings), {}];
+      case 'cutout':
+        return [createCutoutEffect(settings), {}];
+      case 'stainedGlass':
+        return [createStainedGlassEffect(settings), {}];
+      case 'posterEdges':
+        return [createPosterEdgesEffect(settings), {}];
+      case 'toon':
+        return [createToonEffect(settings), {}];
+      case 'gradientMap':
+        return [createGradientMapEffect(settings), {}];
+      case 'bokeh':
+        return [createBokehEffect(settings), {}];
+      case 'doubleExposure':
+        return [createDoubleExposureEffect(settings), {}];
+      case 'toneCurve':
+        return [createToneCurveEffect(settings), {}];
+      case 'cinematicLut':
+        return [createCinematicLutEffect(settings), {}];
+      case 'dehaze':
+        return [createDehazeEffect(settings), {}];
+      case 'depthBlur':
+        return [createDepthBlurEffect(settings), {}];
+      case 'relight':
+        return [createRelightEffect(settings), {}];
 
       // 3D Effects - DISABLED due to poor user experience
       case 'threeDPlane':
@@ -1018,6 +1024,105 @@ const createPencilSketchEffect = (settings: Record<string, number>) => {
   };
 };
 
+/**
+ * Unified Sketch Effect - Combines multiple sketch styles into one configurable effect
+ * Styles: 0=Pencil, 1=Crosshatch, 2=Etched Lines, 3=Ink Wash, 4=Bold Outline
+ */
+const createUnifiedSketchEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const style = Math.floor(settings.style ?? 0);
+    const lineWeight = settings.lineWeight ?? 2;
+    const density = (settings.density ?? 60) / 100;
+    const contrast = (settings.contrast ?? 120) / 100;
+    const invert = (settings.invert ?? 0) === 1;
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+
+      // Convert to grayscale first
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = original[i] * 0.299 + original[i + 1] * 0.587 + original[i + 2] * 0.114;
+        data[i] = data[i + 1] = data[i + 2] = gray;
+      }
+
+      // Sobel kernels for edge detection
+      const sobelX = [-1, 0, 1, -2 * lineWeight, 0, 2 * lineWeight, -1, 0, 1];
+      const sobelY = [-1, -2 * lineWeight, -1, 0, 0, 0, 1, 2 * lineWeight, 1];
+
+      // Apply style-specific processing
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          let gx = 0,
+            gy = 0;
+
+          // Edge detection
+          for (let ky = -1; ky <= 1; ky++) {
+            for (let kx = -1; kx <= 1; kx++) {
+              const idx = ((y + ky) * width + (x + kx)) * 4;
+              const kernelIdx = (ky + 1) * 3 + (kx + 1);
+              gx += data[idx] * sobelX[kernelIdx];
+              gy += data[idx] * sobelY[kernelIdx];
+            }
+          }
+
+          const magnitude = Math.sqrt(gx * gx + gy * gy);
+          const angle = Math.atan2(gy, gx);
+          const idx = (y * width + x) * 4;
+          let value = 255;
+
+          switch (style) {
+            case 0: // Pencil
+              value = 255 - magnitude * density;
+              break;
+
+            case 1: // Crosshatch
+              const hatchAngle1 = Math.PI / 4;
+              const hatchAngle2 = -Math.PI / 4;
+              const hatch1 = Math.sin((x + y) * density * 0.5);
+              const hatch2 = Math.sin((x - y) * density * 0.5);
+              const hatchValue =
+                magnitude > 30 * density ? (hatch1 > 0 || hatch2 > 0 ? 0 : 255) : 255;
+              value = hatchValue;
+              break;
+
+            case 2: // Etched Lines
+              const lineAngle = Math.sin(angle * 3) * 0.5 + 0.5;
+              value = (255 - magnitude * lineAngle * density) * contrast;
+              break;
+
+            case 3: // Ink Wash
+              const gray =
+                original[idx] * 0.299 + original[idx + 1] * 0.587 + original[idx + 2] * 0.114;
+              const inkFactor = (gray / 255) * density;
+              const bleed = (Math.random() - 0.5) * 30 * (1 - density);
+              value = gray * inkFactor + bleed;
+              break;
+
+            case 4: // Bold Outline
+              value = magnitude > 40 * density ? 0 : 255;
+              break;
+          }
+
+          // Apply contrast
+          value = (value - 128) * contrast + 128;
+          value = Math.max(0, Math.min(255, value));
+
+          // Invert if requested
+          if (invert) value = 255 - value;
+
+          data[idx] = data[idx + 1] = data[idx + 2] = value;
+        }
+      }
+    } finally {
+      pool.release(original);
+    }
+  };
+};
+
 // Add new effect function for Halftone
 const createHalftoneEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -1144,6 +1249,196 @@ const createHalftoneEffect = (settings: Record<string, number>) => {
   };
 };
 
+/**
+ * Unified Pattern Effect - Combines multiple pattern styles
+ * Patterns: 0=Dots (Halftone), 1=Screen, 2=Dither, 3=Stipple
+ */
+const createUnifiedPatternEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const pattern = Math.floor(settings.pattern ?? 0);
+    const size = Math.max(2, Math.min(50, settings.size ?? 8));
+    const density = (settings.density ?? 50) / 100;
+    const angle = ((settings.angle ?? 45) * Math.PI) / 180;
+    const colorMode = Math.floor(settings.colorMode ?? 0);
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      // Clear to white/paper color for B&W mode
+      if (colorMode === 0) {
+        for (let i = 0; i < data.length; i += 4) {
+          data[i] = data[i + 1] = data[i + 2] = 255;
+        }
+      }
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+          const r = original[idx];
+          const g = original[idx + 1];
+          const b = original[idx + 2];
+          const alpha = original[idx + 3];
+
+          if (alpha === 0) continue;
+
+          const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+
+          // Rotate coordinates for angled patterns
+          const rx = x * cos + y * sin;
+          const ry = -x * sin + y * cos;
+
+          let shouldDraw = false;
+
+          switch (pattern) {
+            case 0: // Dots (Halftone)
+              const cellX = Math.floor(rx / size);
+              const cellY = Math.floor(ry / size);
+              const centerX = (cellX + 0.5) * size;
+              const centerY = (cellY + 0.5) * size;
+              const dist = Math.sqrt(Math.pow(rx - centerX, 2) + Math.pow(ry - centerY, 2));
+              const maxRadius = (size / 2) * (1 - brightness) * density;
+              shouldDraw = dist < maxRadius;
+              break;
+
+            case 1: // Screen
+              const screenX = (rx % size) / size;
+              const screenY = (ry % size) / size;
+              shouldDraw = screenX + screenY < (2 - brightness * 2) * density;
+              break;
+
+            case 2: // Dither (Bayer matrix approximation)
+              const ditherX = Math.floor(rx) % 4;
+              const ditherY = Math.floor(ry) % 4;
+              const bayerValue = ((ditherX + ditherY * 4) * 17) % 255;
+              shouldDraw = (1 - brightness) * 255 * density > bayerValue;
+              break;
+
+            case 3: // Stipple
+              const randomValue = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+              const rand = randomValue - Math.floor(randomValue);
+              shouldDraw = rand < (1 - brightness) * density;
+              break;
+          }
+
+          if (shouldDraw) {
+            if (colorMode === 0) {
+              // B&W mode - draw black
+              data[idx] = data[idx + 1] = data[idx + 2] = 0;
+            } else {
+              // Color mode - keep original but darken
+              data[idx] = r * 0.2;
+              data[idx + 1] = g * 0.2;
+              data[idx + 2] = b * 0.2;
+            }
+          } else if (colorMode === 1) {
+            // Color mode - lighten non-drawn areas
+            data[idx] = Math.min(255, r + (255 - r) * 0.8);
+            data[idx + 1] = Math.min(255, g + (255 - g) * 0.8);
+            data[idx + 2] = Math.min(255, b + (255 - b) * 0.8);
+          }
+          data[idx + 3] = alpha;
+        }
+      }
+    } finally {
+      pool.release(original);
+    }
+  };
+};
+
+// Black & White effect with adjustable contrast and brightness
+const createBlackAndWhiteEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const data = imageData.data;
+    const contrast = settings.contrast ?? 1.2;
+    const brightness = settings.brightness ?? 0;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      // Convert to grayscale using luminance formula
+      let gray = r * 0.299 + g * 0.587 + b * 0.114;
+
+      // Apply brightness adjustment
+      gray = gray + brightness * 255;
+
+      // Apply contrast adjustment (centered at 128)
+      gray = (gray - 128) * contrast + 128;
+
+      // Clamp to valid range
+      gray = Math.max(0, Math.min(255, gray));
+
+      data[i] = gray;
+      data[i + 1] = gray;
+      data[i + 2] = gray;
+      // Preserve alpha channel
+    }
+  };
+};
+
+/**
+ * Unified Monochrome Effect - Combines multiple monochrome styles
+ * Tones: 0=Gray, 1=Sepia, 2=Cyanotype, 3=Cool Blue, 4=Warm
+ */
+const createUnifiedMonoEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    const tone = Math.floor(settings.tone ?? 0);
+    const intensity = (settings.intensity ?? 100) / 100;
+    const contrast = (settings.contrast ?? 100) / 100;
+    const brightness = (settings.brightness ?? 0) / 100;
+
+    // Tone color mappings (for highlights and shadows)
+    const toneColors = [
+      { h: [1.0, 1.0, 1.0], s: [0.0, 0.0, 0.0] }, // Gray: neutral
+      { h: [1.1, 0.95, 0.7], s: [0.3, 0.2, 0.1] }, // Sepia: warm brown
+      { h: [0.7, 0.9, 1.1], s: [0.05, 0.1, 0.25] }, // Cyanotype: blue
+      { h: [0.85, 0.95, 1.15], s: [0.1, 0.15, 0.2] }, // Cool: slight blue
+      { h: [1.15, 1.05, 0.85], s: [0.15, 0.1, 0.05] }, // Warm: orange/red
+    ];
+
+    const toneConfig = toneColors[tone] || toneColors[0];
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      // Convert to grayscale using luminance formula
+      let gray = r * 0.299 + g * 0.587 + b * 0.114;
+
+      // Apply brightness
+      gray = gray + brightness * 255;
+
+      // Apply contrast (centered at 128)
+      gray = (gray - 128) * contrast + 128;
+
+      // Clamp
+      gray = Math.max(0, Math.min(255, gray));
+
+      // Apply tone coloring based on brightness
+      const t = gray / 255; // 0 = shadow, 1 = highlight
+
+      const outR = gray * (toneConfig.h[0] * t + toneConfig.s[0] * (1 - t));
+      const outG = gray * (toneConfig.h[1] * t + toneConfig.s[1] * (1 - t));
+      const outB = gray * (toneConfig.h[2] * t + toneConfig.s[2] * (1 - t));
+
+      // Blend with original based on intensity
+      data[i] = Math.max(0, Math.min(255, r * (1 - intensity) + outR * intensity));
+      data[i + 1] = Math.max(0, Math.min(255, g * (1 - intensity) + outG * intensity));
+      data[i + 2] = Math.max(0, Math.min(255, b * (1 - intensity) + outB * intensity));
+    }
+  };
+};
+
 // Add new effect function for Duotone
 const createDuotoneEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -1189,54 +1484,140 @@ const createBloomEffect = (settings: Record<string, number>) => {
     const data = imageData.data;
     const width = imageData.width;
     const height = imageData.height;
-    const strength = settings.strength || 0.5;
-    const radius = Math.round(settings.radius || 10);
+    // Convert percentage (0-100) to internal range (0-2)
+    const strength = ((settings.strength ?? 50) / 100) * 2;
+    const radius = Math.round(settings.radius || 15);
 
-    const originalData = new Uint8ClampedArray(data.length);
-    originalData.set(data);
+    const pool = getBufferPool();
+    const originalData = pool.acquire(data.length);
+    const blurData = pool.acquire(data.length);
 
-    const blurData = new Uint8ClampedArray(data.length);
-    blurData.set(data);
+    try {
+      originalData.set(data);
+      blurData.set(data);
 
-    const kernelSize = radius * 2 + 1;
-    const kernelArea = kernelSize * kernelSize;
+      // Use optimized separable blur instead of O(n² × r²) box blur
+      stackBlur(blurData, width, height, radius);
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        let sumR = 0,
-          sumG = 0,
-          sumB = 0;
-        let count = 0;
+      // Apply bloom: add blurred highlights to original
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.min(255, originalData[i] + blurData[i] * strength);
+        data[i + 1] = Math.min(255, originalData[i + 1] + blurData[i + 1] * strength);
+        data[i + 2] = Math.min(255, originalData[i + 2] + blurData[i + 2] * strength);
+        data[i + 3] = originalData[i + 3];
+      }
+    } finally {
+      pool.release(originalData);
+      pool.release(blurData);
+    }
+  };
+};
 
-        for (let ky = -radius; ky <= radius; ky++) {
-          for (let kx = -radius; kx <= radius; kx++) {
-            const px = Math.min(width - 1, Math.max(0, x + kx));
-            const py = Math.min(height - 1, Math.max(0, y + ky));
-            const index = (py * width + px) * 4;
+/**
+ * Unified Glow Effect - Combines multiple glow styles into one configurable effect
+ * Presets: 0=Bloom, 1=Dreamy (Orton), 2=Neon Edges, 3=Bioluminescence, 4=Halation
+ */
+const createUnifiedGlowEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const preset = Math.floor(settings.preset ?? 0);
+    const intensity = (settings.intensity ?? 50) / 100;
+    const radius = Math.max(1, Math.min(100, settings.radius ?? 20));
+    const threshold = (settings.threshold ?? 50) / 100;
+    const colorShift = (settings.colorShift ?? 0) / 100;
+    const darkenBg = (settings.darkenBg ?? 0) / 100;
 
-            sumR += blurData[index];
-            sumG += blurData[index + 1];
-            sumB += blurData[index + 2];
-            count++;
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const glowLayer = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+
+      // Threshold extraction varies by preset
+      const thresholdValue = threshold * 255;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = original[i];
+        const g = original[i + 1];
+        const b = original[i + 2];
+        const brightness = r * 0.299 + g * 0.587 + b * 0.114;
+
+        let glowR = 0,
+          glowG = 0,
+          glowB = 0;
+
+        if (brightness > thresholdValue) {
+          const factor = (brightness - thresholdValue) / (255 - thresholdValue);
+
+          switch (preset) {
+            case 0: // Bloom - additive white glow
+              glowR = r * factor;
+              glowG = g * factor;
+              glowB = b * factor;
+              break;
+
+            case 1: // Dreamy (Orton) - soft warm glow
+              glowR = Math.min(255, r * factor * (1 + colorShift * 0.3));
+              glowG = g * factor;
+              glowB = b * factor * (1 - colorShift * 0.2);
+              break;
+
+            case 2: // Neon - saturated edge colors
+              const hue = Math.atan2(g - b, r - (g + b) / 2) / (Math.PI * 2) + 0.5;
+              const shiftedHue = (hue + colorShift) % 1;
+              const neonColor = hslToRgb(shiftedHue, 1, 0.5);
+              glowR = neonColor.r * 255 * factor;
+              glowG = neonColor.g * 255 * factor;
+              glowB = neonColor.b * 255 * factor;
+              break;
+
+            case 3: // Bioluminescence - cyan/blue-green shift
+              glowR = (r * 0.3 + 20) * factor;
+              glowG = (g * 0.8 + b * 0.3 + 80 * colorShift) * factor;
+              glowB = (b * 0.7 + g * 0.4 + 60) * factor;
+              break;
+
+            case 4: // Halation - film highlight bloom
+              const halationFactor = factor * (1 + colorShift * 0.5);
+              glowR = r * halationFactor;
+              glowG = g * halationFactor * 0.95;
+              glowB = b * halationFactor * 0.9;
+              break;
+
+            default:
+              glowR = r * factor;
+              glowG = g * factor;
+              glowB = b * factor;
           }
         }
 
-        const pixelIndex = (y * width + x) * 4;
-        data[pixelIndex] = sumR / count;
-        data[pixelIndex + 1] = sumG / count;
-        data[pixelIndex + 2] = sumB / count;
+        glowLayer[i] = glowR;
+        glowLayer[i + 1] = glowG;
+        glowLayer[i + 2] = glowB;
+        glowLayer[i + 3] = 255;
       }
-    }
 
-    for (let i = 0; i < data.length; i += 4) {
-      const pixelIndex = i / 4;
-      const x = pixelIndex % width;
-      const y = Math.floor(pixelIndex / width);
+      // Apply blur to glow layer
+      stackBlur(glowLayer, width, height, radius);
 
-      data[i] = Math.min(255, originalData[i] + data[i] * strength);
-      data[i + 1] = Math.min(255, originalData[i + 1] + data[i + 1] * strength);
-      data[i + 2] = Math.min(255, originalData[i + 2] + data[i + 2] * strength);
-      data[i + 3] = originalData[i + 3];
+      // Composite glow with original
+      const bgMultiplier = 1 - darkenBg;
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.min(255, original[i] * bgMultiplier + glowLayer[i] * intensity * 2);
+        data[i + 1] = Math.min(
+          255,
+          original[i + 1] * bgMultiplier + glowLayer[i + 1] * intensity * 2
+        );
+        data[i + 2] = Math.min(
+          255,
+          original[i + 2] * bgMultiplier + glowLayer[i + 2] * intensity * 2
+        );
+        data[i + 3] = original[i + 3];
+      }
+    } finally {
+      pool.release(original);
+      pool.release(glowLayer);
     }
   };
 };
@@ -2210,43 +2591,51 @@ const createEdgeDetectionEffect = (settings: Record<string, number>) => {
 const createSwirlEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const radius = settings.radius ?? Math.min(width, height) / 2;
-    const strength = settings.strength ?? 3;
-    const centerX = (settings.centerX ?? 0.5) * width;
-    const centerY = (settings.centerY ?? 0.5) * height;
+    // Convert percentage-based values to actual pixel values
+    const radiusPercent = (settings.radius ?? 50) / 100;
+    const radius = radiusPercent * Math.min(width, height);
+    const strength = settings.strength ?? 5;
+    const centerX = ((settings.centerX ?? 50) / 100) * width;
+    const centerY = ((settings.centerY ?? 50) / 100) * height;
 
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
+    const pool = getBufferPool();
+    const tempData = pool.acquire(data.length);
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const dx = x - centerX;
-        const dy = y - centerY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const index = (y * width + x) * 4;
+    try {
+      tempData.set(data);
 
-        if (distance < radius) {
-          const percent = distance / radius;
-          // Angle adjustment based on distance and strength
-          const angleOffset = strength * (1.0 - percent); // More twist closer to center
-          const originalAngle = Math.atan2(dy, dx);
-          const newAngle = originalAngle + angleOffset;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const dx = x - centerX;
+          const dy = y - centerY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          const index = (y * width + x) * 4;
 
-          const srcX = Math.round(centerX + Math.cos(newAngle) * distance);
-          const srcY = Math.round(centerY + Math.sin(newAngle) * distance);
+          if (distance < radius) {
+            const percent = distance / radius;
+            // Angle adjustment based on distance and strength
+            const angleOffset = strength * (1.0 - percent); // More twist closer to center
+            const originalAngle = Math.atan2(dy, dx);
+            const newAngle = originalAngle + angleOffset;
 
-          if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
-            const srcIndex = (srcY * width + srcX) * 4;
-            data[index] = tempData[srcIndex];
-            data[index + 1] = tempData[srcIndex + 1];
-            data[index + 2] = tempData[srcIndex + 2];
-            data[index + 3] = tempData[srcIndex + 3];
-          } else {
-            data[index + 3] = 0; // Make out-of-bounds pixels transparent
+            const srcX = Math.round(centerX + Math.cos(newAngle) * distance);
+            const srcY = Math.round(centerY + Math.sin(newAngle) * distance);
+
+            if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+              const srcIndex = (srcY * width + srcX) * 4;
+              data[index] = tempData[srcIndex];
+              data[index + 1] = tempData[srcIndex + 1];
+              data[index + 2] = tempData[srcIndex + 2];
+              data[index + 3] = tempData[srcIndex + 3];
+            } else {
+              data[index + 3] = 0; // Make out-of-bounds pixels transparent
+            }
           }
+          // Pixels outside radius are untouched
         }
-        // Pixels outside radius are untouched (already copied by tempData)
       }
+    } finally {
+      pool.release(tempData);
     }
   };
 };
@@ -2309,11 +2698,13 @@ const createKaleidoscopeEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
     const segments = Math.max(2, Math.floor(settings.segments ?? 6));
-    const centerX = (settings.centerX ?? 0.5) * width;
-    const centerY = (settings.centerY ?? 0.5) * height;
+    // Convert percentage-based center values
+    const centerX = ((settings.centerX ?? 50) / 100) * width;
+    const centerY = ((settings.centerY ?? 50) / 100) * height;
     const anglePerSegment = (Math.PI * 2) / segments;
 
-    const tempData = new Uint8ClampedArray(data.length);
+    const pool = getBufferPool();
+    const tempData = pool.acquire(data.length);
     tempData.set(data); // Use temp for reading source pixels
 
     for (let y = 0; y < height; y++) {
@@ -2528,18 +2919,18 @@ export const getEffectSettings = (effectId: string | null): EffectSetting[] => {
 };
 // Define all available effects with their settings
 export const effectsConfig: Record<string, EffectConfig> = {
-  // Basic Adjustments
+  // Basic Adjustments - Standardized to intuitive percentage-based ranges
   brightness: {
     label: 'Brightness',
     category: 'Adjust',
     settings: [
       {
         id: 'value',
-        label: 'Amount',
-        min: -1,
-        max: 1,
+        label: 'Amount (%)',
+        min: -100,
+        max: 100,
         defaultValue: 0,
-        step: 0.01,
+        step: 1,
       },
     ],
   },
@@ -2549,7 +2940,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     settings: [
       {
         id: 'value',
-        label: 'Amount',
+        label: 'Amount (%)',
         min: -100,
         max: 100,
         defaultValue: 0,
@@ -2563,11 +2954,11 @@ export const effectsConfig: Record<string, EffectConfig> = {
     settings: [
       {
         id: 'value',
-        label: 'Amount',
-        min: -10,
-        max: 10,
+        label: 'Amount (%)',
+        min: -100,
+        max: 100,
         defaultValue: 0,
-        step: 0.1,
+        step: 1,
       },
     ],
   },
@@ -2586,14 +2977,85 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
 
+  dehaze: {
+    label: 'Dehaze',
+    category: 'Adjust',
+    settings: [
+      {
+        id: 'amount',
+        label: 'Amount',
+        min: 0,
+        max: 1,
+        defaultValue: 0.35,
+        step: 0.05,
+      },
+    ],
+  },
+  relight: {
+    label: 'Relight',
+    category: 'Adjust',
+    settings: [
+      {
+        id: 'angle',
+        label: 'Light Angle (Degrees)',
+        min: 0,
+        max: 360,
+        defaultValue: 45,
+        step: 1,
+      },
+      {
+        id: 'strength',
+        label: 'Strength',
+        min: 0,
+        max: 1,
+        defaultValue: 0.4,
+        step: 0.05,
+      },
+      {
+        id: 'ambient',
+        label: 'Ambient',
+        min: 0,
+        max: 1,
+        defaultValue: 0.2,
+        step: 0.05,
+      },
+    ],
+  },
+
   // Filters
   grayscale: {
     label: 'Grayscale',
     category: 'Filters',
   },
+  blackAndWhite: {
+    label: 'Black & White',
+    category: 'Filters',
+    settings: [
+      { id: 'contrast', label: 'Contrast', min: 0.5, max: 2, defaultValue: 1.2, step: 0.1 },
+      { id: 'brightness', label: 'Brightness', min: -0.3, max: 0.3, defaultValue: 0, step: 0.05 },
+    ],
+  },
   sepia: {
     label: 'Sepia',
     category: 'Filters',
+  },
+  // UNIFIED MONOCHROME - Combines B&W, Grayscale, Sepia, Cyanotype, etc.
+  unifiedMono: {
+    label: 'Monochrome Studio',
+    category: 'Filters',
+    settings: [
+      {
+        id: 'tone',
+        label: 'Tone (0=Gray, 1=Sepia, 2=Cyan, 3=Cool, 4=Warm)',
+        min: 0,
+        max: 4,
+        defaultValue: 0,
+        step: 1,
+      },
+      { id: 'intensity', label: 'Intensity (%)', min: 0, max: 100, defaultValue: 100, step: 5 },
+      { id: 'contrast', label: 'Contrast (%)', min: 50, max: 200, defaultValue: 100, step: 5 },
+      { id: 'brightness', label: 'Brightness (%)', min: -50, max: 50, defaultValue: 0, step: 5 },
+    ],
   },
   invert: {
     label: 'Invert',
@@ -2624,7 +3086,90 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
 
-  // Blur & Focus
+  gradientMap: {
+    label: 'Gradient Map',
+    category: 'Color Effects',
+    settings: [
+      {
+        id: 'shadowColor',
+        label: 'Shadow Color (Hex#)',
+        min: 0x000000,
+        max: 0xffffff,
+        defaultValue: 0x1b1f3a,
+        step: 1,
+      },
+      {
+        id: 'midColor',
+        label: 'Mid Color (Hex#)',
+        min: 0x000000,
+        max: 0xffffff,
+        defaultValue: 0xb9c6d3,
+        step: 1,
+      },
+      {
+        id: 'highlightColor',
+        label: 'Highlight Color (Hex#)',
+        min: 0x000000,
+        max: 0xffffff,
+        defaultValue: 0xffd6a5,
+        step: 1,
+      },
+      {
+        id: 'midpoint',
+        label: 'Midpoint',
+        min: 0.1,
+        max: 0.9,
+        defaultValue: 0.5,
+        step: 0.01,
+      },
+      {
+        id: 'strength',
+        label: 'Strength',
+        min: 0,
+        max: 1,
+        defaultValue: 1,
+        step: 0.05,
+      },
+    ],
+  },
+  toneCurve: {
+    label: 'Tone Curve',
+    category: 'Color Effects',
+    settings: [
+      {
+        id: 'amount',
+        label: 'Curve',
+        min: -1,
+        max: 1,
+        defaultValue: 0.25,
+        step: 0.05,
+      },
+    ],
+  },
+  cinematicLut: {
+    label: 'Cinematic LUT',
+    category: 'Color Effects',
+    settings: [
+      {
+        id: 'preset',
+        label: 'Preset (0=Teal/Orange, 1=Bleach, 2=Film Fade, 3=Pastel)',
+        min: 0,
+        max: 3,
+        defaultValue: 0,
+        step: 1,
+      },
+      {
+        id: 'strength',
+        label: 'Strength',
+        min: 0,
+        max: 1,
+        defaultValue: 0.75,
+        step: 0.05,
+      },
+    ],
+  },
+
+  // Blur & Focus - Expanded ranges for more control
   blur: {
     label: 'Blur',
     category: 'Blur & Focus',
@@ -2633,7 +3178,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         id: 'radius',
         label: 'Radius',
         min: 0,
-        max: 20,
+        max: 100,
         defaultValue: 5,
         step: 1,
       },
@@ -2647,10 +3192,37 @@ export const effectsConfig: Record<string, EffectConfig> = {
         id: 'value',
         label: 'Amount',
         min: 0,
-        max: 5,
-        defaultValue: 0.5,
-        step: 0.1,
+        max: 10,
+        defaultValue: 1,
+        step: 0.5,
       },
+    ],
+  },
+
+  bokeh: {
+    label: 'Bokeh',
+    category: 'Blur & Focus',
+    settings: [
+      { id: 'radius', label: 'Blur Radius', min: 0, max: 30, defaultValue: 10, step: 1 },
+      {
+        id: 'threshold',
+        label: 'Highlight Threshold',
+        min: 0.4,
+        max: 0.98,
+        defaultValue: 0.78,
+        step: 0.01,
+      },
+      { id: 'strength', label: 'Blur Mix', min: 0, max: 1, defaultValue: 0.65, step: 0.05 },
+      { id: 'highlights', label: 'Highlight Boost', min: 0, max: 2, defaultValue: 0.9, step: 0.05 },
+    ],
+  },
+  depthBlur: {
+    label: 'Depth Blur',
+    category: 'Blur & Focus',
+    settings: [
+      { id: 'focusY', label: 'Focus Y', min: 0, max: 1, defaultValue: 0.5, step: 0.01 },
+      { id: 'range', label: 'Focus Range', min: 0, max: 0.5, defaultValue: 0.18, step: 0.01 },
+      { id: 'radius', label: 'Max Blur', min: 0, max: 30, defaultValue: 14, step: 1 },
     ],
   },
 
@@ -2722,21 +3294,93 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'contrast', label: 'Contrast', min: 0.5, max: 2.0, defaultValue: 1.2, step: 0.1 },
     ],
   },
+  // UNIFIED SKETCH - Combines pencilSketch, crosshatch, etchedLines, inkWash, inkOutlinePop
+  unifiedSketch: {
+    label: 'Sketch Studio',
+    category: 'Artistic',
+    settings: [
+      {
+        id: 'style',
+        label: 'Style (0=Pencil, 1=Cross, 2=Etched, 3=Ink, 4=Bold)',
+        min: 0,
+        max: 4,
+        defaultValue: 0,
+        step: 1,
+      },
+      { id: 'lineWeight', label: 'Line Weight', min: 1, max: 10, defaultValue: 2, step: 1 },
+      { id: 'density', label: 'Line Density (%)', min: 10, max: 100, defaultValue: 60, step: 5 },
+      { id: 'contrast', label: 'Contrast (%)', min: 50, max: 200, defaultValue: 120, step: 10 },
+      { id: 'invert', label: 'Invert (0=No, 1=Yes)', min: 0, max: 1, defaultValue: 0, step: 1 },
+    ],
+  },
   halftone: {
     label: 'Halftone',
     category: 'Artistic',
     settings: [
-      { id: 'dotSize', label: 'Dot Size', min: 1, max: 10, defaultValue: 3, step: 1 },
-      { id: 'spacing', label: 'Spacing', min: 1, max: 10, defaultValue: 4, step: 1 },
+      { id: 'dotSize', label: 'Dot Size', min: 1, max: 50, defaultValue: 5, step: 1 },
+      { id: 'spacing', label: 'Spacing', min: 2, max: 50, defaultValue: 8, step: 1 },
       { id: 'angle', label: 'Angle', min: 0, max: 180, defaultValue: 45, step: 5 },
+    ],
+  },
+  // UNIFIED PATTERN - Combines halftone, dotScreen, dithering, stippling
+  unifiedPattern: {
+    label: 'Pattern Studio',
+    category: 'Artistic',
+    settings: [
+      {
+        id: 'pattern',
+        label: 'Pattern (0=Dots, 1=Screen, 2=Dither, 3=Stipple)',
+        min: 0,
+        max: 3,
+        defaultValue: 0,
+        step: 1,
+      },
+      { id: 'size', label: 'Size', min: 2, max: 50, defaultValue: 8, step: 1 },
+      { id: 'density', label: 'Density (%)', min: 10, max: 100, defaultValue: 50, step: 5 },
+      { id: 'angle', label: 'Angle', min: 0, max: 180, defaultValue: 45, step: 5 },
+      {
+        id: 'colorMode',
+        label: 'Color (0=B&W, 1=Original)',
+        min: 0,
+        max: 1,
+        defaultValue: 0,
+        step: 1,
+      },
     ],
   },
   bloom: {
     label: 'Bloom',
     category: 'Blur & Focus',
     settings: [
-      { id: 'strength', label: 'Strength', min: 0, max: 2, defaultValue: 0.5, step: 0.1 },
-      { id: 'radius', label: 'Radius', min: 0, max: 20, defaultValue: 10, step: 1 },
+      { id: 'strength', label: 'Strength (%)', min: 0, max: 100, defaultValue: 50, step: 5 },
+      { id: 'radius', label: 'Radius', min: 1, max: 100, defaultValue: 15, step: 1 },
+    ],
+  },
+  // UNIFIED GLOW - Combines bloom, halation, bioluminescence, neon edges, orton
+  unifiedGlow: {
+    label: 'Glow Studio',
+    category: 'Blur & Focus',
+    settings: [
+      {
+        id: 'preset',
+        label: 'Style (0=Bloom, 1=Dreamy, 2=Neon, 3=Bio, 4=Halation)',
+        min: 0,
+        max: 4,
+        defaultValue: 0,
+        step: 1,
+      },
+      { id: 'intensity', label: 'Intensity (%)', min: 0, max: 100, defaultValue: 50, step: 5 },
+      { id: 'radius', label: 'Glow Radius', min: 1, max: 100, defaultValue: 20, step: 1 },
+      { id: 'threshold', label: 'Threshold (%)', min: 0, max: 100, defaultValue: 50, step: 5 },
+      { id: 'colorShift', label: 'Color Shift', min: 0, max: 100, defaultValue: 0, step: 5 },
+      {
+        id: 'darkenBg',
+        label: 'Darken Background (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 0,
+        step: 5,
+      },
     ],
   },
   oilPainting: {
@@ -2745,6 +3389,104 @@ export const effectsConfig: Record<string, EffectConfig> = {
     settings: [
       { id: 'radius', label: 'Brush Size', min: 1, max: 10, defaultValue: 4, step: 1 },
       { id: 'intensity', label: 'Intensity', min: 0.1, max: 2.0, defaultValue: 1.0, step: 0.1 },
+    ],
+  },
+  watercolor: {
+    label: 'Watercolor',
+    category: 'Artistic',
+    settings: [
+      { id: 'intensity', label: 'Wash', min: 0, max: 1, defaultValue: 0.7, step: 0.05 },
+      { id: 'edges', label: 'Edge Ink', min: 0, max: 1, defaultValue: 0.35, step: 0.05 },
+      { id: 'texture', label: 'Paper Texture', min: 0, max: 1, defaultValue: 0.25, step: 0.05 },
+    ],
+  },
+  toon: {
+    label: 'Toon',
+    category: 'Artistic',
+    settings: [
+      { id: 'smoothness', label: 'Smoothness', min: 0, max: 20, defaultValue: 8, step: 1 },
+      { id: 'levels', label: 'Color Levels', min: 2, max: 12, defaultValue: 6, step: 1 },
+      {
+        id: 'edgeThreshold',
+        label: 'Edge Threshold',
+        min: 0,
+        max: 1,
+        defaultValue: 0.25,
+        step: 0.01,
+      },
+      {
+        id: 'edgeStrength',
+        label: 'Edge Strength',
+        min: 0,
+        max: 1,
+        defaultValue: 0.85,
+        step: 0.05,
+      },
+    ],
+  },
+  posterEdges: {
+    label: 'Poster Edges',
+    category: 'Artistic',
+    settings: [
+      { id: 'levels', label: 'Poster Levels', min: 2, max: 10, defaultValue: 5, step: 1 },
+      {
+        id: 'edgeThreshold',
+        label: 'Edge Threshold',
+        min: 0,
+        max: 1,
+        defaultValue: 0.2,
+        step: 0.01,
+      },
+      { id: 'edgeStrength', label: 'Edge Strength', min: 0, max: 1, defaultValue: 0.9, step: 0.05 },
+    ],
+  },
+  cutout: {
+    label: 'Cutout',
+    category: 'Artistic',
+    settings: [
+      { id: 'levels', label: 'Levels', min: 2, max: 12, defaultValue: 6, step: 1 },
+      { id: 'edgeStrength', label: 'Edge Strength', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
+      { id: 'soften', label: 'Soften', min: 0, max: 1, defaultValue: 0.2, step: 0.05 },
+    ],
+  },
+  stainedGlass: {
+    label: 'Stained Glass',
+    category: 'Artistic',
+    settings: [
+      { id: 'cellSize', label: 'Cell Size', min: 4, max: 64, defaultValue: 18, step: 1 },
+      {
+        id: 'borderThickness',
+        label: 'Border Thickness',
+        min: 0,
+        max: 8,
+        defaultValue: 2,
+        step: 1,
+      },
+      {
+        id: 'borderDarkness',
+        label: 'Lead Darkness',
+        min: 0,
+        max: 1,
+        defaultValue: 0.85,
+        step: 0.05,
+      },
+    ],
+  },
+  doubleExposure: {
+    label: 'Double Exposure',
+    category: 'Artistic',
+    settings: [
+      { id: 'offsetX', label: 'Offset X', min: -1, max: 1, defaultValue: 0.15, step: 0.05 },
+      { id: 'offsetY', label: 'Offset Y', min: -1, max: 1, defaultValue: -0.1, step: 0.05 },
+      { id: 'opacity', label: 'Opacity', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
+      {
+        id: 'blendMode',
+        label: 'Blend (0=Screen, 1=Multiply, 2=Overlay)',
+        min: 0,
+        max: 2,
+        defaultValue: 0,
+        step: 1,
+      },
     ],
   },
   vignette: {
@@ -2797,7 +3539,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
   },
   stippling: {
     label: 'Stippling',
-    category: 'Generative',
+    category: 'Artistic',
     settings: [
       {
         id: 'density',
@@ -2986,15 +3728,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
 
-  // 5. Swirl Distortion
+  // 5. Swirl Distortion - Extended strength for more dramatic effects
   swirl: {
     label: 'Swirl',
     category: 'Distortion',
     settings: [
-      { id: 'radius', label: 'Radius', min: 10, max: 500, defaultValue: 150, step: 10 },
-      { id: 'strength', label: 'Strength', min: -10, max: 10, defaultValue: 3, step: 0.5 },
-      { id: 'centerX', label: 'Center X (0-1)', min: 0, max: 1, defaultValue: 0.5, step: 0.01 },
-      { id: 'centerY', label: 'Center Y (0-1)', min: 0, max: 1, defaultValue: 0.5, step: 0.01 },
+      { id: 'radius', label: 'Radius (%)', min: 5, max: 100, defaultValue: 50, step: 5 },
+      { id: 'strength', label: 'Strength', min: -20, max: 20, defaultValue: 5, step: 1 },
+      { id: 'centerX', label: 'Center X (%)', min: 0, max: 100, defaultValue: 50, step: 1 },
+      { id: 'centerY', label: 'Center Y (%)', min: 0, max: 100, defaultValue: 50, step: 1 },
     ],
   },
 
@@ -3067,7 +3809,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
   },
   // --- NEW EFFECTS END HERE ---
   // --- MORE UNIQUE EFFECTS START HERE ---
-  // 11. Voronoi Diagram Pattern
+  // 11. Voronoi Diagram Pattern - Expanded range for artistic control
   voronoi: {
     label: 'Voronoi Pattern',
     category: 'Generative',
@@ -3075,10 +3817,10 @@ export const effectsConfig: Record<string, EffectConfig> = {
       {
         id: 'numPoints',
         label: 'Number of Points',
-        min: 10,
-        max: 500,
+        min: 3,
+        max: 1000,
         defaultValue: 100,
-        step: 10,
+        step: 5,
       },
       {
         id: 'showLines',
@@ -3091,14 +3833,14 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
 
-  // 12. Kaleidoscope Effect
+  // 12. Kaleidoscope Effect - Expanded segments
   kaleidoscope: {
     label: 'Kaleidoscope',
     category: 'Distortion',
     settings: [
-      { id: 'segments', label: 'Segments', min: 2, max: 20, defaultValue: 6, step: 1 },
-      { id: 'centerX', label: 'Center X (0-1)', min: 0, max: 1, defaultValue: 0.5, step: 0.01 },
-      { id: 'centerY', label: 'Center Y (0-1)', min: 0, max: 1, defaultValue: 0.5, step: 0.01 },
+      { id: 'segments', label: 'Segments', min: 2, max: 32, defaultValue: 6, step: 1 },
+      { id: 'centerX', label: 'Center X (%)', min: 0, max: 100, defaultValue: 50, step: 1 },
+      { id: 'centerY', label: 'Center Y (%)', min: 0, max: 100, defaultValue: 50, step: 1 },
     ],
   },
 
@@ -4038,45 +4780,47 @@ const createChromaticGrainEffect = (settings: Record<string, number>) => {
 const createHalationGlowEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const radius = Math.max(1, settings.radius ?? 8);
+    const radius = Math.max(1, Math.min(50, settings.radius ?? 8));
     const strength = settings.strength ?? 0.6;
     const bias = settings.bias ?? 0.8;
 
-    const temp = new Uint8ClampedArray(data.length);
-    temp.set(data);
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const highlights = pool.acquire(data.length);
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const index = (y * width + x) * 4;
-        const brightness = (temp[index] + temp[index + 1] + temp[index + 2]) / 3;
+    try {
+      original.set(data);
 
-        if (brightness > bias * 255) {
-          for (let dy = -radius; dy <= radius; dy++) {
-            for (let dx = -radius; dx <= radius; dx++) {
-              const distance = Math.sqrt(dx * dx + dy * dy);
-              if (distance > radius) continue;
-
-              const targetX = x + dx;
-              const targetY = y + dy;
-
-              if (targetX < 0 || targetX >= width || targetY < 0 || targetY >= height) continue;
-
-              const targetIndex = (targetY * width + targetX) * 4;
-              const falloff = (1 - distance / radius) * strength;
-
-              data[targetIndex] = Math.min(255, data[targetIndex] + temp[index] * falloff);
-              data[targetIndex + 1] = Math.min(
-                255,
-                data[targetIndex + 1] + temp[index + 1] * falloff
-              );
-              data[targetIndex + 2] = Math.min(
-                255,
-                data[targetIndex + 2] + temp[index + 2] * falloff
-              );
-            }
-          }
+      // Extract highlights above bias threshold
+      const biasThreshold = bias * 255;
+      for (let i = 0; i < data.length; i += 4) {
+        const brightness = (original[i] + original[i + 1] + original[i + 2]) / 3;
+        if (brightness > biasThreshold) {
+          const factor = (brightness - biasThreshold) / (255 - biasThreshold);
+          highlights[i] = original[i] * factor;
+          highlights[i + 1] = original[i + 1] * factor;
+          highlights[i + 2] = original[i + 2] * factor;
+          highlights[i + 3] = 255;
+        } else {
+          highlights[i] = 0;
+          highlights[i + 1] = 0;
+          highlights[i + 2] = 0;
+          highlights[i + 3] = 255;
         }
       }
+
+      // Blur the highlights using optimized blur
+      stackBlur(highlights, width, height, radius);
+
+      // Add blurred highlights back to original
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.min(255, original[i] + highlights[i] * strength);
+        data[i + 1] = Math.min(255, original[i + 1] + highlights[i + 1] * strength);
+        data[i + 2] = Math.min(255, original[i + 2] + highlights[i + 2] * strength);
+      }
+    } finally {
+      pool.release(original);
+      pool.release(highlights);
     }
   };
 };
@@ -4857,32 +5601,768 @@ const createSelectiveColorEffect = (settings: Record<string, number>) => {
   };
 };
 
+const clampByte = (value: number) => Math.max(0, Math.min(255, value));
+
+const computeGrayscale = (data: Uint8ClampedArray, width: number, height: number): Uint8Array => {
+  const gray = new Uint8Array(width * height);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    const a = data[i + 3];
+    if (a === 0) {
+      gray[p] = 255;
+      continue;
+    }
+    gray[p] = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+  }
+  return gray;
+};
+
+const sobelMagnitude01 = (gray: Uint8Array, width: number, x: number, y: number): number => {
+  const idx = y * width + x;
+  const a00 = gray[idx - width - 1];
+  const a01 = gray[idx - width];
+  const a02 = gray[idx - width + 1];
+  const a10 = gray[idx - 1];
+  const a12 = gray[idx + 1];
+  const a20 = gray[idx + width - 1];
+  const a21 = gray[idx + width];
+  const a22 = gray[idx + width + 1];
+
+  const gx = -a00 - 2 * a10 - a20 + a02 + 2 * a12 + a22;
+  const gy = -a00 - 2 * a01 - a02 + a20 + 2 * a21 + a22;
+
+  const mag = (Math.abs(gx) + Math.abs(gy)) / 2040;
+  return Math.min(1, Math.max(0, mag));
+};
+
+const pseudoNoise01 = (x: number, y: number) => {
+  const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+};
+
+const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+
+const toneCurve01 = (t: number, k: number) => {
+  const lo = sigmoid(-k / 2);
+  const hi = sigmoid(k / 2);
+  const v = sigmoid(k * (t - 0.5));
+  return (v - lo) / (hi - lo);
+};
+
+const blendScreen = (base: number, overlay: number) => 255 - ((255 - base) * (255 - overlay)) / 255;
+const blendMultiply = (base: number, overlay: number) => (base * overlay) / 255;
+const blendOverlay = (base: number, overlay: number) =>
+  base < 128 ? (2 * base * overlay) / 255 : 255 - (2 * (255 - base) * (255 - overlay)) / 255;
+
+const createDehazeEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    const amount = clamp(settings.amount ?? 0.35, 0, 1);
+    const k = 1 + amount * 6;
+    const sat = 1 + amount * 0.5;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a === 0) continue;
+
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const l = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      const l2 = toneCurve01(l, k);
+      const ratio = l > 0 ? l2 / l : 0;
+
+      let nr = r * ratio;
+      let ng = g * ratio;
+      let nb = b * ratio;
+
+      const gray = l2 * 255;
+      nr = gray + (nr - gray) * sat;
+      ng = gray + (ng - gray) * sat;
+      nb = gray + (nb - gray) * sat;
+
+      const darken = amount * 10;
+      data[i] = clampByte(nr - darken);
+      data[i + 1] = clampByte(ng - darken);
+      data[i + 2] = clampByte(nb - darken);
+      data[i + 3] = a;
+    }
+  };
+};
+
+const createToneCurveEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    const amount = clamp(settings.amount ?? 0.25, -1, 1);
+    const k = Math.exp(amount * 1.8);
+
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a === 0) continue;
+
+      data[i] = clampByte(toneCurve01(data[i] / 255, k) * 255);
+      data[i + 1] = clampByte(toneCurve01(data[i + 1] / 255, k) * 255);
+      data[i + 2] = clampByte(toneCurve01(data[i + 2] / 255, k) * 255);
+      data[i + 3] = a;
+    }
+  };
+};
+
+const createGradientMapEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    const shadow = settings.shadowColor ? hexToRgb(settings.shadowColor) : { r: 27, g: 31, b: 58 };
+    const mid = settings.midColor ? hexToRgb(settings.midColor) : { r: 185, g: 198, b: 211 };
+    const highlight = settings.highlightColor
+      ? hexToRgb(settings.highlightColor)
+      : { r: 255, g: 214, b: 165 };
+
+    const midpoint = clamp(settings.midpoint ?? 0.5, 0.1, 0.9);
+    const strength = clamp(settings.strength ?? 1, 0, 1);
+
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a === 0) continue;
+
+      const r0 = data[i];
+      const g0 = data[i + 1];
+      const b0 = data[i + 2];
+      const t = (0.299 * r0 + 0.587 * g0 + 0.114 * b0) / 255;
+
+      let mr = 0;
+      let mg = 0;
+      let mb = 0;
+
+      if (t <= midpoint) {
+        const u = t / midpoint;
+        mr = lerp(shadow.r, mid.r, u);
+        mg = lerp(shadow.g, mid.g, u);
+        mb = lerp(shadow.b, mid.b, u);
+      } else {
+        const u = (t - midpoint) / (1 - midpoint);
+        mr = lerp(mid.r, highlight.r, u);
+        mg = lerp(mid.g, highlight.g, u);
+        mb = lerp(mid.b, highlight.b, u);
+      }
+
+      data[i] = clampByte(lerp(r0, mr, strength));
+      data[i + 1] = clampByte(lerp(g0, mg, strength));
+      data[i + 2] = clampByte(lerp(b0, mb, strength));
+      data[i + 3] = a;
+    }
+  };
+};
+
+const createCinematicLutEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    const preset = Math.floor(settings.preset ?? 0);
+    const strength = clamp(settings.strength ?? 0.75, 0, 1);
+
+    const applyPreset = (r: number, g: number, b: number): [number, number, number] => {
+      const l = 0.299 * r + 0.587 * g + 0.114 * b;
+      const t = l / 255;
+
+      switch (preset) {
+        case 1: {
+          const k = 1 + 5 * strength;
+          const l2 = toneCurve01(t, k) * 255;
+          const desat = 0.65 * strength;
+          const rr = lerp(r, l2, desat);
+          const gg = lerp(g, l2, desat);
+          const bb = lerp(b, l2, desat);
+          return [rr, gg, bb];
+        }
+        case 2: {
+          const lift = 18 * strength;
+          const fade = 1 - 0.15 * strength;
+          const rr = r * fade + lift + (t > 0.6 ? 10 * strength : 0);
+          const gg = g * fade + lift;
+          const bb = b * fade + lift - (t > 0.6 ? 8 * strength : 0);
+          return [rr, gg, bb];
+        }
+        case 3: {
+          const k = Math.max(0.2, 1 - 0.6 * strength);
+          const l2 = toneCurve01(t, k) * 255;
+          const sat = 1 - 0.35 * strength;
+          let rr = l2 + (r - l2) * sat;
+          let gg = l2 + (g - l2) * sat;
+          const bb = l2 + (b - l2) * sat;
+          rr += 10 * strength;
+          gg += 4 * strength;
+          return [rr, gg, bb];
+        }
+        default: {
+          const shadow = clamp((0.55 - t) / 0.55, 0, 1);
+          const highlight = clamp((t - 0.35) / 0.65, 0, 1);
+
+          let rr = r;
+          let gg = g;
+          let bb = b;
+
+          rr *= 1 - 0.12 * strength * shadow;
+          gg += 18 * strength * shadow;
+          bb += 28 * strength * shadow;
+
+          rr += 34 * strength * highlight;
+          gg += 14 * strength * highlight;
+          bb *= 1 - 0.12 * strength * highlight;
+
+          return [rr, gg, bb];
+        }
+      }
+    };
+
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a === 0) continue;
+
+      const r0 = data[i];
+      const g0 = data[i + 1];
+      const b0 = data[i + 2];
+      const [rr, gg, bb] = applyPreset(r0, g0, b0);
+
+      data[i] = clampByte(lerp(r0, rr, strength));
+      data[i + 1] = clampByte(lerp(g0, gg, strength));
+      data[i + 2] = clampByte(lerp(b0, bb, strength));
+      data[i + 3] = a;
+    }
+  };
+};
+
+const createRelightEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const angle = ((settings.angle ?? 45) * Math.PI) / 180;
+    const strength = clamp(settings.strength ?? 0.4, 0, 1);
+    const ambient = clamp(settings.ambient ?? 0.2, 0, 1);
+
+    const lx = Math.cos(angle);
+    const ly = Math.sin(angle);
+
+    for (let y = 0; y < height; y++) {
+      const ny = height > 1 ? (y / (height - 1)) * 2 - 1 : 0;
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const a = data[idx + 3];
+        if (a === 0) continue;
+
+        const nx = width > 1 ? (x / (width - 1)) * 2 - 1 : 0;
+        const dot = clamp(nx * lx + ny * ly, -1, 1);
+        const light = ambient + dot * strength * 0.35;
+        const mult = clamp(1 + light, 0, 2);
+
+        data[idx] = clampByte(data[idx] * mult);
+        data[idx + 1] = clampByte(data[idx + 1] * mult);
+        data[idx + 2] = clampByte(data[idx + 2] * mult);
+        data[idx + 3] = a;
+      }
+    }
+  };
+};
+
+const createDoubleExposureEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const offsetX = clamp(settings.offsetX ?? 0.15, -1, 1);
+    const offsetY = clamp(settings.offsetY ?? -0.1, -1, 1);
+    const opacity = clamp(settings.opacity ?? 0.6, 0, 1);
+    const blendMode = Math.floor(settings.blendMode ?? 0);
+
+    const dx = Math.round(offsetX * width * 0.25);
+    const dy = Math.round(offsetY * height * 0.25);
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+
+      const blend = (base: number, overlay: number) => {
+        switch (blendMode) {
+          case 1:
+            return blendMultiply(base, overlay);
+          case 2:
+            return blendOverlay(base, overlay);
+          default:
+            return blendScreen(base, overlay);
+        }
+      };
+
+      for (let y = 0; y < height; y++) {
+        const sy = Math.min(height - 1, Math.max(0, y - dy));
+        for (let x = 0; x < width; x++) {
+          const sx = Math.min(width - 1, Math.max(0, x - dx));
+          const i = (y * width + x) * 4;
+          const si = (sy * width + sx) * 4;
+
+          const a = original[i + 3];
+          if (a === 0) continue;
+
+          const r0 = original[i];
+          const g0 = original[i + 1];
+          const b0 = original[i + 2];
+
+          const r1 = original[si];
+          const g1 = original[si + 1];
+          const b1 = original[si + 2];
+
+          const br = blend(r0, r1);
+          const bg = blend(g0, g1);
+          const bb = blend(b0, b1);
+
+          data[i] = clampByte(lerp(r0, br, opacity));
+          data[i + 1] = clampByte(lerp(g0, bg, opacity));
+          data[i + 2] = clampByte(lerp(b0, bb, opacity));
+          data[i + 3] = a;
+        }
+      }
+    } finally {
+      pool.release(original);
+    }
+  };
+};
+
+const createPosterEdgesEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const levels = Math.max(2, Math.min(10, Math.floor(settings.levels ?? 5)));
+    const edgeThreshold = clamp(settings.edgeThreshold ?? 0.2, 0, 1);
+    const edgeStrength = clamp(settings.edgeStrength ?? 0.9, 0, 1);
+    const step = 255 / (levels - 1);
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+      const gray = computeGrayscale(original, width, height);
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          const i = p * 4;
+          const a = original[i + 3];
+          if (a === 0) continue;
+
+          const r = Math.round(Math.round(original[i] / step) * step);
+          const g = Math.round(Math.round(original[i + 1] / step) * step);
+          const b = Math.round(Math.round(original[i + 2] / step) * step);
+
+          let edge = 0;
+          if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
+            edge = sobelMagnitude01(gray, width, x, y);
+          }
+
+          const line =
+            edge > edgeThreshold
+              ? ((edge - edgeThreshold) / (1 - edgeThreshold)) * edgeStrength
+              : 0;
+
+          data[i] = clampByte(lerp(r, 0, line));
+          data[i + 1] = clampByte(lerp(g, 0, line));
+          data[i + 2] = clampByte(lerp(b, 0, line));
+          data[i + 3] = a;
+        }
+      }
+    } finally {
+      pool.release(original);
+    }
+  };
+};
+
+const createCutoutEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const levels = Math.max(2, Math.min(12, Math.floor(settings.levels ?? 6)));
+    const edgeStrength = clamp(settings.edgeStrength ?? 0.6, 0, 1);
+    const soften = clamp(settings.soften ?? 0.2, 0, 1);
+    const step = 255 / (levels - 1);
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const softened = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+      softened.set(data);
+
+      const blurRadius = Math.round(soften * 6);
+      if (blurRadius > 0) {
+        stackBlur(softened, width, height, blurRadius);
+      }
+
+      const gray = computeGrayscale(original, width, height);
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          const i = p * 4;
+          const a = original[i + 3];
+          if (a === 0) continue;
+
+          let r = Math.round(Math.round(softened[i] / step) * step);
+          let g = Math.round(Math.round(softened[i + 1] / step) * step);
+          let b = Math.round(Math.round(softened[i + 2] / step) * step);
+
+          if (edgeStrength > 0 && x > 0 && y > 0 && x < width - 1 && y < height - 1) {
+            const edge = sobelMagnitude01(gray, width, x, y);
+            const darken = 1 - edge * edgeStrength * 0.9;
+            r *= darken;
+            g *= darken;
+            b *= darken;
+          }
+
+          data[i] = clampByte(r);
+          data[i + 1] = clampByte(g);
+          data[i + 2] = clampByte(b);
+          data[i + 3] = a;
+        }
+      }
+    } finally {
+      pool.release(original);
+      pool.release(softened);
+    }
+  };
+};
+
+const createToonEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const smoothness = Math.max(0, Math.min(20, Math.round(settings.smoothness ?? 8)));
+    const levels = Math.max(2, Math.min(12, Math.floor(settings.levels ?? 6)));
+    const edgeThreshold = clamp(settings.edgeThreshold ?? 0.25, 0, 1);
+    const edgeStrength = clamp(settings.edgeStrength ?? 0.85, 0, 1);
+    const step = 255 / (levels - 1);
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const blurred = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+      blurred.set(data);
+
+      if (smoothness > 0) {
+        stackBlur(blurred, width, height, smoothness);
+      }
+
+      const gray = computeGrayscale(original, width, height);
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          const i = p * 4;
+          const a = original[i + 3];
+          if (a === 0) continue;
+
+          let r = Math.round(Math.round(blurred[i] / step) * step);
+          let g = Math.round(Math.round(blurred[i + 1] / step) * step);
+          let b = Math.round(Math.round(blurred[i + 2] / step) * step);
+
+          let edge = 0;
+          if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
+            edge = sobelMagnitude01(gray, width, x, y);
+          }
+
+          const line =
+            edge > edgeThreshold
+              ? ((edge - edgeThreshold) / (1 - edgeThreshold)) * edgeStrength
+              : 0;
+
+          r = lerp(r, 0, line);
+          g = lerp(g, 0, line);
+          b = lerp(b, 0, line);
+
+          data[i] = clampByte(r);
+          data[i + 1] = clampByte(g);
+          data[i + 2] = clampByte(b);
+          data[i + 3] = a;
+        }
+      }
+    } finally {
+      pool.release(original);
+      pool.release(blurred);
+    }
+  };
+};
+
+const createWatercolorEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const intensity = clamp(settings.intensity ?? 0.7, 0, 1);
+    const edges = clamp(settings.edges ?? 0.35, 0, 1);
+    const texture = clamp(settings.texture ?? 0.25, 0, 1);
+
+    const radius = Math.round(2 + intensity * 8);
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const blurred = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+      blurred.set(data);
+
+      if (radius > 0) {
+        stackBlur(blurred, width, height, radius);
+      }
+
+      const gray = computeGrayscale(original, width, height);
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          const i = p * 4;
+          const a = original[i + 3];
+          if (a === 0) continue;
+
+          let r = lerp(original[i], blurred[i], intensity);
+          let g = lerp(original[i + 1], blurred[i + 1], intensity);
+          let b = lerp(original[i + 2], blurred[i + 2], intensity);
+
+          if (edges > 0 && x > 0 && y > 0 && x < width - 1 && y < height - 1) {
+            const mag = sobelMagnitude01(gray, width, x, y);
+            const darken = 1 - mag * edges * 0.9;
+            r *= darken;
+            g *= darken;
+            b *= darken;
+          }
+
+          if (texture > 0) {
+            const n = (pseudoNoise01(x, y) - 0.5) * texture * 30;
+            r += n;
+            g += n;
+            b += n;
+          }
+
+          data[i] = clampByte(r);
+          data[i + 1] = clampByte(g);
+          data[i + 2] = clampByte(b);
+          data[i + 3] = a;
+        }
+      }
+    } finally {
+      pool.release(original);
+      pool.release(blurred);
+    }
+  };
+};
+
+const createStainedGlassEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const cellSize = Math.max(4, Math.min(64, Math.round(settings.cellSize ?? 18)));
+    const borderThickness = Math.max(0, Math.min(8, Math.round(settings.borderThickness ?? 2)));
+    const borderDarkness = clamp(settings.borderDarkness ?? 0.85, 0, 1);
+    const borderScale = 1 - borderDarkness;
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+
+      for (let ty = 0; ty < height; ty += cellSize) {
+        for (let tx = 0; tx < width; tx += cellSize) {
+          let sumR = 0;
+          let sumG = 0;
+          let sumB = 0;
+          let count = 0;
+
+          const yMax = Math.min(height, ty + cellSize);
+          const xMax = Math.min(width, tx + cellSize);
+
+          for (let y = ty; y < yMax; y++) {
+            for (let x = tx; x < xMax; x++) {
+              const i = (y * width + x) * 4;
+              const a = original[i + 3];
+              if (a === 0) continue;
+              sumR += original[i];
+              sumG += original[i + 1];
+              sumB += original[i + 2];
+              count++;
+            }
+          }
+
+          if (count === 0) continue;
+
+          const avgR = sumR / count;
+          const avgG = sumG / count;
+          const avgB = sumB / count;
+
+          for (let y = ty; y < yMax; y++) {
+            for (let x = tx; x < xMax; x++) {
+              const i = (y * width + x) * 4;
+              const a = original[i + 3];
+              if (a === 0) continue;
+
+              const isBorder =
+                borderThickness > 0 &&
+                (x - tx < borderThickness ||
+                  xMax - 1 - x < borderThickness ||
+                  y - ty < borderThickness ||
+                  yMax - 1 - y < borderThickness);
+
+              const scale = isBorder ? borderScale : 1;
+
+              data[i] = clampByte(avgR * scale);
+              data[i + 1] = clampByte(avgG * scale);
+              data[i + 2] = clampByte(avgB * scale);
+              data[i + 3] = a;
+            }
+          }
+        }
+      }
+    } finally {
+      pool.release(original);
+    }
+  };
+};
+
+const createBokehEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const radius = Math.max(0, Math.min(30, Math.round(settings.radius ?? 10)));
+    const threshold = clamp(settings.threshold ?? 0.78, 0.4, 0.98);
+    const strength = clamp(settings.strength ?? 0.65, 0, 1);
+    const highlights = clamp(settings.highlights ?? 0.9, 0, 2);
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const blurred = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+      blurred.set(data);
+
+      if (radius > 0) {
+        stackBlur(blurred, width, height, radius);
+      }
+
+      for (let i = 0; i < data.length; i += 4) {
+        const a = original[i + 3];
+        if (a === 0) continue;
+
+        const r0 = original[i];
+        const g0 = original[i + 1];
+        const b0 = original[i + 2];
+
+        let r = lerp(r0, blurred[i], strength);
+        let g = lerp(g0, blurred[i + 1], strength);
+        let b = lerp(b0, blurred[i + 2], strength);
+
+        const l = (0.299 * r0 + 0.587 * g0 + 0.114 * b0) / 255;
+        if (l > threshold) {
+          const mask = (l - threshold) / (1 - threshold);
+          const boost = mask * highlights;
+          r += blurred[i] * boost * 0.5;
+          g += blurred[i + 1] * boost * 0.5;
+          b += blurred[i + 2] * boost * 0.5;
+        }
+
+        data[i] = clampByte(r);
+        data[i + 1] = clampByte(g);
+        data[i + 2] = clampByte(b);
+        data[i + 3] = a;
+      }
+    } finally {
+      pool.release(original);
+      pool.release(blurred);
+    }
+  };
+};
+
+const createDepthBlurEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const focusY = clamp(settings.focusY ?? 0.5, 0, 1);
+    const range = clamp(settings.range ?? 0.18, 0, 0.5);
+    const radius = Math.max(0, Math.min(30, Math.round(settings.radius ?? 14)));
+
+    const denom = Math.max(0.0001, 0.5 - range);
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const blurred = pool.acquire(data.length);
+
+    try {
+      original.set(data);
+      blurred.set(data);
+
+      if (radius > 0) {
+        stackBlur(blurred, width, height, radius);
+      }
+
+      for (let y = 0; y < height; y++) {
+        const t = height > 1 ? y / (height - 1) : 0.5;
+        const dy = Math.abs(t - focusY);
+        const blurFactor = clamp((dy - range) / denom, 0, 1);
+
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+          const a = original[i + 3];
+          if (a === 0) continue;
+
+          data[i] = clampByte(lerp(original[i], blurred[i], blurFactor));
+          data[i + 1] = clampByte(lerp(original[i + 1], blurred[i + 1], blurFactor));
+          data[i + 2] = clampByte(lerp(original[i + 2], blurred[i + 2], blurFactor));
+          data[i + 3] = a;
+        }
+      }
+    } finally {
+      pool.release(original);
+      pool.release(blurred);
+    }
+  };
+};
+
 // Reorganized effects categories for better UX
 export const effectCategories = {
   Adjust: {
     icon: '',
     description: 'Basic image adjustments',
-    effects: ['brightness', 'contrast', 'saturation', 'hue', 'colorTemperature'],
+    effects: [
+      'brightness',
+      'contrast',
+      'saturation',
+      'hue',
+      'colorTemperature',
+      'dehaze',
+      'relight',
+    ],
   },
   'Blur & Focus': {
     icon: '',
     description: 'Blur and sharpening effects',
-    effects: ['blur', 'sharpen', 'temporalEcho', 'bloom', 'tiltShiftMiniature'],
+    effects: [
+      'blur',
+      'sharpen',
+      'bokeh',
+      'depthBlur',
+      'unifiedGlow',
+      'bloom',
+      'temporalEcho',
+      'tiltShiftMiniature',
+    ],
   },
-  Style: {
+  Artistic: {
     icon: '',
     description: 'Artistic transformations',
     effects: [
+      'unifiedSketch',
+      'unifiedPattern',
+      'stippling',
       'pencilSketch',
+      'watercolor',
       'oilPainting',
+      'toon',
+      'posterEdges',
+      'cutout',
+      'stainedGlass',
+      'doubleExposure',
       'halftone',
       'crosshatch',
       'dotScreen',
-      'stippling',
-      'geometric',
-      'cellular',
-      'reaction-diffusion',
-      'flowField',
       'crystallize',
       'paperCutArt',
       'retroDithering',
@@ -4905,10 +6385,15 @@ export const effectCategories = {
     icon: '',
     description: 'Color grading and effects',
     effects: [
+      'unifiedMono',
+      'blackAndWhite',
       'grayscale',
       'sepia',
       'invert',
       'duotone',
+      'gradientMap',
+      'toneCurve',
+      'cinematicLut',
       'holographicInterference',
       'selectiveColor',
       'colorQuantization',
@@ -5101,12 +6586,19 @@ const createPaperCutArtEffect = (settings: Record<string, number>) => {
       { r: 30, g: 18, b: 15 }, // Darkest
     ];
 
-    // First pass: assign layers
+    // First pass: assign layers (only for non-transparent pixels)
     const layerMap = new Uint8Array(width * height);
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
+      const a = data[i + 3];
+
+      // Skip fully transparent pixels
+      if (a === 0) {
+        layerMap[i / 4] = 255; // Mark as transparent
+        continue;
+      }
 
       const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
       const layerIdx = Math.min(layers - 1, Math.floor((1 - brightness) * layers));
@@ -5117,6 +6609,17 @@ const createPaperCutArtEffect = (settings: Record<string, number>) => {
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const i = (y * width + x) * 4;
+        const originalAlpha = data[i + 3];
+
+        // Preserve transparency - skip fully transparent pixels
+        if (originalAlpha === 0) {
+          tempData[i] = 0;
+          tempData[i + 1] = 0;
+          tempData[i + 2] = 0;
+          tempData[i + 3] = 0;
+          continue;
+        }
+
         const currentLayer = layerMap[y * width + x];
 
         // Get paper color for this layer
@@ -5135,7 +6638,8 @@ const createPaperCutArtEffect = (settings: Record<string, number>) => {
             const ny = y + dy;
             if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
               const neighborLayer = layerMap[ny * width + nx];
-              if (neighborLayer < currentLayer) {
+              // Skip transparent neighbors in shadow calculation
+              if (neighborLayer !== 255 && neighborLayer < currentLayer) {
                 isShadowEdge = true;
                 shadowIntensity = Math.max(
                   shadowIntensity,
@@ -5151,16 +6655,19 @@ const createPaperCutArtEffect = (settings: Record<string, number>) => {
         tempData[i] = Math.floor(color.r * shadowDarken);
         tempData[i + 1] = Math.floor(color.g * shadowDarken);
         tempData[i + 2] = Math.floor(color.b * shadowDarken);
-        tempData[i + 3] = 255;
+        // Preserve original alpha channel
+        tempData[i + 3] = originalAlpha;
       }
     }
 
-    // Add paper fiber texture
+    // Add paper fiber texture (only to non-transparent pixels)
     for (let i = 0; i < tempData.length; i += 4) {
-      const noise = (Math.random() - 0.5) * 12;
-      tempData[i] = Math.max(0, Math.min(255, tempData[i] + noise));
-      tempData[i + 1] = Math.max(0, Math.min(255, tempData[i + 1] + noise));
-      tempData[i + 2] = Math.max(0, Math.min(255, tempData[i + 2] + noise));
+      if (tempData[i + 3] > 0) {
+        const noise = (Math.random() - 0.5) * 12;
+        tempData[i] = Math.max(0, Math.min(255, tempData[i] + noise));
+        tempData[i + 1] = Math.max(0, Math.min(255, tempData[i + 1] + noise));
+        tempData[i + 2] = Math.max(0, Math.min(255, tempData[i + 2] + noise));
+      }
     }
 
     data.set(tempData);
@@ -5175,53 +6682,51 @@ const createTiltShiftMiniatureEffect = (settings: Record<string, number>) => {
     const focalRange = (settings.focalLength ?? 50) * 2;
     const blurStrength = 16 / (settings.aperture ?? 5.6);
 
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const blurred = pool.acquire(data.length);
 
-    for (let y = 0; y < height; y++) {
-      const distance = Math.abs(y - focalPoint);
-      const blurAmount = Math.max(0, (distance - focalRange) / height) * blurStrength;
+    try {
+      original.set(data);
+      blurred.set(data);
 
-      if (blurAmount > 0) {
-        const radius = Math.ceil(blurAmount);
+      // Apply a single blur pass at max strength
+      const maxBlur = Math.ceil(blurStrength);
+      if (maxBlur > 0) {
+        stackBlur(blurred, width, height, maxBlur);
+      }
+
+      // Blend based on distance from focal point
+      for (let y = 0; y < height; y++) {
+        const distance = Math.abs(y - focalPoint);
+        const blendFactor = Math.max(0, Math.min(1, (distance - focalRange) / (height * 0.3)));
 
         for (let x = 0; x < width; x++) {
-          let r = 0,
-            g = 0,
-            b = 0,
-            count = 0;
-
-          for (let dy = -radius; dy <= radius; dy++) {
-            for (let dx = -radius; dx <= radius; dx++) {
-              const ny = Math.max(0, Math.min(height - 1, y + dy));
-              const nx = Math.max(0, Math.min(width - 1, x + dx));
-              const idx = (ny * width + nx) * 4;
-
-              r += tempData[idx];
-              g += tempData[idx + 1];
-              b += tempData[idx + 2];
-              count++;
-            }
-          }
-
           const index = (y * width + x) * 4;
-          data[index] = r / count;
-          data[index + 1] = g / count;
-          data[index + 2] = b / count;
+
+          // Blend between original and blurred based on distance
+          data[index] = original[index] * (1 - blendFactor) + blurred[index] * blendFactor;
+          data[index + 1] =
+            original[index + 1] * (1 - blendFactor) + blurred[index + 1] * blendFactor;
+          data[index + 2] =
+            original[index + 2] * (1 - blendFactor) + blurred[index + 2] * blendFactor;
         }
       }
-    }
 
-    // Add slight saturation boost for toy-like appearance
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const avg = (r + g + b) / 3;
+      // Add slight saturation boost for toy-like appearance
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const avg = (r + g + b) / 3;
 
-      data[i] = avg + (r - avg) * 1.3;
-      data[i + 1] = avg + (g - avg) * 1.3;
-      data[i + 2] = avg + (b - avg) * 1.3;
+        data[i] = Math.min(255, Math.max(0, avg + (r - avg) * 1.3));
+        data[i + 1] = Math.min(255, Math.max(0, avg + (g - avg) * 1.3));
+        data[i + 2] = Math.min(255, Math.max(0, avg + (b - avg) * 1.3));
+      }
+    } finally {
+      pool.release(original);
+      pool.release(blurred);
     }
   };
 };
@@ -5234,113 +6739,95 @@ const createNeonGlowEdgesEffect = (settings: Record<string, number>) => {
     const glowRadius = Math.floor(5 + (glowInput - 1) * 5); // 5 to 50
     const glowIntensity = settings.glowIntensity ?? 0.5;
 
-    // Edge detection with Sobel
-    const edges = new Uint8ClampedArray(width * height);
-    const edgeHue = new Float32Array(width * height); // Store hue from original color
-    const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
-    const kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const glowLayer = pool.acquire(data.length);
 
-    for (let y = 1; y < height - 1; y++) {
-      for (let x = 1; x < width - 1; x++) {
-        let gx = 0,
-          gy = 0;
-        let avgR = 0,
-          avgG = 0,
-          avgB = 0;
+    try {
+      original.set(data);
 
-        for (let ky = -1; ky <= 1; ky++) {
-          for (let kx = -1; kx <= 1; kx++) {
-            const idx = ((y + ky) * width + (x + kx)) * 4;
-            const val = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
-            const kernelIdx = (ky + 1) * 3 + (kx + 1);
-            gx += val * kernelX[kernelIdx];
-            gy += val * kernelY[kernelIdx];
-            avgR += data[idx];
-            avgG += data[idx + 1];
-            avgB += data[idx + 2];
-          }
-        }
+      // Edge detection with Sobel
+      const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+      const kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
 
-        const edgeVal = Math.min(255, Math.sqrt(gx * gx + gy * gy));
-        edges[y * width + x] = edgeVal;
+      // Create colored edge glow layer
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          let gx = 0,
+            gy = 0;
+          let avgR = 0,
+            avgG = 0,
+            avgB = 0;
 
-        // Calculate hue from original colors for neon tinting
-        avgR /= 9;
-        avgG /= 9;
-        avgB /= 9;
-        const max = Math.max(avgR, avgG, avgB);
-        const min = Math.min(avgR, avgG, avgB);
-        let h = 0;
-        if (max !== min) {
-          const d = max - min;
-          if (max === avgR) h = ((avgG - avgB) / d + (avgG < avgB ? 6 : 0)) / 6;
-          else if (max === avgG) h = ((avgB - avgR) / d + 2) / 6;
-          else h = ((avgR - avgG) / d + 4) / 6;
-        }
-        edgeHue[y * width + x] = h;
-      }
-    }
-
-    // Create glow accumulator
-    const glowAccum = new Float32Array(width * height * 3);
-    const step = glowRadius > 25 ? 2 : 1;
-
-    // Apply glow from edges
-    for (let y = 0; y < height; y += step) {
-      for (let x = 0; x < width; x += step) {
-        const edgeStrength = edges[y * width + x];
-
-        if (edgeStrength > 20) {
-          // Neon color based on original image hue + some variation
-          const baseHue = edgeHue[y * width + x];
-          const hue = (baseHue + (x * 0.001 + y * 0.001)) % 1;
-          const { r, g, b } = hslToRgb(hue, 1, 0.55);
-
-          const normalizedEdge = edgeStrength / 255;
-
-          for (let dy = -glowRadius; dy <= glowRadius; dy += step) {
-            for (let dx = -glowRadius; dx <= glowRadius; dx += step) {
-              const ny = y + dy;
-              const nx = x + dx;
-
-              if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
-                const dist = Math.sqrt(dx * dx + dy * dy);
-
-                if (dist <= glowRadius) {
-                  // Gaussian falloff for softer glow
-                  const sigma = glowRadius * 0.35;
-                  const falloff = Math.exp(-(dist * dist) / (2 * sigma * sigma));
-                  const intensity = falloff * glowIntensity * normalizedEdge * 2.5;
-
-                  const accIdx = (ny * width + nx) * 3;
-                  glowAccum[accIdx] += r * intensity;
-                  glowAccum[accIdx + 1] += g * intensity;
-                  glowAccum[accIdx + 2] += b * intensity;
-                }
-              }
+          for (let ky = -1; ky <= 1; ky++) {
+            for (let kx = -1; kx <= 1; kx++) {
+              const idx = ((y + ky) * width + (x + kx)) * 4;
+              const val =
+                original[idx] * 0.299 + original[idx + 1] * 0.587 + original[idx + 2] * 0.114;
+              const kernelIdx = (ky + 1) * 3 + (kx + 1);
+              gx += val * kernelX[kernelIdx];
+              gy += val * kernelY[kernelIdx];
+              avgR += original[idx];
+              avgG += original[idx + 1];
+              avgB += original[idx + 2];
             }
           }
+
+          const edgeVal = Math.min(255, Math.sqrt(gx * gx + gy * gy));
+          const idx = (y * width + x) * 4;
+
+          if (edgeVal > 20) {
+            // Calculate hue from original colors for neon tinting
+            avgR /= 9;
+            avgG /= 9;
+            avgB /= 9;
+            const max = Math.max(avgR, avgG, avgB);
+            const min = Math.min(avgR, avgG, avgB);
+            let h = 0;
+            if (max !== min) {
+              const d = max - min;
+              if (max === avgR) h = ((avgG - avgB) / d + (avgG < avgB ? 6 : 0)) / 6;
+              else if (max === avgG) h = ((avgB - avgR) / d + 2) / 6;
+              else h = ((avgR - avgG) / d + 4) / 6;
+            }
+
+            // Neon color based on hue with variation
+            const hue = (h + (x * 0.001 + y * 0.001)) % 1;
+            const { r, g, b } = hslToRgb(hue, 1, 0.55);
+            const normalizedEdge = edgeVal / 255;
+
+            glowLayer[idx] = r * normalizedEdge * 255;
+            glowLayer[idx + 1] = g * normalizedEdge * 255;
+            glowLayer[idx + 2] = b * normalizedEdge * 255;
+            glowLayer[idx + 3] = 255;
+          } else {
+            glowLayer[idx] = 0;
+            glowLayer[idx + 1] = 0;
+            glowLayer[idx + 2] = 0;
+            glowLayer[idx + 3] = 255;
+          }
         }
       }
-    }
 
-    // Darken background and apply accumulated glow
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const idx = (y * width + x) * 4;
-        const accIdx = (y * width + x) * 3;
+      // Blur the glow layer using optimized blur
+      stackBlur(glowLayer, width, height, glowRadius);
 
-        // Dark background with slight original image tint
-        const bgFactor = 0.08;
-        data[idx] = data[idx] * bgFactor + glowAccum[accIdx] * 255;
-        data[idx + 1] = data[idx + 1] * bgFactor + glowAccum[accIdx + 1] * 255;
-        data[idx + 2] = data[idx + 2] * bgFactor + glowAccum[accIdx + 2] * 255;
-
-        // Clamp
-        data[idx] = Math.min(255, data[idx]);
-        data[idx + 1] = Math.min(255, data[idx + 1]);
-        data[idx + 2] = Math.min(255, data[idx + 2]);
+      // Composite: dark background + blurred neon glow
+      const bgFactor = 0.08;
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.min(255, original[i] * bgFactor + glowLayer[i] * glowIntensity * 2.5);
+        data[i + 1] = Math.min(
+          255,
+          original[i + 1] * bgFactor + glowLayer[i + 1] * glowIntensity * 2.5
+        );
+        data[i + 2] = Math.min(
+          255,
+          original[i + 2] * bgFactor + glowLayer[i + 2] * glowIntensity * 2.5
+        );
       }
+    } finally {
+      pool.release(original);
+      pool.release(glowLayer);
     }
   };
 };
@@ -5580,128 +7067,88 @@ const createBioluminescenceEffect = (settings: Record<string, number>) => {
     const glowIntensity = settings.glowIntensity ?? 0.5;
     const glowSpread = settings.glowSpread ?? 0.5;
 
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const glowLayer = pool.acquire(data.length);
 
-    // First pass: identify bright/saturated regions that will glow
-    const glowMap = new Float32Array(width * height);
-    const colorMap: Array<{ r: number; g: number; b: number }> = new Array(width * height);
+    try {
+      original.set(data);
 
-    // Brightness threshold scales with intensity - lower intensity = more selective glow
-    const brightnessThreshold = 0.3 + (1 - glowIntensity) * 0.4; // 0.3 to 0.7
+      // Brightness threshold scales with intensity
+      const brightnessThreshold = 0.3 + (1 - glowIntensity) * 0.4;
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const idx = (y * width + x) * 4;
-        const r = tempData[idx];
-        const g = tempData[idx + 1];
-        const b = tempData[idx + 2];
+      // Extract glow sources - bright/saturated areas with bioluminescent color shift
+      for (let i = 0; i < data.length; i += 4) {
+        const r = original[i];
+        const g = original[i + 1];
+        const b = original[i + 2];
         const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
 
-        // Calculate color saturation - saturated colors also glow
         const maxC = Math.max(r, g, b);
         const minC = Math.min(r, g, b);
         const saturation = maxC > 0 ? (maxC - minC) / maxC : 0;
 
-        // Areas glow based on brightness OR saturation
         const glowFactor =
           brightness > brightnessThreshold
             ? (brightness - brightnessThreshold) / (1 - brightnessThreshold)
             : 0;
         const satGlow = saturation > 0.3 ? saturation * 0.5 : 0;
-
         const combinedGlow = Math.min(1, glowFactor + satGlow);
-        glowMap[y * width + x] = combinedGlow;
 
-        // Store original color for the glow tint
-        colorMap[y * width + x] = { r, g, b };
+        if (combinedGlow > 0.1) {
+          // Bioluminescent color shift - push towards cyan/blue-green
+          glowLayer[i] = (r * 0.3 + 20) * combinedGlow;
+          glowLayer[i + 1] = (g * 0.8 + b * 0.3 + 100) * combinedGlow;
+          glowLayer[i + 2] = (b * 0.7 + g * 0.4 + 80) * combinedGlow;
+          glowLayer[i + 3] = 255;
+        } else {
+          glowLayer[i] = 0;
+          glowLayer[i + 1] = 0;
+          glowLayer[i + 2] = 0;
+          glowLayer[i + 3] = 255;
+        }
       }
-    }
 
-    // Darkness factor - more spread = darker background for more contrast
-    const darknessFactor = 0.05 + (1 - glowSpread) * 0.15; // 0.05 to 0.2
+      // Blur the glow layer using optimized separable blur
+      const glowRadius = Math.ceil(5 + glowSpread * 55);
+      stackBlur(glowLayer, width, height, Math.min(glowRadius, 60));
 
-    // Create dark background
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = tempData[i] * darknessFactor;
-      data[i + 1] = tempData[i + 1] * darknessFactor;
-      data[i + 2] = tempData[i + 2] * (darknessFactor + 0.03); // Slight blue tint
-    }
+      // Darkness factor for background
+      const darknessFactor = 0.05 + (1 - glowSpread) * 0.15;
 
-    // Map spread 0-1 to actual radius 5-60 pixels
-    const glowRadius = Math.ceil(5 + glowSpread * 55);
-    // Use step size for performance on large radii
-    const step = glowRadius > 30 ? 2 : 1;
+      // Composite: dark background + blurred glow
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.min(255, original[i] * darknessFactor + glowLayer[i] * glowIntensity * 2);
+        data[i + 1] = Math.min(
+          255,
+          original[i + 1] * darknessFactor + glowLayer[i + 1] * glowIntensity * 2
+        );
+        data[i + 2] = Math.min(
+          255,
+          original[i + 2] * (darknessFactor + 0.03) + glowLayer[i + 2] * glowIntensity * 2
+        );
+      }
 
-    // Create a glow accumulator for additive blending
-    const glowAccum = new Float32Array(width * height * 3);
+      // Add sparkle particles at high intensity
+      if (glowIntensity > 0.6) {
+        const particleCount = Math.floor((glowIntensity - 0.6) * 300);
+        for (let i = 0; i < particleCount; i++) {
+          const px = Math.floor(Math.random() * width);
+          const py = Math.floor(Math.random() * height);
+          const idx = (py * width + px) * 4;
 
-    for (let y = 0; y < height; y += step) {
-      for (let x = 0; x < width; x += step) {
-        const glowValue = glowMap[y * width + x];
-
-        if (glowValue > 0.1) {
-          const srcColor = colorMap[y * width + x];
-
-          // Create bioluminescent color shift - push towards cyan/blue-green
-          const glowR = srcColor.r * 0.3 + 20;
-          const glowG = srcColor.g * 0.8 + srcColor.b * 0.3 + 100;
-          const glowB = srcColor.b * 0.7 + srcColor.g * 0.4 + 80;
-
-          for (let dy = -glowRadius; dy <= glowRadius; dy += step) {
-            for (let dx = -glowRadius; dx <= glowRadius; dx += step) {
-              const ny = y + dy;
-              const nx = x + dx;
-
-              if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
-                const dist = Math.sqrt(dx * dx + dy * dy);
-
-                if (dist <= glowRadius) {
-                  // Gaussian falloff
-                  const sigma = glowRadius * 0.4;
-                  const falloff = Math.exp(-(dist * dist) / (2 * sigma * sigma));
-                  const glowAmount = glowValue * falloff * glowIntensity * 2;
-
-                  const accIdx = (ny * width + nx) * 3;
-                  glowAccum[accIdx] += glowR * glowAmount;
-                  glowAccum[accIdx + 1] += glowG * glowAmount;
-                  glowAccum[accIdx + 2] += glowB * glowAmount;
-                }
-              }
-            }
+          // Only sparkle where there's glow
+          if (glowLayer[idx] > 20 || glowLayer[idx + 1] > 20) {
+            const sparkle = 50 + Math.random() * 100;
+            data[idx] = Math.min(255, data[idx] + sparkle * 0.3);
+            data[idx + 1] = Math.min(255, data[idx + 1] + sparkle);
+            data[idx + 2] = Math.min(255, data[idx + 2] + sparkle * 0.8);
           }
         }
       }
-    }
-
-    // Apply accumulated glow
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const idx = (y * width + x) * 4;
-        const accIdx = (y * width + x) * 3;
-
-        data[idx] = Math.min(255, data[idx] + glowAccum[accIdx]);
-        data[idx + 1] = Math.min(255, data[idx + 1] + glowAccum[accIdx + 1]);
-        data[idx + 2] = Math.min(255, data[idx + 2] + glowAccum[accIdx + 2]);
-      }
-    }
-
-    // Add subtle pulsing particles effect at high intensity
-    if (glowIntensity > 0.6) {
-      const particleCount = Math.floor((glowIntensity - 0.6) * 500);
-      for (let i = 0; i < particleCount; i++) {
-        const px = Math.floor(Math.random() * width);
-        const py = Math.floor(Math.random() * height);
-        const glowVal = glowMap[py * width + px];
-
-        if (glowVal > 0.2) {
-          const idx = (py * width + px) * 4;
-          const sparkle = 50 + Math.random() * 100;
-          data[idx] = Math.min(255, data[idx] + sparkle * 0.3);
-          data[idx + 1] = Math.min(255, data[idx + 1] + sparkle);
-          data[idx + 2] = Math.min(255, data[idx + 2] + sparkle * 0.8);
-        }
-      }
+    } finally {
+      pool.release(original);
+      pool.release(glowLayer);
     }
   };
 };

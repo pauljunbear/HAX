@@ -33,7 +33,7 @@ interface ImageEditorProps {
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
-const MAX_CACHE_ENTRIES = 200;
+const MAX_CACHE_ENTRIES = 50; // Reduced from 200 to prevent memory bloat
 
 const createTemporaryStage = (imageElement: HTMLImageElement): TemporaryStageResources => {
   const container = document.createElement('div');
@@ -261,13 +261,33 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
 
           const filters: ((imageData: ImageData) => void)[] = [];
 
-          konvaNode.brightness(0);
-          konvaNode.contrast(0);
-          konvaNode.saturation(0);
-          konvaNode.hue(0);
-          konvaNode.blurRadius(0);
-          konvaNode.noise(0);
-          konvaNode.enhance(0);
+          const resetNumberProp = (key: string, value: number) => {
+            const nodeRecord = konvaNode as unknown as Record<string, unknown>;
+            const maybeSetter = nodeRecord[key];
+            if (typeof maybeSetter === 'function') {
+              (maybeSetter as (input: number) => void).call(konvaNode, value);
+            } else {
+              nodeRecord[key] = value;
+            }
+          };
+
+          // Reset commonly-used Konva filter props (guarded so we don't crash if a filter module isn't loaded yet)
+          [
+            'brightness',
+            'contrast',
+            'saturation',
+            'hue',
+            'blurRadius',
+            'noise',
+            'enhance',
+            'pixelSize',
+          ].forEach(key => {
+            try {
+              resetNumberProp(key, 0);
+            } catch {
+              // ignore
+            }
+          });
 
           for (const layer of effectLayers) {
             if (layer.visible && layer.effectId) {
@@ -306,9 +326,26 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
           konvaNode.filters(filters);
           konvaNode.cache({ pixelRatio: Math.max(0.5, pixelRatio) });
           konvaNode.getLayer()?.draw();
+          setError(null);
         } catch (err) {
           console.error('Failed to apply effects', err);
-          setError('Failed to apply effects. Please try again.');
+          try {
+            const konvaNode = node as KonvaImageNode;
+            konvaNode.filters([]);
+            konvaNode.clearCache?.();
+            konvaNode.cache({ pixelRatio: Math.max(0.5, pixelRatio) });
+            konvaNode.getLayer()?.draw();
+          } catch {
+            // ignore
+          }
+
+          const message =
+            err instanceof Error
+              ? err.message
+              : typeof err === 'string'
+                ? err
+                : 'Please try again.';
+          setError(`Failed to apply effects. ${message}`);
         }
       },
       [effectLayers]
@@ -579,11 +616,24 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
 
         {error && (
           <div
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-20 max-w-[min(680px,calc(100%-32px))]"
             role="alert"
           >
-            <strong className="font-bold">Error: </strong>
-            <span className="block sm:inline">{error}</span>
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <strong className="font-bold">Error: </strong>
+                <span className="block sm:inline break-words">{error}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                className="flex-shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-md bg-red-200/60 hover:bg-red-200 transition-colors"
+                aria-label="Dismiss error"
+                title="Dismiss"
+              >
+                <span className="text-red-700 leading-none text-lg">×</span>
+              </button>
+            </div>
           </div>
         )}
 

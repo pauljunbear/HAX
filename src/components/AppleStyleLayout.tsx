@@ -55,6 +55,11 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
   const [isLeftOpen, setIsLeftOpen] = useState(false);
   const [isRightOpen, setIsRightOpen] = useState(false);
 
+  const nextTheme =
+    theme === 'light' ? 'instrument' : theme === 'instrument' ? 'terminal' : 'light';
+  const nextThemeLabel =
+    nextTheme === 'instrument' ? 'Instrument' : nextTheme === 'terminal' ? 'Terminal' : 'Light';
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -198,9 +203,9 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
         <button
           onClick={toggleTheme}
           className="w-10 h-10 md:w-12 md:h-12 theme-toggle-button rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
-          title={`Switch to ${theme === 'light' ? 'terminal' : 'light'} theme`}
+          title={`Switch to ${nextThemeLabel} theme`}
         >
-          {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+          {nextTheme === 'terminal' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
         </button>
       </div>
 
