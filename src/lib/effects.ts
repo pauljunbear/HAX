@@ -973,53 +973,86 @@ const createReactionDiffusionEffect = (settings: Record<string, number>) => {
 // Add new effect function for Pencil Sketch
 const createPencilSketchEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
-    const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
+    const { data, width, height } = imageData;
 
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const avg = (r + g + b) / 3;
-      data[i] = data[i + 1] = data[i + 2] = avg;
-    }
+    const intensity = clamp(settings.intensity ?? 1.0, 0.1, 2.0);
+    const lineWeight = clamp(settings.lineWeight ?? 2, 1, 5);
+    const contrast = clamp(settings.contrast ?? 1.2, 0.5, 2.0);
 
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
+    // Map intensity's 0.1–2 range into a stable 0–1 blend.
+    const mix = clamp((intensity - 0.1) / 1.9, 0, 1);
+    const blurRadius = Math.max(1, Math.round(1 + lineWeight * 2));
 
-    const strength = settings.strength || 1.0;
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const gray = pool.acquire(data.length);
+    const inverted = pool.acquire(data.length);
+    const blurred = pool.acquire(data.length);
 
-    for (let i = 0; i < data.length; i += 4) {
-      const pixelIndex = i / 4;
-      const x = pixelIndex % width;
-      const y = Math.floor(pixelIndex / width);
+    try {
+      original.set(data);
 
-      if (x === 0 || x === width - 1 || y === 0 || y === height - 1) {
-        continue;
-      }
-
-      const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
-      const kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
-
-      let gx = 0;
-      let gy = 0;
-
-      for (let ky = -1; ky <= 1; ky++) {
-        for (let kx = -1; kx <= 1; kx++) {
-          const kernelIndex = (ky + 1) * 3 + (kx + 1);
-          const neighborIndex = ((y + ky) * width + (x + kx)) * 4;
-          const pixelValue = tempData[neighborIndex];
-
-          gx += pixelValue * kernelX[kernelIndex];
-          gy += pixelValue * kernelY[kernelIndex];
+      // Grayscale (preserve alpha)
+      for (let i = 0; i < data.length; i += 4) {
+        const a = original[i + 3];
+        if (a === 0) {
+          gray[i] = 0;
+          gray[i + 1] = 0;
+          gray[i + 2] = 0;
+          gray[i + 3] = 0;
+          continue;
         }
+
+        const g = original[i] * 0.299 + original[i + 1] * 0.587 + original[i + 2] * 0.114;
+        gray[i] = gray[i + 1] = gray[i + 2] = g;
+        gray[i + 3] = a;
       }
 
-      const magnitude = 255 - Math.sqrt(gx * gx + gy * gy);
-      const edgeValue = Math.min(255, Math.max(0, magnitude * strength));
+      // Invert the grayscale image
+      for (let i = 0; i < data.length; i += 4) {
+        const a = gray[i + 3];
+        if (a === 0) {
+          inverted[i] = 0;
+          inverted[i + 1] = 0;
+          inverted[i + 2] = 0;
+          inverted[i + 3] = 0;
+          continue;
+        }
 
-      data[i] = data[i + 1] = data[i + 2] = edgeValue;
+        inverted[i] = 255 - gray[i];
+        inverted[i + 1] = 255 - gray[i + 1];
+        inverted[i + 2] = 255 - gray[i + 2];
+        inverted[i + 3] = a;
+      }
+
+      // Blur the inverted image; lineWeight controls blur radius -> perceived line thickness
+      blurred.set(inverted);
+      stackBlur(blurred, width, height, blurRadius);
+
+      // Color dodge blend (classic pencil sketch technique)
+      for (let i = 0; i < data.length; i += 4) {
+        const a = original[i + 3];
+        if (a === 0) continue;
+
+        const base = gray[i];
+        const blend = blurred[i];
+        const denom = Math.max(1, 255 - blend);
+        const dodge = clamp((base * 255) / denom, 0, 255);
+
+        let out = lerp(base, dodge, mix);
+        out = (out - 128) * contrast + 128;
+        out = clamp(out, 0, 255);
+
+        data[i] = out;
+        data[i + 1] = out;
+        data[i + 2] = out;
+        data[i + 3] = a;
+      }
+    } finally {
+      pool.release(original);
+      pool.release(gray);
+      pool.release(inverted);
+      pool.release(blurred);
     }
   };
 };
