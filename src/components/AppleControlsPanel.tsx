@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { effectsConfig } from '@/lib/effects';
+import { effectsConfig, getEffectCategory } from '@/lib/effects';
 import { Settings, Download, Layers, FileImage, Film, Monitor, X } from 'lucide-react';
 import { useTheme } from '@/lib/themes';
 
@@ -121,6 +121,9 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   // Get the active layer with null checking
   const activeLayer = effectLayers?.find(layer => layer.id === activeEffect);
   const activeEffectConfig = activeLayer ? effectsConfig[activeLayer.effectId] : null;
+  const activeEffectCategory = activeLayer
+    ? (getEffectCategory(activeLayer.effectId) ?? activeEffectConfig?.category)
+    : null;
 
   // Get current effect settings with proper fallbacks
   const currentEffectSettings =
@@ -241,7 +244,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                           {activeEffectConfig?.label}
                         </h3>
                         <p className="text-xs text-gray-500 mt-1 control-panel-category">
-                          {activeEffectConfig?.category}
+                          {activeEffectCategory}
                         </p>
                       </div>
                       <button

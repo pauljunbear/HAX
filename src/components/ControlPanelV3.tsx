@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { effectsConfig, effectCategories } from '@/lib/effects';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
-import { ARIA_LABELS, focusRingClass, announce, useKeyboardNavigation } from '@/lib/accessibility';
+import { ARIA_LABELS, focusRingClass, announce } from '@/lib/accessibility';
 import { GroupedVirtualScroll } from './VirtualScroll';
 import { EffectHoverPreview } from './EffectHoverPreview';
+
+// Debounce delay for slider updates (ms)
+const SLIDER_DEBOUNCE_DELAY = 50; // Fast but prevents excessive updates
 
 interface ControlPanelV3Props {
   activeEffect?: string | null;
@@ -53,6 +55,40 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const sliderDebounceRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const pendingSettingsRef = useRef<Map<string, number>>(new Map());
+
+  // Debounced setting change handler for smoother slider performance
+  const handleDebouncedSettingChange = useCallback(
+    (settingId: string, value: number) => {
+      // Store the pending value for immediate UI feedback
+      pendingSettingsRef.current.set(settingId, value);
+
+      // Clear existing timeout for this setting
+      const existingTimeout = sliderDebounceRef.current.get(settingId);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+
+      // Set new debounced call
+      const timeoutId = setTimeout(() => {
+        onSettingChange?.(settingId, value);
+        sliderDebounceRef.current.delete(settingId);
+        pendingSettingsRef.current.delete(settingId);
+      }, SLIDER_DEBOUNCE_DELAY);
+
+      sliderDebounceRef.current.set(settingId, timeoutId);
+    },
+    [onSettingChange]
+  );
+
+  // Cleanup debounce timers on unmount
+  useEffect(() => {
+    return () => {
+      sliderDebounceRef.current.forEach(timeout => clearTimeout(timeout));
+      sliderDebounceRef.current.clear();
+    };
+  }, []);
 
   // Load recent effects on mount
   useEffect(() => {
@@ -61,11 +97,11 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
 
   // Get settings for the active effect
   const currentEffectSettings = useMemo(() => {
-    if (!activeEffect || !effectsConfig[activeEffect]?.settings) return [];
-    return Object.entries(effectsConfig[activeEffect].settings).map(([key, setting]) => ({
-      id: key,
-      ...(setting as any),
-      currentValue: effectSettings[key] ?? (setting as any).default,
+    const settings = activeEffect ? effectsConfig[activeEffect]?.settings : undefined;
+    if (!activeEffect || !settings) return [];
+    return settings.map(setting => ({
+      ...setting,
+      currentValue: effectSettings[setting.id] ?? setting.defaultValue,
     }));
   }, [activeEffect, effectSettings]);
 
@@ -141,29 +177,30 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
     const results: { id: string; category: string; score: number }[] = [];
     const query = searchQuery.toLowerCase();
 
-    Object.entries(effectCategories as Record<string, { effects: string[] }>).
-      forEach(([category, data]) => {
-      data.effects.forEach(effectId => {
-        const effect = effectsConfig[effectId];
-        if (effect) {
-          const label = effect.label.toLowerCase();
-          let score = 0;
+    Object.entries(effectCategories as Record<string, { effects: string[] }>).forEach(
+      ([category, data]) => {
+        data.effects.forEach(effectId => {
+          const effect = effectsConfig[effectId];
+          if (effect) {
+            const label = effect.label.toLowerCase();
+            let score = 0;
 
-          // Exact match
-          if (label === query) score = 100;
-          // Starts with
-          else if (label.startsWith(query)) score = 80;
-          // Contains
-          else if (label.includes(query)) score = 60;
-          // Category match
-          else if (category.toLowerCase().includes(query)) score = 40;
+            // Exact match
+            if (label === query) score = 100;
+            // Starts with
+            else if (label.startsWith(query)) score = 80;
+            // Contains
+            else if (label.includes(query)) score = 60;
+            // Category match
+            else if (category.toLowerCase().includes(query)) score = 40;
 
-          if (score > 0) {
-            results.push({ id: effectId, category, score });
+            if (score > 0) {
+              results.push({ id: effectId, category, score });
+            }
           }
-        }
-      });
-    });
+        });
+      }
+    );
 
     return results.sort((a, b) => b.score - a.score).map(r => r.id);
   }, [searchQuery]);
@@ -439,7 +476,7 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                       {viewMode === 'list' && (
                         <div className="text-[10px] opacity-60">
                           {
-                            Object.entries(effectCategories).find(([_, data]) =>
+                            Object.entries(effectCategories).find(([, data]) =>
                               data.effects.includes(effectId)
                             )?.[0]
                           }
@@ -454,16 +491,17 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
         ) : (
           /* Category Groups with Virtual Scrolling */
           <GroupedVirtualScroll
-            groups={Object.entries(effectCategories as Record<string, { effects: string[] }>).
-              map(([category, data]) => ({
-              label: category,
-              items: expandedCategories.has(category) ? data.effects : [],
-            }))}
+            groups={Object.entries(effectCategories as Record<string, { effects: string[] }>).map(
+              ([category, data]) => ({
+                label: category,
+                items: expandedCategories.has(category) ? data.effects : [],
+              })
+            )}
             itemHeight={viewMode === 'grid' ? 40 : 32}
             groupHeaderHeight={40}
             containerHeight={containerHeight}
             renderGroupHeader={category => {
-              const data = (effectCategories as any)[category];
+              const data = (effectCategories as Record<string, { effects: string[] }>)[category];
               return (
                 <button
                   onClick={() => toggleCategory(category)}
@@ -562,7 +600,7 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                   onClick={() => {
                     // Reset all settings to default
                     currentEffectSettings.forEach(setting => {
-                      onSettingChange?.(setting.id, setting.default);
+                      onSettingChange?.(setting.id, setting.defaultValue);
                     });
                   }}
                   className="text-[10px] text-dark-textMuted hover:text-dark-text transition-colors"
@@ -587,8 +625,10 @@ const ControlPanelV3: React.FC<ControlPanelV3Props> = ({
                       min={setting.min}
                       max={setting.max}
                       step={setting.step}
-                      value={setting.currentValue}
-                      onChange={e => onSettingChange?.(setting.id, parseFloat(e.target.value))}
+                      value={pendingSettingsRef.current.get(setting.id) ?? setting.currentValue}
+                      onChange={e =>
+                        handleDebouncedSettingChange(setting.id, parseFloat(e.target.value))
+                      }
                       className="w-full h-1 bg-dark-border rounded-lg appearance-none cursor-pointer slider"
                       aria-label={setting.label}
                     />

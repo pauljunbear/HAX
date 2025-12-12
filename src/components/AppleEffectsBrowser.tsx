@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { effectsConfig } from '@/lib/effects';
-import { ChevronRight, Plus, Search, Grid3X3, List } from 'lucide-react';
+import { effectsConfig, effectCategories } from '@/lib/effects';
+import { ChevronRight, Plus, Search } from 'lucide-react';
 
 interface AppleEffectsBrowserProps {
   activeEffect?: string | null;
@@ -18,37 +18,47 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   onEffectChange,
   hasImage = false,
   onNewImage,
-  onHidePanel,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [hoveredEffect, setHoveredEffect] = useState<string | null>(null);
 
-  // Start with ALL categories collapsed by default
+  // Start with curated categories collapsed by default
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
-    new Set(Object.values(effectsConfig).map(effect => effect.category))
+    () => new Set([...Object.keys(effectCategories), 'More'])
   );
 
   // Group effects by category
   const effectsByCategory = useMemo(() => {
     const grouped: Record<string, Array<[string, (typeof effectsConfig)[string]]>> = {};
 
-    Object.entries(effectsConfig).forEach(([id, effect]) => {
-      if (!grouped[effect.category]) {
-        grouped[effect.category] = [];
-      }
-      grouped[effect.category].push([id, effect]);
+    // Use the curated UI categories (keeps menus compact and predictable)
+    Object.entries(effectCategories).forEach(([category, data]) => {
+      const items = (data.effects || [])
+        .filter(effectId => !!effectsConfig[effectId])
+        .map(
+          effectId =>
+            [effectId, effectsConfig[effectId]] as [string, (typeof effectsConfig)[string]]
+        )
+        .sort((a, b) => a[1].label.localeCompare(b[1].label));
+
+      grouped[category] = items;
     });
 
-    // Sort categories and effects within each category
-    const sortedCategories = Object.keys(grouped).sort();
-    const result: Record<string, Array<[string, (typeof effectsConfig)[string]]>> = {};
-
-    sortedCategories.forEach(category => {
-      result[category] = grouped[category].sort((a, b) => a[1].label.localeCompare(b[1].label));
+    // Ensure every effect remains discoverable under "More"
+    const included = new Set<string>();
+    Object.values(grouped).forEach(items => {
+      items.forEach(([id]) => included.add(id));
     });
 
-    return result;
+    const remaining = Object.entries(effectsConfig)
+      .filter(([id]) => !included.has(id))
+      .sort((a, b) => a[1].label.localeCompare(b[1].label));
+
+    if (remaining.length > 0) {
+      grouped['More'] = remaining;
+    }
+
+    return grouped;
   }, []);
 
   // Filter effects based on search
@@ -59,7 +69,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
 
     Object.entries(effectsByCategory).forEach(([category, effects]) => {
       const matchingEffects = effects.filter(
-        ([id, effect]) =>
+        ([, effect]) =>
           effect.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
           category.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -192,7 +202,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
 
           {/* Categories and Effects */}
           {hasImage &&
-            Object.entries(filteredEffectsByCategory).map(([category, effects], categoryIndex) => {
+            Object.entries(filteredEffectsByCategory).map(([category, effects]) => {
               const isExpanded = !collapsedCategories.has(category);
 
               return (
@@ -200,8 +210,6 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                   {/* Category Header */}
                   <button
                     onClick={() => toggleCategory(category)}
-                    onMouseEnter={() => setHoveredCategory(category)}
-                    onMouseLeave={() => setHoveredCategory(null)}
                     className={`
                       w-full flex items-center justify-between px-3 py-2.5 text-left 
                       transition-all rounded-xl group relative overflow-hidden glass-effect-button

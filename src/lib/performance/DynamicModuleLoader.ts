@@ -57,92 +57,10 @@ export class DynamicModuleLoader {
       },
     ],
 
-    // Advanced image processing modules
-    [
-      'advanced-filters',
-      {
-        id: 'advanced-filters',
-        loader: () => import('../effects/advancedFilters'),
-        size: 85, // ~85KB
-        preload: false,
-      },
-    ],
-
-    [
-      'ai-effects',
-      {
-        id: 'ai-effects',
-        loader: () => import('../effects/aiEffects'),
-        size: 150, // ~150KB
-        preload: false,
-      },
-    ],
-
-    // Video processing
-    [
-      'ffmpeg-wasm',
-      {
-        id: 'ffmpeg-wasm',
-        loader: () => import('@ffmpeg/ffmpeg'),
-        size: 340, // ~340KB
-        preload: false,
-      },
-    ],
-
-    // Advanced export formats
-    [
-      'gif-encoder',
-      {
-        id: 'gif-encoder',
-        loader: () => import('../export/gifEncoder'),
-        size: 45, // ~45KB
-        preload: false,
-      },
-    ],
-
-    // Performance profiling tools
-    [
-      'performance-profiler',
-      {
-        id: 'performance-profiler',
-        loader: () => import('./PerformanceProfiler'),
-        size: 25, // ~25KB
-        preload: false,
-      },
-    ],
-
-    // Accessibility tools
-    [
-      'accessibility-tools',
-      {
-        id: 'accessibility-tools',
-        loader: () => import('../accessibility/AccessibilityTools'),
-        size: 35, // ~35KB
-        preload: false,
-      },
-    ],
-
-    // Machine learning models
-    [
-      'tensorflow',
-      {
-        id: 'tensorflow',
-        loader: () => import('@tensorflow/tfjs'),
-        size: 450, // ~450KB
-        preload: false,
-      },
-    ],
-
-    // Advanced color spaces
-    [
-      'color-spaces',
-      {
-        id: 'color-spaces',
-        loader: () => import('../color/advancedColorSpaces'),
-        size: 60, // ~60KB
-        preload: false,
-      },
-    ],
+    // Note: Additional modules can be registered dynamically using registerModule()
+    // The following modules are commented out until their implementations exist:
+    // - advanced-filters, ai-effects, gif-encoder, performance-profiler
+    // - accessibility-tools, tensorflow, color-spaces
   ]);
 
   constructor() {
@@ -372,11 +290,6 @@ export class DynamicModuleLoader {
         this.preloadModule('three');
       }
     }, 2000); // Wait 2 seconds after app load
-
-    // Preload advanced filters after 10 seconds of interaction
-    setTimeout(() => {
-      this.preloadModule('advanced-filters');
-    }, 10000);
   }
 
   /**
@@ -447,6 +360,4 @@ export const getModuleLoader = (): DynamicModuleLoader => {
 // Convenience functions for common modules
 export const loadThreeJS = () => getModuleLoader().loadModule('three');
 export const loadThreeFiber = () => getModuleLoader().loadModule('three-fiber');
-export const loadAdvancedFilters = () => getModuleLoader().loadModule('advanced-filters');
-export const loadFFmpeg = () => getModuleLoader().loadModule('ffmpeg-wasm');
-export const loadTensorFlow = () => getModuleLoader().loadModule('tensorflow');
+export const loadThreeDrei = () => getModuleLoader().loadModule('three-drei');

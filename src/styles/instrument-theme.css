@@ -1,0 +1,324 @@
+/* =======================================
+   INSTRUMENT THEME - SWISS MINIMAL PANEL
+   ======================================= */
+
+html.theme-instrument {
+  color-scheme: light;
+
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-space-mono);
+
+  /* Fog background */
+  --bg: #cfd4d9;
+
+  /* Floating surfaces */
+  --panel-bg: rgba(255, 255, 255, 0.34);
+  --panel-bg-strong: rgba(255, 255, 255, 0.92); /* cleaner canvas */
+  --panel-border: rgba(17, 19, 21, 0.08);
+  --panel-border-strong: rgba(17, 19, 21, 0.12);
+
+  /* Type */
+  --text-primary: #111315;
+  --text-secondary: rgba(17, 19, 21, 0.62);
+  --text-tertiary: rgba(17, 19, 21, 0.44);
+
+  /* Used by slider track logic in ControlsPanel (terminalTrack) */
+  --text-accent: #111315;
+
+  /* Shape + depth */
+  --radius-panel: 14px;
+  --radius-control: 10px;
+  --shadow-panel: 0 18px 48px rgba(0, 0, 0, 0.1);
+  --shadow-panel-soft: 0 10px 28px rgba(0, 0, 0, 0.08);
+
+  --focus-ring: rgba(17, 19, 21, 0.28);
+}
+
+html.theme-instrument body {
+  background: var(--bg) !important;
+  color: var(--text-primary) !important;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji' !important;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* App background */
+html.theme-instrument .layout-bg {
+  background-color: var(--bg) !important;
+}
+
+/* No grid/texture (keeps canvas feeling super clean) */
+html.theme-instrument .layout-bg::before,
+html.theme-instrument .layout-bg::after {
+  display: none !important;
+}
+
+/* Panels: translucent cards, no distortion layers */
+html.theme-instrument .glass-container {
+  background: var(--panel-bg) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: var(--radius-panel) !important;
+  box-shadow: var(--shadow-panel) !important;
+  backdrop-filter: blur(18px) saturate(1.05) brightness(1.02) !important;
+}
+
+html.theme-instrument .canvas-area.glass-container {
+  background: var(--panel-bg-strong) !important; /* keeps the image area clean */
+  border-color: var(--panel-border-strong) !important;
+  box-shadow: var(--shadow-panel-soft) !important;
+  backdrop-filter: none !important;
+}
+
+html.theme-instrument .glass-filter,
+html.theme-instrument .glass-overlay,
+html.theme-instrument .glass-specular {
+  display: none !important;
+}
+
+/* Micro headers (Effects / Controls) */
+html.theme-instrument .glass-content h2 {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em !important;
+  text-transform: uppercase !important;
+  color: var(--text-secondary) !important;
+}
+
+/* Inputs */
+html.theme-instrument .glass-input {
+  background: rgba(255, 255, 255, 0.46) !important;
+  border: 1px solid var(--panel-border-strong) !important;
+  border-radius: var(--radius-control) !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+}
+
+/* Buttons */
+html.theme-instrument .glass-button {
+  background: rgba(255, 255, 255, 0.28) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: var(--radius-control) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+  color: var(--text-primary) !important;
+  backdrop-filter: blur(12px) saturate(1.05) !important;
+  transform: none;
+}
+
+html.theme-instrument .glass-button:hover {
+  background: rgba(255, 255, 255, 0.42) !important;
+  border-color: var(--panel-border-strong) !important;
+  transform: none !important;
+}
+
+html.theme-instrument .glass-button:active {
+  background: rgba(255, 255, 255, 0.22) !important;
+}
+
+/* Selected state: hard black bar (tabs + selected effect) */
+html.theme-instrument .glass-button.glass-active,
+html.theme-instrument .glass-button.glass-active:hover {
+  background: var(--text-primary) !important;
+  border-color: var(--text-primary) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+/* Theme toggle button (bottom-right) */
+html.theme-instrument .theme-toggle-button {
+  background: rgba(255, 255, 255, 0.52) !important;
+  border: 1px solid var(--panel-border-strong) !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12) !important;
+  backdrop-filter: blur(18px) saturate(1.05) !important;
+  color: var(--text-primary) !important;
+}
+
+html.theme-instrument .theme-toggle-button:hover {
+  background: rgba(255, 255, 255, 0.62) !important;
+  transform: none !important;
+}
+
+/* Cards (override global Apple glass-card) */
+html.theme-instrument .glass-card {
+  background: rgba(255, 255, 255, 0.32) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: var(--radius-panel) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(14px) saturate(1.05) !important;
+  transform: none !important;
+}
+
+html.theme-instrument .glass-card:hover {
+  background: rgba(255, 255, 255, 0.38) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Liquid material (used for small icon tiles) */
+html.theme-instrument .liquid-material {
+  background: rgba(255, 255, 255, 0.28) !important;
+  border: 1px solid var(--panel-border) !important;
+  border-radius: var(--radius-control) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(12px) saturate(1.05) !important;
+}
+
+html.theme-instrument .liquid-material::before,
+html.theme-instrument .liquid-material::after {
+  display: none !important;
+}
+
+/* Category headers (buttons): keep subtle even when expanded */
+html.theme-instrument button.glass-effect-button {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html.theme-instrument button.glass-effect-button:hover {
+  background: rgba(255, 255, 255, 0.24) !important;
+  border-color: var(--panel-border) !important;
+  transform: none !important;
+}
+
+html.theme-instrument button.glass-effect-button.glass-active,
+html.theme-instrument button.glass-effect-button.glass-active:hover {
+  background: rgba(17, 19, 21, 0.08) !important;
+  border-color: var(--panel-border-strong) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Active layer row (div): hard black selected state */
+html.theme-instrument div.glass-effect-button.glass-active,
+html.theme-instrument div.glass-effect-button.glass-active:hover {
+  background: var(--text-primary) !important;
+  border: 1px solid var(--text-primary) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+/* Nested icon buttons inside active rows */
+html.theme-instrument div.glass-effect-button.glass-active .glass-button {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html.theme-instrument div.glass-effect-button.glass-active .glass-button:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
+}
+
+/* Effect items: “one loud note” for the selected effect */
+html.theme-instrument .effect-button-modern {
+  border-radius: var(--radius-control) !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(17, 19, 21, 0.06) !important;
+  box-shadow: none !important;
+}
+
+html.theme-instrument .effect-button-modern:hover:not(.glass-active):not(:disabled) {
+  background: rgba(255, 255, 255, 0.32) !important;
+  border-color: rgba(17, 19, 21, 0.1) !important;
+}
+
+html.theme-instrument .effect-button-modern.glass-active,
+html.theme-instrument .effect-button-modern.glass-active:hover {
+  background: var(--text-primary) !important;
+  border-color: var(--text-primary) !important;
+  color: #ffffff !important;
+}
+
+/* Kill rainbow hover feel without touching JS */
+html.theme-instrument .effect-button-modern > div {
+  border-radius: inherit !important;
+  background: linear-gradient(to right, rgba(17, 19, 21, 0.1), rgba(17, 19, 21, 0.04)) !important;
+}
+
+html.theme-instrument .effect-button-modern span {
+  color: inherit !important;
+}
+
+html.theme-instrument .effect-button-modern span.text-white {
+  color: inherit !important;
+}
+
+/* Badges */
+html.theme-instrument .glass-badge {
+  background: rgba(255, 255, 255, 0.28) !important;
+  border: 1px solid var(--panel-border) !important;
+  color: var(--text-secondary) !important;
+  font-family: var(--font-mono) !important;
+}
+
+/* Controls typography */
+html.theme-instrument .control-panel-title,
+html.theme-instrument .control-panel-label {
+  font-size: 12px !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  font-weight: 600 !important;
+  color: var(--text-secondary) !important;
+}
+
+html.theme-instrument .control-panel-category {
+  color: var(--text-tertiary) !important;
+}
+
+/* Value chips */
+html.theme-instrument .bg-gray-100 {
+  background: rgba(255, 255, 255, 0.38) !important;
+  border: 1px solid var(--panel-border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Sliders (thumb + baseline) */
+html.theme-instrument .slider {
+  height: 2px !important;
+  border-radius: 9999px !important;
+  opacity: 0.9;
+}
+
+html.theme-instrument .slider::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 9999px !important;
+  background: var(--text-primary) !important;
+  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.theme-instrument .slider::-moz-range-thumb {
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 9999px !important;
+  background: var(--text-primary) !important;
+  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* In-canvas export pill */
+html.theme-instrument .glass-content button[data-testid='export-button'] {
+  background: rgba(255, 255, 255, 0.46) !important;
+  border: 1px solid var(--panel-border-strong) !important;
+  color: var(--text-primary) !important;
+}
+
+html.theme-instrument .glass-content button[data-testid='export-button']:hover {
+  background: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Focus (keyboard) */
+html.theme-instrument .glass-button:focus-visible,
+html.theme-instrument .glass-input:focus-visible,
+html.theme-instrument .glass-effect-button:focus-visible {
+  outline: 2px solid var(--focus-ring) !important;
+  outline-offset: 2px !important;
+}

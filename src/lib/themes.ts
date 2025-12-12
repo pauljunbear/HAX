@@ -1,18 +1,28 @@
 // Theme definitions and utilities
 import { useState, useEffect } from 'react';
 
-export type Theme = 'light' | 'terminal';
+export type Theme = 'light' | 'instrument' | 'terminal';
 
 export const themes = {
   light: {
     name: 'Light',
     class: 'theme-light',
   },
+  instrument: {
+    name: 'Instrument',
+    class: 'theme-instrument',
+  },
   terminal: {
     name: 'Terminal',
     class: 'theme-terminal',
   },
 } as const;
+
+const THEME_ORDER: Theme[] = ['light', 'instrument', 'terminal'];
+
+const isTheme = (value: string | null): value is Theme => {
+  return value === 'light' || value === 'instrument' || value === 'terminal';
+};
 
 export const getTheme = (): Theme => {
   if (typeof window === 'undefined') return 'light';
@@ -24,14 +34,23 @@ export const getTheme = (): Theme => {
     return 'light';
   }
 
-  return (stored as Theme) || 'light';
+  if (isTheme(stored)) {
+    return stored;
+  }
+
+  return 'light';
 };
 
 export const setTheme = (theme: Theme) => {
   if (typeof window === 'undefined') return;
 
   localStorage.setItem('app-theme', theme);
-  document.documentElement.classList.remove('theme-light', 'theme-terminal', 'theme-apple');
+  document.documentElement.classList.remove(
+    'theme-light',
+    'theme-instrument',
+    'theme-terminal',
+    'theme-apple'
+  );
   document.documentElement.classList.add(themes[theme].class);
 
   // Dispatch event for components that need to react to theme change
@@ -66,8 +85,9 @@ export const useTheme = () => {
   }, []);
 
   const toggleTheme = () => {
-    const newTheme: Theme = theme === 'light' ? 'terminal' : 'light';
-    setTheme(newTheme);
+    const currentIndex = THEME_ORDER.indexOf(theme);
+    const nextTheme = THEME_ORDER[(currentIndex + 1) % THEME_ORDER.length];
+    setTheme(nextTheme);
   };
 
   return { theme, toggleTheme, setTheme };
