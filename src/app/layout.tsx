@@ -3,6 +3,7 @@ import '../styles/apple-colors.css';
 import '../styles/light-theme.css';
 import '../styles/instrument-theme.css';
 import '../styles/terminal-theme.css';
+import '../styles/studio-theme.css';
 import type { Metadata } from 'next';
 import { Inter, Fira_Code, Space_Mono } from 'next/font/google';
 
@@ -59,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 }
 
                 const resolved = stored === 'apple' ? 'light' : stored;
-                const allowed = new Set(['light', 'instrument', 'terminal']);
+                const allowed = new Set(['light', 'instrument', 'terminal', 'studio']);
                 const theme = allowed.has(resolved) ? resolved : 'light';
 
                 document.documentElement.classList.add('theme-' + theme);

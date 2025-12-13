@@ -1,7 +1,7 @@
 // Theme definitions and utilities
 import { useState, useEffect } from 'react';
 
-export type Theme = 'light' | 'instrument' | 'terminal';
+export type Theme = 'light' | 'instrument' | 'terminal' | 'studio';
 
 export const themes = {
   light: {
@@ -16,16 +16,20 @@ export const themes = {
     name: 'Terminal',
     class: 'theme-terminal',
   },
+  studio: {
+    name: 'Studio',
+    class: 'theme-studio',
+  },
 } as const;
 
-const THEME_ORDER: Theme[] = ['light', 'instrument', 'terminal'];
+const THEME_ORDER: Theme[] = ['light', 'instrument', 'terminal', 'studio'];
 
 const isTheme = (value: string | null): value is Theme => {
-  return value === 'light' || value === 'instrument' || value === 'terminal';
+  return value === 'light' || value === 'instrument' || value === 'terminal' || value === 'studio';
 };
 
 export const getTheme = (): Theme => {
-  if (typeof window === 'undefined') return 'light';
+  if (typeof window === 'undefined') return 'studio'; // Default to studio for new users
 
   // Migration: Convert old 'apple' theme to 'light'
   const stored = localStorage.getItem('app-theme');
@@ -38,7 +42,7 @@ export const getTheme = (): Theme => {
     return stored;
   }
 
-  return 'light';
+  return 'studio'; // Default to studio
 };
 
 export const setTheme = (theme: Theme) => {
@@ -49,7 +53,8 @@ export const setTheme = (theme: Theme) => {
     'theme-light',
     'theme-instrument',
     'theme-terminal',
-    'theme-apple'
+    'theme-apple',
+    'theme-studio'
   );
   document.documentElement.classList.add(themes[theme].class);
 
