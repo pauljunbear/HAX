@@ -3,8 +3,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig, getEffectCategory } from '@/lib/effects';
-import { Settings, Download, Layers, FileImage, Film, Monitor, X } from 'lucide-react';
-import { useTheme } from '@/lib/themes';
+import { Layers, FileImage, Film, Monitor, X, Plus } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface EffectLayer {
   id: string;
@@ -70,14 +71,10 @@ const HexColorInput: React.FC<{
   };
 
   return (
-    <div className="p-3 border border-gray-200/20">
+    <div className="p-3 border border-border">
       <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-gray-800 font-mono uppercase tracking-wide">
-          {label}
-        </label>
-        <span className="text-xs text-green-400 font-mono bg-black/50 px-2 py-0.5 border border-green-400/30">
-          {hexValue.toUpperCase()}
-        </span>
+        <label className="text-sm font-medium control-panel-label">{label}</label>
+        <span className="text-xs font-mono bg-muted px-2 py-0.5">{hexValue.toUpperCase()}</span>
       </div>
 
       <div className="flex items-center space-x-2">
@@ -85,18 +82,20 @@ const HexColorInput: React.FC<{
           type="color"
           value={hexValue}
           onChange={e => handleColorChange(e.target.value)}
-          className="w-12 h-8 border-2 border-green-400/30 cursor-pointer overflow-hidden bg-black"
+          className="w-12 h-8 border-2 border-border cursor-pointer overflow-hidden bg-background"
         />
         <input
           type="text"
           value={hexValue}
           onChange={e => handleTextInputChange(e.target.value)}
           placeholder="#000000"
-          className="flex-1 px-3 py-1.5 text-sm border border-gray-200/20 bg-black/50 text-gray-800 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-colors font-mono"
+          className="flex-1 px-3 py-1.5 text-sm border border-border bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-ring transition-colors font-mono"
         />
       </div>
 
-      <div className="mt-2 text-xs text-gray-500 font-mono">Click color box or enter hex code</div>
+      <div className="mt-2 text-xs text-muted-foreground font-mono">
+        Click color box or enter hex code
+      </div>
     </div>
   );
 };
@@ -117,8 +116,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   hasImage = false,
   isCollapsed,
 }) => {
-  const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'settings' | 'layers' | 'export'>('settings');
+  const [activeTab, setActiveTab] = useState<string>('settings');
   const dragFromIndexRef = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -135,25 +133,6 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
       ...setting,
       currentValue: effectSettings[setting.id] ?? setting.defaultValue,
     })) || [];
-
-  const tabs: Array<{
-    id: 'settings' | 'layers' | 'export' | 'new';
-    label: string;
-    icon: React.ComponentType<{ className?: string }> | (() => JSX.Element);
-  }> = [
-    { id: 'settings', label: 'Effects', icon: Settings },
-    { id: 'layers', label: 'Layers', icon: Layers },
-    { id: 'export', label: 'Export', icon: Download },
-    {
-      id: 'new',
-      label: '+',
-      icon: () => (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      ),
-    },
-  ];
 
   const exportOptions = [
     {
@@ -194,35 +173,24 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
     <div className="h-full w-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
-        <h2 className="text-sm font-semibold">Controls</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide">Controls</h2>
       </div>
 
-      {/* Tabs */}
-      <div className="px-3 pb-3 mb-4">
-        <div className="flex gap-1 w-full">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                if (tab.id === 'new') {
-                  onNewImage?.();
-                  // Don't change active tab for action buttons
-                } else {
-                  setActiveTab(tab.id as 'settings' | 'layers' | 'export');
-                }
-              }}
-              className={`
-                glass-button ${tab.id === 'new' ? 'px-2 py-1.5 flex-shrink-0' : 'px-2.5 py-1.5 flex-1 min-w-0'} text-xs font-medium transition-all rounded-lg
-                ${activeTab === (tab.id as 'settings' | 'layers' | 'export') && tab.id !== 'new' ? 'glass-active' : ''}
-              `}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {/* Tabs using shadcn */}
+      <div className="px-3 pb-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full">
+            <TabsTrigger value="settings">Effects</TabsTrigger>
+            <TabsTrigger value="layers">Layers</TabsTrigger>
+            <TabsTrigger value="export">Export</TabsTrigger>
+            <TabsTrigger value="new" onClick={() => onNewImage?.()} className="px-2 flex-shrink-0">
+              <Plus className="w-4 h-4" />
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      {/* Tab Content - with scroll edge effects */}
+      {/* Tab Content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4">
         <AnimatePresence mode="wait">
           {activeTab === 'settings' && (
@@ -235,25 +203,25 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               className="space-y-4"
             >
               {!activeLayer ? (
-                <div className="text-center text-xs text-gray-500 py-12">
+                <div className="text-center text-xs text-muted-foreground py-12">
                   Effect controls will appear here when an effect is selected
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* Effect Header */}
-                  <div className="glass-card rounded-xl p-4 mb-4">
+                  <div className="glass-card p-4 mb-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
                         <h3 className="text-sm font-semibold truncate control-panel-title">
                           {activeEffectConfig?.label}
                         </h3>
-                        <p className="text-xs text-gray-500 mt-1 control-panel-category">
+                        <p className="text-xs text-muted-foreground mt-1 control-panel-category">
                           {activeEffectCategory}
                         </p>
                       </div>
                       <button
                         onClick={() => onRemoveEffect?.(activeLayer.id)}
-                        className="ml-3 p-2 rounded-lg transition-all duration-200 flex-shrink-0 glass-button"
+                        className="ml-3 p-2 transition-all duration-200 flex-shrink-0 glass-button"
                         title="Remove effect"
                       >
                         <X className="w-5 h-5" />
@@ -264,14 +232,14 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                     <div className="flex gap-2">
                       <button
                         onClick={() => onResetSettings?.()}
-                        className="flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 glass-button"
+                        className="flex-1 px-3 py-2 text-xs font-medium transition-all duration-200 glass-button"
                       >
                         Reset Values
                       </button>
                     </div>
                   </div>
 
-                  {/* Settings Controls */}
+                  {/* Settings Controls with shadcn Slider */}
                   <div className="space-y-6">
                     {currentEffectSettings.map(setting => {
                       // Check if this is a color setting (hex color)
@@ -281,7 +249,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
 
                       if (isColorSetting) {
                         return (
-                          <div key={setting.id} className="glass-card rounded-xl p-4">
+                          <div key={setting.id} className="glass-card p-4">
                             <HexColorInput
                               label={setting.label}
                               value={setting.currentValue}
@@ -291,41 +259,30 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                         );
                       }
 
-                      const percentage =
-                        ((setting.currentValue - setting.min) / (setting.max - setting.min)) * 100;
-                      const lightTrack = `linear-gradient(to right, #007aff 0%, #007aff ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`;
-                      const terminalTrack = `linear-gradient(to right, var(--text-accent) 0%, var(--text-accent) ${percentage}%, var(--panel-border) ${percentage}%, var(--panel-border) 100%)`;
-
                       // Regular slider for non-color settings
                       return (
-                        <div key={setting.id} className="glass-card rounded-xl p-4">
+                        <div key={setting.id} className="glass-card p-4">
                           <div className="flex items-center justify-between mb-3">
                             <label className="text-sm font-medium control-panel-label">
                               {setting.label}
                             </label>
-                            <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded-md">
+                            <span className="text-xs font-mono bg-muted px-2 py-1 slider-value">
                               {setting.currentValue.toFixed(2)}
                             </span>
                           </div>
 
-                          <div className="space-y-2">
-                            <input
-                              type="range"
+                          <div className="space-y-3">
+                            <Slider
                               min={setting.min}
                               max={setting.max}
                               step={setting.step}
-                              value={setting.currentValue}
-                              onChange={e =>
-                                onSettingChange?.(setting.id, parseFloat(e.target.value))
-                              }
-                              className="w-full appearance-none cursor-pointer slider"
-                              style={{
-                                background: theme === 'light' ? lightTrack : terminalTrack,
-                              }}
+                              value={[setting.currentValue]}
+                              onValueChange={values => onSettingChange?.(setting.id, values[0])}
+                              className="w-full"
                             />
 
                             {/* Range markers */}
-                            <div className="flex justify-between text-xs text-gray-500">
+                            <div className="flex justify-between text-xs text-muted-foreground">
                               <span>{setting.min}</span>
                               <span>{setting.max}</span>
                             </div>
@@ -349,16 +306,16 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               className="space-y-4"
             >
               {!hasImage ? (
-                <div className="text-center text-xs text-gray-500 py-12">
+                <div className="text-center text-xs text-muted-foreground py-12">
                   Upload an image to manage layers
                 </div>
               ) : effectLayers.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center liquid-material">
-                    <Layers className="w-8 h-8 text-gray-400" />
+                  <div className="w-16 h-16 mx-auto mb-3 flex items-center justify-center liquid-material">
+                    <Layers className="w-8 h-8 text-muted-foreground" />
                   </div>
                   <p className="text-sm mb-1">No effect layers yet</p>
-                  <p className="text-xs text-gray-500">Apply an effect to create a layer</p>
+                  <p className="text-xs text-muted-foreground">Apply an effect to create a layer</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -376,7 +333,6 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                           dragFromIndexRef.current = index;
                           setDragOverIndex(null);
                           e.dataTransfer.effectAllowed = 'move';
-                          // Some browsers require data to be set for drag to start.
                           e.dataTransfer.setData('text/plain', layer.id);
                         }}
                         onDragOver={e => {
@@ -406,9 +362,9 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                           setDragOverIndex(null);
                         }}
                         className={`
-                          p-3 rounded-xl cursor-pointer transition-all glass-effect-button
+                          p-3 cursor-pointer transition-all glass-effect-button
                           ${isActive ? 'glass-active' : ''}
-                          ${dragOverIndex === index ? 'ring-2 ring-black/30' : ''}
+                          ${dragOverIndex === index ? 'ring-2 ring-primary/30' : ''}
                         `}
                       >
                         <div className="flex items-center justify-between">
@@ -419,7 +375,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                                 e.stopPropagation();
                                 onToggleLayerVisibility?.(layer.id);
                               }}
-                              className="transition-colors glass-button"
+                              className="transition-colors glass-button p-1"
                             >
                               {layer.visible ? (
                                 <svg
@@ -460,11 +416,13 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
 
                             {/* Layer Info */}
                             <div className="flex-1">
-                              <h4 className={`text-sm font-medium ${isActive ? 'text-white' : ''}`}>
+                              <h4
+                                className={`text-sm font-medium ${isActive ? 'text-primary-foreground' : ''}`}
+                              >
                                 {effectConfig?.label || 'Unknown Effect'}
                               </h4>
                               <p
-                                className={`text-[11px] ${isActive ? 'text-white/80' : 'text-gray-600'}`}
+                                className={`text-[11px] ${isActive ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
                               >
                                 Layer {effectLayers.length - index}
                               </p>
@@ -489,7 +447,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                   {effectLayers.length > 1 && (
                     <button
                       onClick={() => onClearAllEffects?.()}
-                      className="w-full mt-2 px-3 py-2 text-xs font-medium text-red-600 rounded-xl glass-button"
+                      className="w-full mt-2 px-3 py-2 text-xs font-medium text-destructive glass-button"
                     >
                       Clear All Layers
                     </button>
@@ -506,26 +464,28 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="p-4 space-y-4"
+              className="space-y-4"
             >
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {exportOptions.map(option => {
                   const Icon = option.icon;
                   return (
                     <button
                       key={option.format}
                       onClick={() => onExport?.(option.format)}
-                      className="w-full p-2 rounded-xl transition-all text-left group glass-effect-button"
+                      className="w-full p-3 transition-all text-left group glass-effect-button"
                     >
                       <div className="flex items-center">
-                        <div className="w-8 h-8 rounded flex items-center justify-center mr-3 liquid-material">
+                        <div className="w-8 h-8 flex items-center justify-center mr-3 liquid-material">
                           <Icon className="w-4 h-4" />
                         </div>
                         <div className="flex-1">
                           <div className="text-xs font-medium">{option.type}</div>
-                          <div className="text-[10px] text-gray-600">{option.description}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {option.description}
+                          </div>
                         </div>
-                        <div className="text-[10px] font-medium px-2 py-0.5 rounded ml-3 glass-badge">
+                        <div className="text-[10px] font-medium px-2 py-0.5 ml-3 glass-badge">
                           {option.format}
                         </div>
                       </div>

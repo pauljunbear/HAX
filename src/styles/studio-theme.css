@@ -193,18 +193,32 @@ html.theme-studio .slider::-webkit-slider-thumb {
   margin-top: -5px !important;
 }
 
-/* Inputs */
+/* Search Input Styling */
 html.theme-studio .glass-input {
   background: transparent !important;
   border: 1px solid var(--panel-border-light) !important;
   border-radius: 0 !important;
   font-family: var(--font-mono) !important;
   color: var(--text-primary) !important;
+  padding-left: 36px !important;
+  font-size: 11px !important;
+}
+
+html.theme-studio .glass-input::placeholder {
+  color: var(--text-tertiary) !important;
 }
 
 html.theme-studio .glass-input:focus {
   border-color: var(--text-primary) !important;
   outline: none !important;
+}
+
+/* Fix search icon position */
+html.theme-studio .glass-input + svg,
+html.theme-studio .absolute.left-0 svg {
+  color: var(--text-tertiary) !important;
+  width: 14px !important;
+  height: 14px !important;
 }
 
 /* Buttons (Export etc) */
@@ -252,6 +266,83 @@ html.theme-studio .bg-gray-100 {
 html.theme-studio ::selection {
   background: var(--text-primary);
   color: var(--accent-contrast);
+}
+
+/* ========================================
+   SHADCN COMPONENT OVERRIDES
+   ======================================== */
+
+/* Slider - Square thumb, thin track */
+html.theme-studio .slider-track {
+  height: 1px !important;
+  background: var(--panel-border-light) !important;
+  border-radius: 0 !important;
+}
+
+html.theme-studio .slider-range {
+  background: var(--text-primary) !important;
+  border-radius: 0 !important;
+}
+
+html.theme-studio .slider-thumb {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 0 !important;
+  border: none !important;
+  background: var(--text-primary) !important;
+  box-shadow: none !important;
+}
+
+html.theme-studio .slider-thumb:hover {
+  transform: scale(1.1) !important;
+}
+
+html.theme-studio .slider-thumb:focus-visible {
+  outline: 1px solid var(--text-primary) !important;
+  outline-offset: 2px !important;
+}
+
+/* Slider value display */
+html.theme-studio .slider-value {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* Tabs - Minimal, square */
+html.theme-studio .tabs-list {
+  background: transparent !important;
+  border-bottom: 1px solid var(--panel-border-light) !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+html.theme-studio .tabs-trigger {
+  border-radius: 0 !important;
+  border: 1px solid var(--panel-border-light) !important;
+  border-bottom: none !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+  padding: 8px 12px !important;
+  margin-bottom: -1px !important;
+}
+
+html.theme-studio .tabs-trigger:hover {
+  background: rgba(0, 0, 0, 0.02) !important;
+  color: var(--text-primary) !important;
+}
+
+html.theme-studio .tabs-trigger[data-state='active'] {
+  background: var(--text-primary) !important;
+  color: var(--accent-contrast) !important;
+  border-color: var(--text-primary) !important;
+}
+
+html.theme-studio .tabs-content {
+  margin-top: 16px !important;
 }
 
 /* GLOBAL OVERRIDES FOR STUDIO THEME */
