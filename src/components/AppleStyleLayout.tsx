@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Sun, Moon, Menu } from 'lucide-react';
+import { Sun, Moon, Menu, Box, Activity } from 'lucide-react';
 import AppleEffectsBrowser from './AppleEffectsBrowser';
 import AppleControlsPanel from './AppleControlsPanel';
 import { useTheme } from '@/lib/themes';
@@ -58,9 +58,21 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
   const [isRightOpen, setIsRightOpen] = useState(false);
 
   const nextTheme =
-    theme === 'light' ? 'instrument' : theme === 'instrument' ? 'terminal' : 'light';
+    theme === 'light'
+      ? 'instrument'
+      : theme === 'instrument'
+        ? 'terminal'
+        : theme === 'terminal'
+          ? 'studio'
+          : 'light';
   const nextThemeLabel =
-    nextTheme === 'instrument' ? 'Instrument' : nextTheme === 'terminal' ? 'Terminal' : 'Light';
+    nextTheme === 'instrument'
+      ? 'Instrument'
+      : nextTheme === 'terminal'
+        ? 'Terminal'
+        : nextTheme === 'studio'
+          ? 'Studio'
+          : 'Light';
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -209,7 +221,15 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
           className="w-10 h-10 md:w-12 md:h-12 theme-toggle-button rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
           title={`Switch to ${nextThemeLabel} theme`}
         >
-          {nextTheme === 'terminal' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+          {nextTheme === 'terminal' ? (
+            <Moon className="w-5 h-5" />
+          ) : nextTheme === 'studio' ? (
+            <Box className="w-5 h-5" />
+          ) : nextTheme === 'instrument' ? (
+            <Activity className="w-5 h-5" />
+          ) : (
+            <Sun className="w-5 h-5" />
+          )}
         </button>
       </div>
 
