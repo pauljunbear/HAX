@@ -85,9 +85,69 @@ const loadKonva = async () => {
   }
 };
 
-const clamp = (value: number, min: number, max: number) => {
+// ============================================================================
+// PERFORMANCE UTILITIES
+// ============================================================================
+
+/**
+ * Generic clamp function
+ */
+const clamp = (value: number, min: number, max: number): number => {
   if (Number.isNaN(value)) return min;
   return Math.min(max, Math.max(min, value));
+};
+
+/**
+ * Fast byte clamping (0-255) - optimized for hot paths
+ * Uses bitwise operations for speed when possible
+ */
+const clampByte = (value: number): number => {
+  return value < 0 ? 0 : value > 255 ? 255 : value | 0;
+};
+
+/**
+ * Luminance calculation using standard coefficients (ITU-R BT.601)
+ */
+const getLuminance = (r: number, g: number, b: number): number => {
+  return r * 0.299 + g * 0.587 + b * 0.114;
+};
+
+/**
+ * Normalized luminance (0-1)
+ */
+const getNormalizedLuminance = (r: number, g: number, b: number): number => {
+  return (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+};
+
+/**
+ * Linear interpolation
+ */
+const lerp = (a: number, b: number, t: number): number => {
+  return a + (b - a) * t;
+};
+
+/**
+ * Get buffer from pool or create new one
+ * Always use this instead of `new Uint8ClampedArray(size)`
+ */
+const acquireBuffer = (size: number): Uint8ClampedArray => {
+  return getBufferPool().acquire(size);
+};
+
+/**
+ * Return buffer to pool for reuse
+ */
+const releaseBuffer = (buffer: Uint8ClampedArray): void => {
+  getBufferPool().release(buffer);
+};
+
+/**
+ * Acquire buffer and copy source data into it
+ */
+const acquireBufferCopy = (source: Uint8ClampedArray): Uint8ClampedArray => {
+  const buffer = getBufferPool().acquire(source.length);
+  buffer.set(source);
+  return buffer;
 };
 
 const createPosterizeFallback = (levels: number): KonvaFilterFunction => {
@@ -247,10 +307,7 @@ function getBrightness(
   return pixelCount > 0 ? totalBrightness / pixelCount : 0;
 }
 
-// Helper function to interpolate between two values
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
+// lerp function defined in utilities section above
 
 // Update applyEffect signature and logic
 export const applyEffect = async (
@@ -259,7 +316,6 @@ export const applyEffect = async (
   // Return the Konva Filter function and parameters object
 ): Promise<[KonvaFilterFunction | null, FilterParams | null]> => {
   if (!effectName || typeof window === 'undefined') {
-    console.log('Cannot apply effect: No effect name or not in browser');
     return [null, null];
   }
 
@@ -275,34 +331,28 @@ export const applyEffect = async (
     }
   }
 
-  console.log(`Getting Konva filter for: ${effectName} with settings:`, settings);
-
   try {
     switch (effectName) {
       case 'brightness': {
         // Convert from percentage (-100 to 100) to Konva range (-1 to 1)
         const brightnessValue = (settings.value ?? 0) / 100;
-        console.log(`Applying brightness: ${brightnessValue}`);
         return [Konva.Filters.Brighten, { brightness: brightnessValue }];
       }
 
       case 'contrast': {
         // Contrast already uses -100 to 100 range
         const contrastValue = settings.value ?? 0;
-        console.log(`Applying contrast: ${contrastValue}`);
         return [Konva.Filters.Contrast, { contrast: contrastValue }];
       }
 
       case 'saturation': {
         // Convert from percentage (-100 to 100) to Konva range (-10 to 10)
         const scaledSaturation = (settings.value ?? 0) / 10;
-        console.log(`Applying saturation: ${scaledSaturation}`);
         return [Konva.Filters.HSL, { saturation: scaledSaturation }];
       }
 
       case 'hue': {
         const hueDegrees = settings.value !== undefined ? settings.value : 0;
-        console.log(`Applying hue: ${hueDegrees}`);
         return [Konva.Filters.HSL, { hue: hueDegrees }];
       }
 
@@ -857,140 +907,7 @@ const createCellularAutomataEffect = (settings: Record<string, number>) => {
 // Implementation of reaction-diffusion effect (Gray-Scott model)
 // Note: This basic implementation is kept for fallback purposes.
 // The advanced implementation is in ./effects/reactionDiffusionEffect.ts
-const createReactionDiffusionEffect = (settings: Record<string, number>) => {
-  return function (imageData: KonvaImageData) {
-    const width = imageData.width;
-    const height = imageData.height;
-    const data = imageData.data;
-
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
-
-    const iterations = Math.max(1, Math.min(20, Math.floor(settings.iterations || 10)));
-    const scale = Math.max(1, Math.min(8, Math.floor(settings.scale || 4)));
-    const feedRate = Math.max(0.01, Math.min(0.1, settings.feedRate || 0.055));
-    const killRate = Math.max(0.01, Math.min(0.1, settings.killRate || 0.062));
-
-    const simWidth = Math.ceil(width / scale);
-    const simHeight = Math.ceil(height / scale);
-
-    let gridA = new Float32Array(simWidth * simHeight);
-    let gridB = new Float32Array(simWidth * simHeight);
-
-    for (let y = 0; y < simHeight; y++) {
-      for (let x = 0; x < simWidth; x++) {
-        let totalBrightness = 0;
-        let count = 0;
-
-        for (let sy = 0; sy < scale && y * scale + sy < height; sy++) {
-          for (let sx = 0; sx < scale && x * scale + sx < width; sx++) {
-            const imgX = x * scale + sx;
-            const imgY = y * scale + sy;
-            const index = (imgY * width + imgX) * 4;
-
-            const r = tempData[index];
-            const g = tempData[index + 1];
-            const b = tempData[index + 2];
-            const brightness = (r + g + b) / 3 / 255;
-
-            totalBrightness += brightness;
-            count++;
-          }
-        }
-
-        const avgBrightness = count > 0 ? totalBrightness / count : 0;
-
-        const idx = y * simWidth + x;
-        gridA[idx] = avgBrightness < 0.4 ? 0.5 : 1.0;
-        gridB[idx] = avgBrightness < 0.4 ? 0.25 : 0.0;
-      }
-    }
-
-    const centerX = Math.floor(simWidth / 2);
-    const centerY = Math.floor(simHeight / 2);
-    const seedSize = Math.floor(Math.min(simWidth, simHeight) / 10);
-
-    for (let y = -seedSize; y <= seedSize; y++) {
-      for (let x = -seedSize; x <= seedSize; x++) {
-        const sx = (centerX + x + simWidth) % simWidth;
-        const sy = (centerY + y + simHeight) % simHeight;
-
-        if (x * x + y * y <= seedSize * seedSize) {
-          gridA[sy * simWidth + sx] = 0.5;
-          gridB[sy * simWidth + sx] = 0.25;
-        }
-      }
-    }
-
-    const dA = 1.0;
-    const dB = 0.5;
-    const dt = 1.0;
-
-    let nextA = new Float32Array(simWidth * simHeight);
-    let nextB = new Float32Array(simWidth * simHeight);
-
-    for (let iter = 0; iter < iterations; iter++) {
-      for (let y = 0; y < simHeight; y++) {
-        for (let x = 0; x < simWidth; x++) {
-          const idx = y * simWidth + x;
-
-          const a = gridA[idx];
-          const b = gridB[idx];
-
-          let laplA = 0;
-          let laplB = 0;
-
-          for (let ny = -1; ny <= 1; ny++) {
-            for (let nx = -1; nx <= 1; nx++) {
-              if (nx === 0 && ny === 0) continue;
-
-              const weight = nx === 0 || ny === 0 ? 0.2 : 0.05;
-              const nidx =
-                ((y + ny + simHeight) % simHeight) * simWidth + ((x + nx + simWidth) % simWidth);
-
-              laplA += weight * gridA[nidx];
-              laplB += weight * gridB[nidx];
-            }
-          }
-
-          laplA -= 0.95 * a;
-          laplB -= 0.95 * b;
-
-          const abb = a * b * b;
-          const reaction = abb - (feedRate + killRate) * b;
-
-          nextA[idx] = a + dt * (dA * laplA - abb + feedRate * (1 - a));
-          nextB[idx] = b + dt * (dB * laplB + reaction);
-
-          nextA[idx] = Math.max(0, Math.min(1, nextA[idx]));
-          nextB[idx] = Math.max(0, Math.min(1, nextB[idx]));
-        }
-      }
-
-      [gridA, nextA] = [nextA, gridA];
-      [gridB, nextB] = [nextB, gridB];
-    }
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const simX = Math.min(simWidth - 1, Math.floor(x / scale));
-        const simY = Math.min(simHeight - 1, Math.floor(y / scale));
-        const simIdx = simY * simWidth + simX;
-
-        const a = gridA[simIdx];
-        const b = gridB[simIdx];
-
-        const index = (y * width + x) * 4;
-
-        const val = Math.round(255 * (1 - b));
-
-        data[index] = val;
-        data[index + 1] = val;
-        data[index + 2] = val;
-      }
-    }
-  };
-};
+// REMOVED: createReactionDiffusionEffect - unused dead code
 
 // Add new effect function for Pencil Sketch
 const createPencilSketchEffect = (settings: Record<string, number>) => {
@@ -1164,7 +1081,7 @@ const createUnifiedSketchEffect = (settings: Record<string, number>) => {
 
           // Apply contrast
           value = (value - 128) * contrast + 128;
-          value = Math.max(0, Math.min(255, value));
+          value = clampByte(value);
 
           // Invert if requested
           if (invert) value = 255 - value;
@@ -1429,7 +1346,7 @@ const createBlackAndWhiteEffect = (settings: Record<string, number>) => {
       gray = (gray - 128) * contrast + 128;
 
       // Clamp to valid range
-      gray = Math.max(0, Math.min(255, gray));
+      gray = clampByte(gray);
 
       data[i] = gray;
       data[i + 1] = gray;
@@ -1477,7 +1394,7 @@ const createUnifiedMonoEffect = (settings: Record<string, number>) => {
       gray = (gray - 128) * contrast + 128;
 
       // Clamp
-      gray = Math.max(0, Math.min(255, gray));
+      gray = clampByte(gray);
 
       // Apply tone coloring based on brightness
       const t = gray / 255; // 0 = shadow, 1 = highlight
@@ -1487,9 +1404,9 @@ const createUnifiedMonoEffect = (settings: Record<string, number>) => {
       const outB = gray * (toneConfig.h[2] * t + toneConfig.s[2] * (1 - t));
 
       // Blend with original based on intensity
-      data[i] = Math.max(0, Math.min(255, r * (1 - intensity) + outR * intensity));
-      data[i + 1] = Math.max(0, Math.min(255, g * (1 - intensity) + outG * intensity));
-      data[i + 2] = Math.max(0, Math.min(255, b * (1 - intensity) + outB * intensity));
+      data[i] = clampByte(r * (1 - intensity) + outR * intensity);
+      data[i + 1] = clampByte(g * (1 - intensity) + outG * intensity);
+      data[i + 2] = clampByte(b * (1 - intensity) + outB * intensity);
     }
   };
 };
@@ -1995,9 +1912,9 @@ const createCrosshatchEffect = (settings: Record<string, number>) => {
 
         // Add subtle paper texture
         const noise = (Math.random() - 0.5) * 6;
-        outputData[index] = Math.max(0, Math.min(255, outputData[index] + noise));
-        outputData[index + 1] = Math.max(0, Math.min(255, outputData[index + 1] + noise));
-        outputData[index + 2] = Math.max(0, Math.min(255, outputData[index + 2] + noise));
+        outputData[index] = clampByte(outputData[index] + noise);
+        outputData[index + 1] = clampByte(outputData[index + 1] + noise);
+        outputData[index + 2] = clampByte(outputData[index + 2] + noise);
       }
     }
 
@@ -2264,37 +2181,7 @@ const createRgbShiftEffect = (settings: Record<string, number>) => {
 // Flow Field Distortion (Simplified - displace based on noise angle)
 // Requires a noise function (e.g., Perlin/Simplex). Placeholder for now.
 // Simple random angle displacement:
-const createFlowFieldEffect = (settings: Record<string, number>) => {
-  return function (imageData: KonvaImageData) {
-    const { data, width, height } = imageData;
-    // const scale = settings.scale ?? 0.05; // Noise scale - not used in random version
-    const strength = settings.strength ?? 5;
-
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data); // Read source pixels from tempData
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const destIndex = (y * width + x) * 4;
-
-        // Simplified random displacement
-        const angle = Math.random() * Math.PI * 2;
-        const displaceX = Math.round(Math.cos(angle) * strength);
-        const displaceY = Math.round(Math.sin(angle) * strength);
-
-        const sourceX = Math.min(width - 1, Math.max(0, x + displaceX));
-        const sourceY = Math.min(height - 1, Math.max(0, y + displaceY));
-        const sourceIndex = (sourceY * width + sourceX) * 4;
-
-        // Write to destination pixel (data) from source pixel (tempData)
-        data[destIndex] = tempData[sourceIndex];
-        data[destIndex + 1] = tempData[sourceIndex + 1];
-        data[destIndex + 2] = tempData[sourceIndex + 2];
-        data[destIndex + 3] = tempData[sourceIndex + 3];
-      }
-    }
-  };
-};
+// REMOVED: createFlowFieldEffect - unused dead code
 
 // --- PLACEHOLDER FUNCTIONS FOR NEW EFFECTS ---
 
@@ -2393,7 +2280,7 @@ const createColorQuantizationEffect = (settings: Record<string, number>) => {
             const newPixel = Math.round(oldPixel / step) * step;
             const error = oldPixel - newPixel;
 
-            data[index + channel] = Math.max(0, Math.min(255, newPixel));
+            data[index + channel] = clampByte(newPixel);
 
             // Distribute error to neighboring pixels
             if (x + 1 < width) {
@@ -2948,16 +2835,15 @@ const createColorTemperatureEffect = (settings: Record<string, number>) => {
       b *= redBlueTintMultiplier;
 
       // Clamp values
-      data[i] = Math.max(0, Math.min(255, r));
-      data[i + 1] = Math.max(0, Math.min(255, g));
-      data[i + 2] = Math.max(0, Math.min(255, b));
+      data[i] = clampByte(r);
+      data[i + 1] = clampByte(g);
+      data[i + 2] = clampByte(b);
     }
   };
 };
 
 // Initialize Konva when in browser environment
 if (typeof window !== 'undefined') {
-  console.log('Browser environment detected, initializing Konva');
   loadKonva().catch(err => console.error('Failed to initialize Konva on module load:', err));
 }
 // Export helper for explicit initialization
@@ -3152,9 +3038,9 @@ const applyVhsEffect = (
   // Add noise
   for (let i = 0; i < data.length; i += 4) {
     const noise = (Math.random() - 0.5) * intensity * 30;
-    data[i] = Math.max(0, Math.min(255, data[i] + noise));
-    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
-    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+    data[i] = clampByte(data[i] + noise);
+    data[i + 1] = clampByte(data[i + 1] + noise);
+    data[i + 2] = clampByte(data[i + 2] + noise);
   }
 };
 
@@ -3430,9 +3316,9 @@ const applyFadedFilm = (data: Uint8ClampedArray, intensity: number, fade: number
     if (newR < 128) newB += intensity * 10;
     else newR += intensity * 10;
 
-    data[i] = Math.max(0, Math.min(255, newR));
-    data[i + 1] = Math.max(0, Math.min(255, newG));
-    data[i + 2] = Math.max(0, Math.min(255, newB));
+    data[i] = clampByte(newR);
+    data[i + 1] = clampByte(newG);
+    data[i + 2] = clampByte(newB);
   }
 };
 
@@ -3447,9 +3333,9 @@ const applyCrossProcess = (data: Uint8ClampedArray, intensity: number) => {
     const newG = g * 0.9;
     const newB = b * 1.2 + (b < 128 ? 30 : 0);
 
-    data[i] = Math.max(0, Math.min(255, r * (1 - intensity) + newR * intensity));
-    data[i + 1] = Math.max(0, Math.min(255, g * (1 - intensity) + newG * intensity));
-    data[i + 2] = Math.max(0, Math.min(255, b * (1 - intensity) + newB * intensity));
+    data[i] = clampByte(r * (1 - intensity) + newR * intensity);
+    data[i + 1] = clampByte(g * (1 - intensity) + newG * intensity);
+    data[i + 2] = clampByte(b * (1 - intensity) + newB * intensity);
   }
 };
 
@@ -3503,17 +3389,17 @@ const applyPolaroid = (data: Uint8ClampedArray, intensity: number, warmth: numbe
     newR += warmth * 30;
     newB -= warmth * 20;
 
-    data[i] = Math.max(0, Math.min(255, r * (1 - intensity) + newR * intensity));
-    data[i + 1] = Math.max(0, Math.min(255, g * (1 - intensity) + newG * intensity));
-    data[i + 2] = Math.max(0, Math.min(255, b * (1 - intensity) + newB * intensity));
+    data[i] = clampByte(r * (1 - intensity) + newR * intensity);
+    data[i + 1] = clampByte(g * (1 - intensity) + newG * intensity);
+    data[i + 2] = clampByte(b * (1 - intensity) + newB * intensity);
   }
 };
 
 const applyWarmth = (data: Uint8ClampedArray, warmth: number) => {
   const shift = warmth * 30;
   for (let i = 0; i < data.length; i += 4) {
-    data[i] = Math.max(0, Math.min(255, data[i] + shift));
-    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] - shift * 0.5));
+    data[i] = clampByte(data[i] + shift);
+    data[i + 2] = clampByte(data[i + 2] - shift * 0.5);
   }
 };
 
@@ -3521,9 +3407,9 @@ const applyFilmGrain = (data: Uint8ClampedArray, amount: number) => {
   const grainStrength = amount * 40;
   for (let i = 0; i < data.length; i += 4) {
     const noise = (Math.random() - 0.5) * grainStrength;
-    data[i] = Math.max(0, Math.min(255, data[i] + noise));
-    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
-    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+    data[i] = clampByte(data[i] + noise);
+    data[i + 1] = clampByte(data[i + 1] + noise);
+    data[i + 2] = clampByte(data[i + 2] + noise);
   }
 };
 
@@ -6121,14 +6007,6 @@ const createChromaticGlitchEffect = (settings: Record<string, number>) => {
     const amount = Math.max(0, settings.amount ?? 5);
     const frequency = Math.max(1, settings.frequency ?? 5);
 
-    // Debug logging
-    console.log('Chromatic glitch effect applied with settings:', {
-      amount,
-      frequency,
-      width,
-      height,
-    });
-
     // For preview, ensure we have visible effect
     const effectiveAmount = amount || 8;
 
@@ -6366,10 +6244,7 @@ const createEtchedLinesEffect = (settings: Record<string, number>) => {
         const base = (temp[etchedIndex] + temp[etchedIndex + 1] + temp[etchedIndex + 2]) / 3;
         const etched = base * (0.5 + line * 0.5) + magnitude * 0.2;
 
-        data[etchedIndex] =
-          data[etchedIndex + 1] =
-          data[etchedIndex + 2] =
-            Math.max(0, Math.min(255, etched));
+        data[etchedIndex] = data[etchedIndex + 1] = data[etchedIndex + 2] = clampByte(etched);
       }
     }
   };
@@ -6387,9 +6262,9 @@ const createInkWashEffect = (settings: Record<string, number>) => {
       const ink = brightness * density;
       const bleedFactor = (Math.random() - 0.5) * bleed * 255;
 
-      data[i] = Math.max(0, Math.min(255, ink + bleedFactor));
-      data[i + 1] = Math.max(0, Math.min(255, ink + bleedFactor * softness));
-      data[i + 2] = Math.max(0, Math.min(255, ink + bleedFactor * (1 - softness)));
+      data[i] = clampByte(ink + bleedFactor);
+      data[i + 1] = clampByte(ink + bleedFactor * softness);
+      data[i + 2] = clampByte(ink + bleedFactor * (1 - softness));
     }
   };
 };
@@ -6420,10 +6295,7 @@ const createRetroRasterEffect = (settings: Record<string, number>) => {
         const luminance = (temp[srcIndex] + temp[srcIndex + 1] + temp[srcIndex + 2]) / 3;
         const tinted = luminance * contrast + temp[srcIndex] * (1 - contrast);
 
-        data[dstIndex] =
-          data[dstIndex + 1] =
-          data[dstIndex + 2] =
-            Math.max(0, Math.min(255, tinted));
+        data[dstIndex] = data[dstIndex + 1] = data[dstIndex + 2] = clampByte(tinted);
       }
     }
   };
@@ -7107,7 +6979,7 @@ const createSelectiveColorEffect = (settings: Record<string, number>) => {
   };
 };
 
-const clampByte = (value: number) => Math.max(0, Math.min(255, value));
+// clampByte already defined above
 
 const computeGrayscale = (data: Uint8ClampedArray, width: number, height: number): Uint8Array => {
   const gray = new Uint8Array(width * height);
@@ -8228,9 +8100,9 @@ const createPaperCutArtEffect = (settings: Record<string, number>) => {
     for (let i = 0; i < tempData.length; i += 4) {
       if (tempData[i + 3] > 0) {
         const noise = (Math.random() - 0.5) * 12;
-        tempData[i] = Math.max(0, Math.min(255, tempData[i] + noise));
-        tempData[i + 1] = Math.max(0, Math.min(255, tempData[i + 1] + noise));
-        tempData[i + 2] = Math.max(0, Math.min(255, tempData[i + 2] + noise));
+        tempData[i] = clampByte(tempData[i] + noise);
+        tempData[i + 1] = clampByte(tempData[i + 1] + noise);
+        tempData[i + 2] = clampByte(tempData[i + 2] + noise);
       }
     }
 
@@ -8705,7 +8577,7 @@ const applyFloydSteinberg = (
         const error = oldVal - newVal;
 
         if (x < width - 1) {
-          data[idx + 4 + c] = Math.max(0, Math.min(255, data[idx + 4 + c] + (error * 7) / 16));
+          data[idx + 4 + c] = clampByte(data[idx + 4 + c] + (error * 7) / 16);
         }
         if (y < height - 1) {
           if (x > 0) {
@@ -8744,10 +8616,10 @@ const applyAtkinson = (data: Uint8ClampedArray, width: number, height: number, l
 
         // Distribute error to 6 neighbors (Atkinson pattern)
         if (x < width - 1) {
-          data[idx + 4 + c] = Math.max(0, Math.min(255, data[idx + 4 + c] + error));
+          data[idx + 4 + c] = clampByte(data[idx + 4 + c] + error);
         }
         if (x < width - 2) {
-          data[idx + 8 + c] = Math.max(0, Math.min(255, data[idx + 8 + c] + error));
+          data[idx + 8 + c] = clampByte(data[idx + 8 + c] + error);
         }
         if (y < height - 1) {
           if (x > 0) {
@@ -8756,7 +8628,7 @@ const applyAtkinson = (data: Uint8ClampedArray, width: number, height: number, l
               Math.min(255, data[idx + (width - 1) * 4 + c] + error)
             );
           }
-          data[idx + width * 4 + c] = Math.max(0, Math.min(255, data[idx + width * 4 + c] + error));
+          data[idx + width * 4 + c] = clampByte(data[idx + width * 4 + c] + error);
           if (x < width - 1) {
             data[idx + (width + 1) * 4 + c] = Math.max(
               0,
@@ -8819,10 +8691,8 @@ const applyStucki = (data: Uint8ClampedArray, width: number, height: number, lev
 
         // Stucki kernel (42 divisor)
         // Current row
-        if (x < width - 1)
-          data[idx + 4 + c] = Math.max(0, Math.min(255, data[idx + 4 + c] + (error * 8) / 42));
-        if (x < width - 2)
-          data[idx + 8 + c] = Math.max(0, Math.min(255, data[idx + 8 + c] + (error * 4) / 42));
+        if (x < width - 1) data[idx + 4 + c] = clampByte(data[idx + 4 + c] + (error * 8) / 42);
+        if (x < width - 2) data[idx + 8 + c] = clampByte(data[idx + 8 + c] + (error * 4) / 42);
 
         // Next row
         if (y < height - 1) {
@@ -8897,10 +8767,8 @@ const applySierra = (data: Uint8ClampedArray, width: number, height: number, lev
         const error = oldVal - newVal;
 
         // Sierra kernel (32 divisor)
-        if (x < width - 1)
-          data[idx + 4 + c] = Math.max(0, Math.min(255, data[idx + 4 + c] + (error * 5) / 32));
-        if (x < width - 2)
-          data[idx + 8 + c] = Math.max(0, Math.min(255, data[idx + 8 + c] + (error * 3) / 32));
+        if (x < width - 1) data[idx + 4 + c] = clampByte(data[idx + 4 + c] + (error * 5) / 32);
+        if (x < width - 2) data[idx + 8 + c] = clampByte(data[idx + 8 + c] + (error * 3) / 32);
 
         if (y < height - 1) {
           if (x > 1)
@@ -9261,9 +9129,9 @@ const createRetroPaletteEffect = (settings: Record<string, number>) => {
           // Atkinson diffusion pattern
           const diffuse = (offset: number) => {
             if (idx + offset >= 0 && idx + offset < data.length - 3) {
-              data[idx + offset] = Math.max(0, Math.min(255, data[idx + offset] + errorR));
-              data[idx + offset + 1] = Math.max(0, Math.min(255, data[idx + offset + 1] + errorG));
-              data[idx + offset + 2] = Math.max(0, Math.min(255, data[idx + offset + 2] + errorB));
+              data[idx + offset] = clampByte(data[idx + offset] + errorR);
+              data[idx + offset + 1] = clampByte(data[idx + offset + 1] + errorG);
+              data[idx + offset + 2] = clampByte(data[idx + offset + 2] + errorB);
             }
           };
 
@@ -9289,9 +9157,9 @@ const createRetroPaletteEffect = (settings: Record<string, number>) => {
           const my = y % matrixSize;
           const bayerValue = (matrix[my][mx] / 16 - 0.5) * ditherStrength * 64;
 
-          const r = Math.max(0, Math.min(255, data[idx] + bayerValue));
-          const g = Math.max(0, Math.min(255, data[idx + 1] + bayerValue));
-          const b = Math.max(0, Math.min(255, data[idx + 2] + bayerValue));
+          const r = clampByte(data[idx] + bayerValue);
+          const g = clampByte(data[idx + 1] + bayerValue);
+          const b = clampByte(data[idx + 2] + bayerValue);
 
           const nearest = findNearestColor(r, g, b, palette);
           data[idx] = nearest[0];
@@ -9434,9 +9302,9 @@ const createWeavePatternEffect = (settings: Record<string, number>) => {
 
         // Subtle fabric grain noise
         const noise = (Math.random() - 0.5) * 8;
-        data[idx] = Math.max(0, Math.min(255, data[idx] + noise));
-        data[idx + 1] = Math.max(0, Math.min(255, data[idx + 1] + noise));
-        data[idx + 2] = Math.max(0, Math.min(255, data[idx + 2] + noise));
+        data[idx] = clampByte(data[idx] + noise);
+        data[idx + 1] = clampByte(data[idx + 1] + noise);
+        data[idx + 2] = clampByte(data[idx + 2] + noise);
       }
     }
   };
