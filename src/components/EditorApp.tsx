@@ -24,13 +24,6 @@ export default function EditorApp() {
   const [imageError, setImageError] = useState<string | null>(null);
   const imageEditorRef = useRef<ImageEditorHandle | null>(null);
 
-  // Debug ref connection
-  useEffect(() => {
-    console.log('🔗 imageEditorRef.current updated:', !!imageEditorRef.current);
-    if (imageEditorRef.current) {
-      console.log('🔗 Available methods:', Object.keys(imageEditorRef.current));
-    }
-  }, [selectedImage]);
   // Initialize history with empty state
   const { clearHistory } = useHistory({
     activeEffect: null,
@@ -54,11 +47,6 @@ export default function EditorApp() {
   // Extract effectSettings from the active effect layer
   const effectSettings = activeEffectLayer?.settings || {};
 
-  // Add debugging on component mount
-  useEffect(() => {
-    console.log('Home component mounted');
-  }, []);
-
   useEffect(() => {
     setIsReady(true);
   }, []);
@@ -67,8 +55,6 @@ export default function EditorApp() {
     // Reset error state
     setImageError(null);
     setImageLoading(true);
-
-    console.log('handleImageUpload called with file:', file.name);
 
     // Reset active effect and clear history when a new image is uploaded
     clearHistory({ activeEffect: null, effectSettings: {} });
@@ -89,8 +75,6 @@ export default function EditorApp() {
       // Test load the image first
       const testImage = new Image();
       testImage.onload = () => {
-        console.log('Test image loaded successfully in Home component, setting selectedImage');
-        console.log('Dimensions:', testImage.width, 'x', testImage.height);
         setSelectedImage(imageDataUrl);
         setImageLoading(false);
       };
@@ -128,8 +112,6 @@ export default function EditorApp() {
   };
 
   const handleEffectChange = (effectName: string | null) => {
-    console.log('Effect changed to:', effectName);
-
     if (effectName) {
       // Add as a new effect layer
       addEffectLayer(effectName);
@@ -140,8 +122,6 @@ export default function EditorApp() {
   };
 
   const handleSettingChange = (settingName: string, value: number) => {
-    console.log(`Setting ${settingName} changed to:`, value);
-
     if (activeEffectLayerId) {
       updateLayerSettings(activeEffectLayerId, settingName, value);
     }
@@ -167,17 +147,14 @@ export default function EditorApp() {
   };
 
   const handleClearAllEffects = () => {
-    console.log('Clearing all effects');
     clearEffectLayers();
   };
 
   const handleRemoveEffect = (layerId: string) => {
-    console.log(`Removing effect layer: ${layerId}`);
     removeEffectLayer(layerId);
   };
 
   const handleToggleLayerVisibility = (layerId: string) => {
-    console.log(`Toggling visibility for layer: ${layerId}`);
     // This assumes your useEffectLayers hook has a function like toggleLayerVisibility
     // If not, you'll need to implement it. For now, let's add it to the hook.
     const layer = effectLayers.find(l => l.id === layerId);
