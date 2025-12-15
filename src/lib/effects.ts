@@ -4121,7 +4121,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
   },
   // UNIFIED MONOCHROME - Combines B&W, Grayscale, Sepia, Cyanotype, etc.
   unifiedMono: {
-    label: 'Monochrome Studio',
+    label: 'Monochrome',
     category: 'Filters',
     settings: [
       {
@@ -4376,7 +4376,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
   },
   // UNIFIED SKETCH - Combines pencilSketch, crosshatch, etchedLines, inkWash, inkOutlinePop
   unifiedSketch: {
-    label: 'Sketch Studio',
+    label: 'Sketch',
     category: 'Artistic',
     settings: [
       {
@@ -4404,7 +4404,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
   },
   // UNIFIED PATTERN - Combines halftone, dotScreen, dithering, stippling
   unifiedPattern: {
-    label: 'Pattern Studio',
+    label: 'Pattern',
     category: 'Artistic',
     settings: [
       {
@@ -4438,7 +4438,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
   },
   // UNIFIED GLOW - Combines bloom, halation, bioluminescence, neon edges, orton
   unifiedGlow: {
-    label: 'Glow Studio',
+    label: 'Glow',
     category: 'Blur & Focus',
     settings: [
       {
@@ -4469,7 +4469,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
   // ============================================================================
 
   unifiedGlitch: {
-    label: 'Glitch Studio',
+    label: 'Glitch',
     category: 'Distort',
     settings: [
       {
@@ -4495,7 +4495,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
   unifiedVintage: {
-    label: 'Vintage Studio',
+    label: 'Vintage',
     category: 'Color',
     settings: [
       {
@@ -4515,7 +4515,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
   unifiedWarp: {
-    label: 'Warp Studio',
+    label: 'Warp',
     category: 'Distort',
     settings: [
       {
@@ -4543,7 +4543,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
   unifiedBlur: {
-    label: 'Blur Studio',
+    label: 'Blur',
     category: 'Blur & Focus',
     settings: [
       {
@@ -5261,7 +5261,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     settings: [{ id: 'levels', label: 'Color Levels', min: 2, max: 8, defaultValue: 4, step: 1 }],
   },
   advancedDithering: {
-    label: 'Advanced Dithering',
+    label: 'Dithering',
     category: 'Artistic',
     settings: [
       {
