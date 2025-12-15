@@ -7719,11 +7719,12 @@ export const effectCategories = {
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // UNIFIED STUDIOS - Rich preset-based effects (NEW)
+  // UNIFIED STUDIOS - Rich preset-based effects with multiple variations
+  // Each studio contains multiple presets accessible via a single control
   // ─────────────────────────────────────────────────────────────────────────────
   Studios: {
     icon: '🎨',
-    description: 'Unified effect studios with multiple presets',
+    description: 'Effect studios with multiple style presets',
     effects: [
       'unifiedBlur', // Gaussian, Bokeh, Tilt-Shift, Motion, Radial
       'unifiedGlow', // Bloom, Dreamy, Neon, Bioluminescence, Halation
@@ -7763,8 +7764,10 @@ export const effectCategories = {
     effects: [
       'invert',
       'toneCurve',
+      'gradientMap',
       'cinematicLut',
       'selectiveColor',
+      'colorQuantization',
       'heatmap',
       'thermalPalette',
       'holographicInterference',
@@ -7772,11 +7775,11 @@ export const effectCategories = {
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // TEXTURE - Overlays and texture effects
+  // TEXTURE - Overlays, patterns, and texture effects
   // ─────────────────────────────────────────────────────────────────────────────
   Texture: {
     icon: '📐',
-    description: 'Textures, overlays, and noise',
+    description: 'Textures, patterns, and noise',
     effects: [
       'noise',
       'fractalNoise',
@@ -7784,11 +7787,14 @@ export const effectCategories = {
       'paperRelief',
       'weavePattern',
       'topographicContours',
+      'cellular',
+      'geometric',
+      'voronoi',
     ],
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // SPECIAL FX - Unique simulation effects
+  // SPECIAL FX - Unique simulation and experimental effects
   // ─────────────────────────────────────────────────────────────────────────────
   'Special FX': {
     icon: '✨',
@@ -7805,6 +7811,8 @@ export const effectCategories = {
       'iridescentSheen',
       'crystalFacet',
       'paperCutArt',
+      'pixelExplosion',
+      'temporalEcho',
     ],
   },
 
@@ -7817,6 +7825,62 @@ export const effectCategories = {
     effects: ['threshold', 'posterize', 'edgeDetection', 'sharpen', 'vignette', 'lensFlare'],
   },
 };
+
+// ============================================================================
+// LEGACY/DUPLICATE EFFECTS - Hidden from UI but still functional
+// ============================================================================
+// These effects are presets within unified Studios. They remain in effectsConfig
+// for backwards compatibility but should NOT appear in the UI.
+export const hiddenLegacyEffects = new Set([
+  // Covered by unifiedBlur
+  'blur',
+  'bokeh',
+  'depthBlur',
+  'tiltShiftMiniature',
+  // Covered by unifiedGlow
+  'bloom',
+  'bioluminescence',
+  'neonGlowEdges',
+  'orton',
+  // Covered by unifiedSketch
+  'pencilSketch',
+  'crosshatch',
+  // Covered by unifiedPattern
+  'halftone',
+  'dotScreen',
+  'stippling',
+  'halftonePattern',
+  // Covered by unifiedGlitch
+  'rgbShift',
+  'chromaticAberration',
+  'scanLines',
+  'glitchArt',
+  'databending',
+  'pixelSort',
+  'chromaticGlitch',
+  // Covered by unifiedVintage
+  'sepia',
+  'oldPhoto',
+  'scratchedFilm',
+  // Covered by unifiedWarp
+  'pixelate',
+  'swirl',
+  'kaleidoscope',
+  'kaleidoscopeFracture',
+  'fisheyeWarp',
+  'dispersionShatter',
+  'mosaic',
+  // Covered by unifiedMono
+  'grayscale',
+  'blackAndWhite',
+  'duotone',
+  // Covered by advancedDithering
+  'atkinsonDithering',
+  'orderedDithering',
+  'blueNoiseDithering',
+  'retroDithering',
+  'retroPalette',
+]);
 
 // ============================================================================
 // LEGACY EFFECT ALIASES

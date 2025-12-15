@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { effectsConfig, effectCategories } from '@/lib/effects';
+import { effectsConfig, effectCategories, hiddenLegacyEffects } from '@/lib/effects';
 import { ChevronRight, Plus, Search } from 'lucide-react';
 
 interface AppleEffectsBrowserProps {
@@ -44,16 +44,18 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
       grouped[category] = items;
     });
 
-    // Ensure every effect remains discoverable under "More"
+    // Find any effects not in a category (should be minimal after proper categorization)
+    // Filter out legacy effects that are now presets in unified Studios
     const included = new Set<string>();
     Object.values(grouped).forEach(items => {
       items.forEach(([id]) => included.add(id));
     });
 
     const remaining = Object.entries(effectsConfig)
-      .filter(([id]) => !included.has(id))
+      .filter(([id]) => !included.has(id) && !hiddenLegacyEffects.has(id))
       .sort((a, b) => a[1].label.localeCompare(b[1].label));
 
+    // Only show "More" if there are truly uncategorized effects
     if (remaining.length > 0) {
       grouped['More'] = remaining;
     }
