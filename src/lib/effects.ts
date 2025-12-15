@@ -505,6 +505,16 @@ export const applyEffect = async (
       case 'bioluminescence':
         return [createBioluminescenceEffect(settings), {}];
 
+      // --- NEW UNIFIED EFFECTS ---
+      case 'unifiedGlitch':
+        return [createUnifiedGlitchEffect(settings), {}];
+      case 'unifiedVintage':
+        return [createUnifiedVintageEffect(settings), {}];
+      case 'unifiedWarp':
+        return [createUnifiedWarpEffect(settings), {}];
+      case 'unifiedBlur':
+        return [createUnifiedBlurEffect(settings), {}];
+
       // --- NEW POPULAR EFFECTS ---
       case 'watercolor':
         return [createWatercolorEffect(settings), {}];
@@ -2962,6 +2972,1145 @@ export const getEffectSettings = (effectId: string | null): EffectSetting[] => {
   }
   return effectsConfig[effectId].settings || [];
 };
+// ============================================================================
+// NEW UNIFIED EFFECTS - Consolidated from multiple similar effects
+// ============================================================================
+
+/**
+ * Unified Glitch Effect - Combines RGB Shift, Chromatic Aberration, Scanlines,
+ * Digital Glitch, VHS, Databend, and Pixel Sort into one configurable effect.
+ *
+ * Presets: 0=RGB Shift, 1=Chromatic Aberration, 2=Scanlines, 3=VHS/Analog,
+ *          4=Digital Corruption, 5=Databend, 6=Pixel Sort
+ */
+const createUnifiedGlitchEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const preset = Math.floor(settings.preset ?? 0);
+    const intensity = settings.intensity ?? 0.5;
+    const amount = Math.floor((settings.amount ?? 10) * intensity);
+    const direction = Math.floor(settings.direction ?? 0); // 0=horizontal, 1=vertical, 2=both
+    const blockSize = Math.floor(settings.blockSize ?? 8);
+    const randomness = settings.randomness ?? 0.5;
+
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    switch (preset) {
+      case 0: // RGB Shift
+        applyRgbShift(data, tempData, width, height, amount, direction);
+        break;
+      case 1: // Chromatic Aberration
+        applyChromaticAberration(data, tempData, width, height, amount);
+        break;
+      case 2: // Scanlines
+        applyScanlines(data, width, height, intensity, blockSize);
+        break;
+      case 3: // VHS/Analog
+        applyVhsEffect(data, tempData, width, height, intensity, randomness);
+        break;
+      case 4: // Digital Corruption
+        applyDigitalCorruption(data, tempData, width, height, intensity, blockSize, randomness);
+        break;
+      case 5: // Databend
+        applyDatabend(data, width, height, intensity, blockSize);
+        break;
+      case 6: // Pixel Sort
+        applyPixelSort(data, width, height, intensity, direction);
+        break;
+    }
+  };
+};
+
+// Helper functions for Unified Glitch
+const applyRgbShift = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  amount: number,
+  direction: number
+) => {
+  const shiftX = direction !== 1 ? amount : 0;
+  const shiftY = direction !== 0 ? amount : 0;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      // Red channel - shift one direction
+      const rX = Math.min(width - 1, Math.max(0, x + shiftX));
+      const rY = Math.min(height - 1, Math.max(0, y + shiftY));
+      const rIdx = (rY * width + rX) * 4;
+
+      // Blue channel - shift opposite direction
+      const bX = Math.min(width - 1, Math.max(0, x - shiftX));
+      const bY = Math.min(height - 1, Math.max(0, y - shiftY));
+      const bIdx = (bY * width + bX) * 4;
+
+      data[idx] = tempData[rIdx]; // Red from shifted position
+      data[idx + 1] = tempData[idx + 1]; // Green stays
+      data[idx + 2] = tempData[bIdx + 2]; // Blue from opposite shift
+    }
+  }
+};
+
+const applyChromaticAberration = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  amount: number
+) => {
+  const centerX = width / 2;
+  const centerY = height / 2;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      // Calculate radial distance from center
+      const dx = x - centerX;
+      const dy = y - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+      const factor = (dist / maxDist) * amount;
+
+      // Shift channels radially
+      const angle = Math.atan2(dy, dx);
+      const rX = Math.round(x + Math.cos(angle) * factor);
+      const rY = Math.round(y + Math.sin(angle) * factor);
+      const bX = Math.round(x - Math.cos(angle) * factor);
+      const bY = Math.round(y - Math.sin(angle) * factor);
+
+      const rIdx =
+        (Math.max(0, Math.min(height - 1, rY)) * width + Math.max(0, Math.min(width - 1, rX))) * 4;
+      const bIdx =
+        (Math.max(0, Math.min(height - 1, bY)) * width + Math.max(0, Math.min(width - 1, bX))) * 4;
+
+      data[idx] = tempData[rIdx];
+      data[idx + 2] = tempData[bIdx + 2];
+    }
+  }
+};
+
+const applyScanlines = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number,
+  spacing: number
+) => {
+  const darkness = intensity * 0.8;
+
+  for (let y = 0; y < height; y++) {
+    const isScanline = y % spacing < spacing / 2;
+    if (isScanline) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        data[idx] *= 1 - darkness;
+        data[idx + 1] *= 1 - darkness;
+        data[idx + 2] *= 1 - darkness;
+      }
+    }
+  }
+};
+
+const applyVhsEffect = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number,
+  randomness: number
+) => {
+  // Horizontal line shifts
+  for (let y = 0; y < height; y++) {
+    if (Math.random() < randomness * 0.1) {
+      const shift = Math.floor((Math.random() - 0.5) * width * intensity * 0.1);
+      for (let x = 0; x < width; x++) {
+        const srcX = (x + shift + width) % width;
+        const idx = (y * width + x) * 4;
+        const srcIdx = (y * width + srcX) * 4;
+        data[idx] = tempData[srcIdx];
+        data[idx + 1] = tempData[srcIdx + 1];
+        data[idx + 2] = tempData[srcIdx + 2];
+      }
+    }
+  }
+
+  // Color bleeding
+  const bleed = Math.floor(intensity * 5);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width - bleed; x++) {
+      const idx = (y * width + x) * 4;
+      const nextIdx = (y * width + x + bleed) * 4;
+      data[idx] = Math.round(data[idx] * 0.9 + data[nextIdx] * 0.1);
+    }
+  }
+
+  // Add noise
+  for (let i = 0; i < data.length; i += 4) {
+    const noise = (Math.random() - 0.5) * intensity * 30;
+    data[i] = Math.max(0, Math.min(255, data[i] + noise));
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+  }
+};
+
+const applyDigitalCorruption = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number,
+  blockSize: number,
+  randomness: number
+) => {
+  const blockHeight = Math.max(1, blockSize);
+  const numBlocks = Math.ceil(height / blockHeight);
+
+  for (let block = 0; block < numBlocks; block++) {
+    if (Math.random() < randomness * intensity) {
+      const startY = block * blockHeight;
+      const endY = Math.min(height, startY + blockHeight);
+      const shiftX = Math.floor((Math.random() - 0.5) * width * intensity * 0.2);
+
+      for (let y = startY; y < endY; y++) {
+        for (let x = 0; x < width; x++) {
+          const srcX = (x + shiftX + width) % width;
+          const idx = (y * width + x) * 4;
+          const srcIdx = (y * width + srcX) * 4;
+
+          // Random channel corruption
+          if (Math.random() < intensity * 0.3) {
+            data[idx] = tempData[srcIdx];
+            data[idx + 1] = tempData[(y * width + ((x + 2) % width)) * 4 + 1];
+            data[idx + 2] = tempData[(y * width + ((x - 2 + width) % width)) * 4 + 2];
+          } else {
+            data[idx] = tempData[srcIdx];
+            data[idx + 1] = tempData[srcIdx + 1];
+            data[idx + 2] = tempData[srcIdx + 2];
+          }
+        }
+      }
+    }
+  }
+};
+
+const applyDatabend = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number,
+  blockSize: number
+) => {
+  const bendAmount = Math.floor(intensity * 50);
+
+  for (let y = 0; y < height; y++) {
+    // Create wave distortion
+    const offset = Math.floor(Math.sin(y / blockSize) * bendAmount * intensity);
+
+    if (offset !== 0) {
+      const row = new Uint8ClampedArray(width * 4);
+      for (let x = 0; x < width; x++) {
+        const srcX = (x + offset + width) % width;
+        const idx = x * 4;
+        const srcIdx = (y * width + srcX) * 4;
+        row[idx] = data[srcIdx];
+        row[idx + 1] = data[srcIdx + 1];
+        row[idx + 2] = data[srcIdx + 2];
+        row[idx + 3] = data[srcIdx + 3];
+      }
+
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        data[idx] = row[x * 4];
+        data[idx + 1] = row[x * 4 + 1];
+        data[idx + 2] = row[x * 4 + 2];
+        data[idx + 3] = row[x * 4 + 3];
+      }
+    }
+  }
+};
+
+const applyPixelSort = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number,
+  direction: number
+) => {
+  const threshold = (1 - intensity) * 255;
+
+  if (direction === 0 || direction === 2) {
+    // Horizontal sort
+    for (let y = 0; y < height; y++) {
+      let sortStart = -1;
+
+      for (let x = 0; x <= width; x++) {
+        const idx = (y * width + Math.min(x, width - 1)) * 4;
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+
+        if (brightness > threshold && sortStart === -1) {
+          sortStart = x;
+        } else if ((brightness <= threshold || x === width) && sortStart !== -1) {
+          // Sort this segment
+          const segment: number[][] = [];
+          for (let sx = sortStart; sx < x; sx++) {
+            const sIdx = (y * width + sx) * 4;
+            segment.push([data[sIdx], data[sIdx + 1], data[sIdx + 2], data[sIdx + 3]]);
+          }
+
+          segment.sort((a, b) => a[0] + a[1] + a[2] - (b[0] + b[1] + b[2]));
+
+          for (let sx = sortStart; sx < x; sx++) {
+            const sIdx = (y * width + sx) * 4;
+            const pixel = segment[sx - sortStart];
+            data[sIdx] = pixel[0];
+            data[sIdx + 1] = pixel[1];
+            data[sIdx + 2] = pixel[2];
+            data[sIdx + 3] = pixel[3];
+          }
+
+          sortStart = -1;
+        }
+      }
+    }
+  }
+
+  if (direction === 1 || direction === 2) {
+    // Vertical sort
+    for (let x = 0; x < width; x++) {
+      let sortStart = -1;
+
+      for (let y = 0; y <= height; y++) {
+        const idx = (Math.min(y, height - 1) * width + x) * 4;
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+
+        if (brightness > threshold && sortStart === -1) {
+          sortStart = y;
+        } else if ((brightness <= threshold || y === height) && sortStart !== -1) {
+          const segment: number[][] = [];
+          for (let sy = sortStart; sy < y; sy++) {
+            const sIdx = (sy * width + x) * 4;
+            segment.push([data[sIdx], data[sIdx + 1], data[sIdx + 2], data[sIdx + 3]]);
+          }
+
+          segment.sort((a, b) => a[0] + a[1] + a[2] - (b[0] + b[1] + b[2]));
+
+          for (let sy = sortStart; sy < y; sy++) {
+            const sIdx = (sy * width + x) * 4;
+            const pixel = segment[sy - sortStart];
+            data[sIdx] = pixel[0];
+            data[sIdx + 1] = pixel[1];
+            data[sIdx + 2] = pixel[2];
+            data[sIdx + 3] = pixel[3];
+          }
+
+          sortStart = -1;
+        }
+      }
+    }
+  }
+};
+
+/**
+ * Unified Vintage Effect - Combines Sepia, Old Photo, Faded Film,
+ * Cross Process, Scratched Film, and Instant/Polaroid into one effect.
+ *
+ * Presets: 0=Sepia, 1=Old Photo, 2=Faded Film, 3=Cross Process,
+ *          4=Scratched Film, 5=Instant/Polaroid
+ */
+const createUnifiedVintageEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const preset = Math.floor(settings.preset ?? 0);
+    const intensity = settings.intensity ?? 0.7;
+    const vignette = settings.vignette ?? 0.5;
+    const grain = settings.grain ?? 0.3;
+    const scratches = settings.scratches ?? 0;
+    const fade = settings.fade ?? 0;
+    const warmth = (settings.warmth ?? 0.5) - 0.5; // -0.5 to 0.5
+
+    // Apply base color transformation based on preset
+    switch (preset) {
+      case 0: // Sepia
+        applySepiaTone(data, intensity);
+        break;
+      case 1: // Old Photo
+        applyOldPhotoTone(data, intensity, fade);
+        break;
+      case 2: // Faded Film
+        applyFadedFilm(data, intensity, fade);
+        break;
+      case 3: // Cross Process
+        applyCrossProcess(data, intensity);
+        break;
+      case 4: // Scratched Film
+        applyScratchedFilm(data, width, height, intensity, scratches);
+        break;
+      case 5: // Instant/Polaroid
+        applyPolaroid(data, intensity, warmth);
+        break;
+    }
+
+    // Apply common vintage effects
+    if (warmth !== 0) {
+      applyWarmth(data, warmth);
+    }
+
+    if (grain > 0) {
+      applyFilmGrain(data, grain);
+    }
+
+    if (vignette > 0) {
+      applyVintageVignette(data, width, height, vignette);
+    }
+  };
+};
+
+// Helper functions for Unified Vintage
+const applySepiaTone = (data: Uint8ClampedArray, intensity: number) => {
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i],
+      g = data[i + 1],
+      b = data[i + 2];
+    const gray = r * 0.299 + g * 0.587 + b * 0.114;
+
+    const sepiaR = gray * 1.2;
+    const sepiaG = gray * 0.9;
+    const sepiaB = gray * 0.6;
+
+    data[i] = Math.min(255, r * (1 - intensity) + sepiaR * intensity);
+    data[i + 1] = Math.min(255, g * (1 - intensity) + sepiaG * intensity);
+    data[i + 2] = Math.min(255, b * (1 - intensity) + sepiaB * intensity);
+  }
+};
+
+const applyOldPhotoTone = (data: Uint8ClampedArray, intensity: number, fade: number) => {
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i],
+      g = data[i + 1],
+      b = data[i + 2];
+    const gray = r * 0.299 + g * 0.587 + b * 0.114;
+
+    // Warm sepia with slight fade
+    let newR = gray * 1.1 + 20;
+    let newG = gray * 0.95 + 10;
+    let newB = gray * 0.7;
+
+    // Apply fade (lift blacks)
+    const fadeAmount = fade * 50;
+    newR = Math.min(255, newR + fadeAmount);
+    newG = Math.min(255, newG + fadeAmount);
+    newB = Math.min(255, newB + fadeAmount);
+
+    data[i] = Math.min(255, r * (1 - intensity) + newR * intensity);
+    data[i + 1] = Math.min(255, g * (1 - intensity) + newG * intensity);
+    data[i + 2] = Math.min(255, b * (1 - intensity) + newB * intensity);
+  }
+};
+
+const applyFadedFilm = (data: Uint8ClampedArray, intensity: number, fade: number) => {
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i],
+      g = data[i + 1],
+      b = data[i + 2];
+
+    // Reduce contrast and shift colors
+    const contrast = 1 - intensity * 0.3;
+    const fadeAmount = (fade + intensity * 0.3) * 30;
+
+    let newR = (r - 128) * contrast + 128 + fadeAmount;
+    const newG = (g - 128) * contrast + 128 + fadeAmount * 0.9;
+    let newB = (b - 128) * contrast + 128 + fadeAmount * 0.8;
+
+    // Slight cyan shadows, yellow highlights
+    if (newR < 128) newB += intensity * 10;
+    else newR += intensity * 10;
+
+    data[i] = Math.max(0, Math.min(255, newR));
+    data[i + 1] = Math.max(0, Math.min(255, newG));
+    data[i + 2] = Math.max(0, Math.min(255, newB));
+  }
+};
+
+const applyCrossProcess = (data: Uint8ClampedArray, intensity: number) => {
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i],
+      g = data[i + 1],
+      b = data[i + 2];
+
+    // Cross-process: boost contrast, shift colors
+    const newR = r * 1.1 + (r > 128 ? 20 : -10);
+    const newG = g * 0.9;
+    const newB = b * 1.2 + (b < 128 ? 30 : 0);
+
+    data[i] = Math.max(0, Math.min(255, r * (1 - intensity) + newR * intensity));
+    data[i + 1] = Math.max(0, Math.min(255, g * (1 - intensity) + newG * intensity));
+    data[i + 2] = Math.max(0, Math.min(255, b * (1 - intensity) + newB * intensity));
+  }
+};
+
+const applyScratchedFilm = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number,
+  scratchAmount: number
+) => {
+  // Apply base sepia
+  applySepiaTone(data, intensity * 0.7);
+
+  // Add scratches
+  const numScratches = Math.floor(scratchAmount * 20);
+  for (let s = 0; s < numScratches; s++) {
+    const scratchX = Math.floor(Math.random() * width);
+    const scratchWidth = Math.random() < 0.5 ? 1 : 2;
+
+    for (let y = 0; y < height; y++) {
+      if (Math.random() < 0.95) {
+        // Make scratches slightly discontinuous
+        for (let dx = 0; dx < scratchWidth; dx++) {
+          const x = scratchX + dx;
+          if (x >= 0 && x < width) {
+            const idx = (y * width + x) * 4;
+            const brightness = 200 + Math.floor(Math.random() * 55);
+            data[idx] = Math.min(255, data[idx] + (brightness - data[idx]) * 0.5);
+            data[idx + 1] = Math.min(255, data[idx + 1] + (brightness - data[idx + 1]) * 0.5);
+            data[idx + 2] = Math.min(255, data[idx + 2] + (brightness - data[idx + 2]) * 0.5);
+          }
+        }
+      }
+    }
+  }
+};
+
+const applyPolaroid = (data: Uint8ClampedArray, intensity: number, warmth: number) => {
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i],
+      g = data[i + 1],
+      b = data[i + 2];
+
+    // Polaroid look: slightly faded, warm tones, reduced contrast
+    const contrast = 0.9;
+    let newR = (r - 128) * contrast + 128 + 10;
+    const newG = (g - 128) * contrast + 128 + 5;
+    let newB = (b - 128) * contrast + 128 - 10;
+
+    // Add warmth
+    newR += warmth * 30;
+    newB -= warmth * 20;
+
+    data[i] = Math.max(0, Math.min(255, r * (1 - intensity) + newR * intensity));
+    data[i + 1] = Math.max(0, Math.min(255, g * (1 - intensity) + newG * intensity));
+    data[i + 2] = Math.max(0, Math.min(255, b * (1 - intensity) + newB * intensity));
+  }
+};
+
+const applyWarmth = (data: Uint8ClampedArray, warmth: number) => {
+  const shift = warmth * 30;
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = Math.max(0, Math.min(255, data[i] + shift));
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] - shift * 0.5));
+  }
+};
+
+const applyFilmGrain = (data: Uint8ClampedArray, amount: number) => {
+  const grainStrength = amount * 40;
+  for (let i = 0; i < data.length; i += 4) {
+    const noise = (Math.random() - 0.5) * grainStrength;
+    data[i] = Math.max(0, Math.min(255, data[i] + noise));
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise));
+  }
+};
+
+const applyVintageVignette = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  amount: number
+) => {
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = x - centerX;
+      const dy = y - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const factor = 1 - (dist / maxDist) * amount;
+
+      const idx = (y * width + x) * 4;
+      data[idx] *= factor;
+      data[idx + 1] *= factor;
+      data[idx + 2] *= factor;
+    }
+  }
+};
+
+/**
+ * Unified Warp Effect - Combines Pixelate, Swirl, Kaleidoscope, Fisheye,
+ * Spherize, Pinch/Bulge, Wave/Ripple, and Shatter into one effect.
+ *
+ * Presets: 0=Pixelate, 1=Swirl, 2=Kaleidoscope, 3=Fisheye, 4=Spherize,
+ *          5=Pinch/Bulge, 6=Wave/Ripple, 7=Shatter
+ */
+const createUnifiedWarpEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const preset = Math.floor(settings.preset ?? 0);
+    const amount = settings.amount ?? 0.5;
+    const centerX = (settings.centerX ?? 0.5) * width;
+    const centerY = (settings.centerY ?? 0.5) * height;
+    const segments = Math.floor(settings.segments ?? 6);
+    const radius = (settings.radius ?? 0.5) * Math.min(width, height);
+
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    switch (preset) {
+      case 0: // Pixelate
+        applyPixelateWarp(data, tempData, width, height, Math.floor(amount * 50) + 2);
+        break;
+      case 1: // Swirl
+        applySwirlWarp(data, tempData, width, height, amount * 10, centerX, centerY, radius);
+        break;
+      case 2: // Kaleidoscope
+        applyKaleidoscopeWarp(data, tempData, width, height, segments, centerX, centerY);
+        break;
+      case 3: // Fisheye
+        applyFisheyeWarp(data, tempData, width, height, amount * 2, centerX, centerY);
+        break;
+      case 4: // Spherize
+        applySpherizeWarp(data, tempData, width, height, amount, centerX, centerY, radius);
+        break;
+      case 5: // Pinch/Bulge
+        applyPinchBulgeWarp(
+          data,
+          tempData,
+          width,
+          height,
+          (amount - 0.5) * 2,
+          centerX,
+          centerY,
+          radius
+        );
+        break;
+      case 6: // Wave/Ripple
+        applyWaveWarp(data, tempData, width, height, amount * 30, settings.frequency ?? 10);
+        break;
+      case 7: // Shatter
+        applyShatterWarp(data, tempData, width, height, amount);
+        break;
+    }
+  };
+};
+
+// Helper functions for Unified Warp
+const applyPixelateWarp = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  blockSize: number
+) => {
+  for (let by = 0; by < height; by += blockSize) {
+    for (let bx = 0; bx < width; bx += blockSize) {
+      let r = 0,
+        g = 0,
+        b = 0,
+        count = 0;
+
+      // Calculate average color of block
+      for (let y = by; y < Math.min(by + blockSize, height); y++) {
+        for (let x = bx; x < Math.min(bx + blockSize, width); x++) {
+          const idx = (y * width + x) * 4;
+          r += tempData[idx];
+          g += tempData[idx + 1];
+          b += tempData[idx + 2];
+          count++;
+        }
+      }
+
+      r = Math.round(r / count);
+      g = Math.round(g / count);
+      b = Math.round(b / count);
+
+      // Apply average to all pixels in block
+      for (let y = by; y < Math.min(by + blockSize, height); y++) {
+        for (let x = bx; x < Math.min(bx + blockSize, width); x++) {
+          const idx = (y * width + x) * 4;
+          data[idx] = r;
+          data[idx + 1] = g;
+          data[idx + 2] = b;
+        }
+      }
+    }
+  }
+};
+
+const applySwirlWarp = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  amount: number,
+  cx: number,
+  cy: number,
+  radius: number
+) => {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < radius) {
+        const factor = 1 - dist / radius;
+        const angle = factor * factor * amount;
+
+        const srcX = Math.round(cx + dx * Math.cos(angle) - dy * Math.sin(angle));
+        const srcY = Math.round(cy + dx * Math.sin(angle) + dy * Math.cos(angle));
+
+        if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+          const idx = (y * width + x) * 4;
+          const srcIdx = (srcY * width + srcX) * 4;
+          data[idx] = tempData[srcIdx];
+          data[idx + 1] = tempData[srcIdx + 1];
+          data[idx + 2] = tempData[srcIdx + 2];
+        }
+      }
+    }
+  }
+};
+
+const applyKaleidoscopeWarp = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  segments: number,
+  cx: number,
+  cy: number
+) => {
+  const segmentAngle = (2 * Math.PI) / segments;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      let angle = Math.atan2(dy, dx);
+
+      if (angle < 0) angle += 2 * Math.PI;
+
+      // Map to first segment, reflecting if needed
+      const segmentIndex = Math.floor(angle / segmentAngle);
+      let localAngle = angle - segmentIndex * segmentAngle;
+
+      if (segmentIndex % 2 === 1) {
+        localAngle = segmentAngle - localAngle;
+      }
+
+      const srcX = Math.round(cx + dist * Math.cos(localAngle));
+      const srcY = Math.round(cy + dist * Math.sin(localAngle));
+
+      if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+        const idx = (y * width + x) * 4;
+        const srcIdx = (srcY * width + srcX) * 4;
+        data[idx] = tempData[srcIdx];
+        data[idx + 1] = tempData[srcIdx + 1];
+        data[idx + 2] = tempData[srcIdx + 2];
+      }
+    }
+  }
+};
+
+const applyFisheyeWarp = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  amount: number,
+  cx: number,
+  cy: number
+) => {
+  const maxRadius = Math.min(width, height) / 2;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = (x - cx) / maxRadius;
+      const dy = (y - cy) / maxRadius;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < 1) {
+        const factor = Math.pow(dist, amount) / dist;
+        const srcX = Math.round(cx + dx * factor * maxRadius);
+        const srcY = Math.round(cy + dy * factor * maxRadius);
+
+        if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+          const idx = (y * width + x) * 4;
+          const srcIdx = (srcY * width + srcX) * 4;
+          data[idx] = tempData[srcIdx];
+          data[idx + 1] = tempData[srcIdx + 1];
+          data[idx + 2] = tempData[srcIdx + 2];
+        }
+      }
+    }
+  }
+};
+
+const applySpherizeWarp = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  amount: number,
+  cx: number,
+  cy: number,
+  radius: number
+) => {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < radius) {
+        const factor = dist / radius;
+        const sphereFactor = Math.sqrt(1 - factor * factor) * amount + (1 - amount);
+
+        const srcX = Math.round(cx + dx * sphereFactor);
+        const srcY = Math.round(cy + dy * sphereFactor);
+
+        if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+          const idx = (y * width + x) * 4;
+          const srcIdx = (srcY * width + srcX) * 4;
+          data[idx] = tempData[srcIdx];
+          data[idx + 1] = tempData[srcIdx + 1];
+          data[idx + 2] = tempData[srcIdx + 2];
+        }
+      }
+    }
+  }
+};
+
+const applyPinchBulgeWarp = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  amount: number, // negative = pinch, positive = bulge
+  cx: number,
+  cy: number,
+  radius: number
+) => {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < radius) {
+        const factor = dist / radius;
+        const warpFactor = Math.pow(factor, 1 - amount);
+
+        const srcX = Math.round(cx + (dx * warpFactor) / factor);
+        const srcY = Math.round(cy + (dy * warpFactor) / factor);
+
+        if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+          const idx = (y * width + x) * 4;
+          const srcIdx = (srcY * width + srcX) * 4;
+          data[idx] = tempData[srcIdx];
+          data[idx + 1] = tempData[srcIdx + 1];
+          data[idx + 2] = tempData[srcIdx + 2];
+        }
+      }
+    }
+  }
+};
+
+const applyWaveWarp = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  amplitude: number,
+  frequency: number
+) => {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const offsetX = Math.sin(y / frequency) * amplitude;
+      const offsetY = Math.cos(x / frequency) * amplitude;
+
+      const srcX = Math.round(x + offsetX);
+      const srcY = Math.round(y + offsetY);
+
+      if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+        const idx = (y * width + x) * 4;
+        const srcIdx = (srcY * width + srcX) * 4;
+        data[idx] = tempData[srcIdx];
+        data[idx + 1] = tempData[srcIdx + 1];
+        data[idx + 2] = tempData[srcIdx + 2];
+      }
+    }
+  }
+};
+
+const applyShatterWarp = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  amount: number
+) => {
+  const numShards = Math.floor(5 + amount * 20);
+  const shardCenters: { x: number; y: number; offsetX: number; offsetY: number }[] = [];
+
+  // Generate random shard centers with offsets
+  for (let i = 0; i < numShards; i++) {
+    shardCenters.push({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      offsetX: (Math.random() - 0.5) * amount * 50,
+      offsetY: (Math.random() - 0.5) * amount * 50,
+    });
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      // Find nearest shard center
+      let nearestDist = Infinity;
+      let nearestShard = shardCenters[0];
+
+      for (const shard of shardCenters) {
+        const dist = Math.sqrt(Math.pow(x - shard.x, 2) + Math.pow(y - shard.y, 2));
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestShard = shard;
+        }
+      }
+
+      // Apply offset from that shard
+      const srcX = Math.round(x + nearestShard.offsetX);
+      const srcY = Math.round(y + nearestShard.offsetY);
+
+      if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+        const idx = (y * width + x) * 4;
+        const srcIdx = (srcY * width + srcX) * 4;
+        data[idx] = tempData[srcIdx];
+        data[idx + 1] = tempData[srcIdx + 1];
+        data[idx + 2] = tempData[srcIdx + 2];
+      }
+    }
+  }
+};
+
+/**
+ * Unified Blur Effect - Combines Gaussian, Bokeh, Depth/Tilt-Shift,
+ * Motion, and Radial blur into one effect.
+ *
+ * Presets: 0=Gaussian, 1=Bokeh, 2=Tilt-Shift, 3=Motion, 4=Radial/Zoom
+ */
+const createUnifiedBlurEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const preset = Math.floor(settings.preset ?? 0);
+    const radius = Math.floor(settings.radius ?? 10);
+    const focusX = (settings.focusX ?? 0.5) * width;
+    const focusY = (settings.focusY ?? 0.5) * height;
+    const focusSize = (settings.focusSize ?? 0.3) * Math.min(width, height);
+    const angle = (settings.angle ?? 0) * (Math.PI / 180);
+
+    const tempData = new Uint8ClampedArray(data.length);
+    tempData.set(data);
+
+    switch (preset) {
+      case 0: // Gaussian
+        stackBlur(data, width, height, radius);
+        break;
+      case 1: // Bokeh (simulated with multi-pass)
+        applyBokehBlur(data, tempData, width, height, radius);
+        break;
+      case 2: // Tilt-Shift
+        applyTiltShiftBlur(data, tempData, width, height, radius, focusY, focusSize);
+        break;
+      case 3: // Motion
+        applyMotionBlur(data, tempData, width, height, radius, angle);
+        break;
+      case 4: // Radial/Zoom
+        applyRadialBlur(data, tempData, width, height, radius, focusX, focusY);
+        break;
+    }
+  };
+};
+
+// Helper functions for Unified Blur
+const applyBokehBlur = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number
+) => {
+  // Simulate bokeh with hexagonal averaging
+  const points = 6;
+  const angleStep = (Math.PI * 2) / points;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let r = 0,
+        g = 0,
+        b = 0,
+        count = 0;
+
+      // Sample in hexagonal pattern
+      for (let ring = 0; ring <= radius; ring++) {
+        for (let p = 0; p < points; p++) {
+          const angle = p * angleStep;
+          const sampleX = Math.round(x + ring * Math.cos(angle));
+          const sampleY = Math.round(y + ring * Math.sin(angle));
+
+          if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
+            const idx = (sampleY * width + sampleX) * 4;
+            // Weight brighter pixels more for bokeh effect
+            const brightness = (tempData[idx] + tempData[idx + 1] + tempData[idx + 2]) / 765;
+            const weight = 1 + brightness * 2;
+            r += tempData[idx] * weight;
+            g += tempData[idx + 1] * weight;
+            b += tempData[idx + 2] * weight;
+            count += weight;
+          }
+        }
+      }
+
+      const idx = (y * width + x) * 4;
+      data[idx] = Math.round(r / count);
+      data[idx + 1] = Math.round(g / count);
+      data[idx + 2] = Math.round(b / count);
+    }
+  }
+};
+
+const applyTiltShiftBlur = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  maxRadius: number,
+  focusY: number,
+  focusSize: number
+) => {
+  // Create blurred version
+  const blurred = new Uint8ClampedArray(data.length);
+  blurred.set(tempData);
+  stackBlur(blurred, width, height, maxRadius);
+
+  // Blend based on distance from focus band
+  for (let y = 0; y < height; y++) {
+    const distFromFocus = Math.abs(y - focusY);
+    const blurAmount = Math.max(0, Math.min(1, (distFromFocus - focusSize / 2) / (focusSize / 2)));
+
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      data[idx] = Math.round(tempData[idx] * (1 - blurAmount) + blurred[idx] * blurAmount);
+      data[idx + 1] = Math.round(
+        tempData[idx + 1] * (1 - blurAmount) + blurred[idx + 1] * blurAmount
+      );
+      data[idx + 2] = Math.round(
+        tempData[idx + 2] * (1 - blurAmount) + blurred[idx + 2] * blurAmount
+      );
+    }
+  }
+};
+
+const applyMotionBlur = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number,
+  angle: number
+) => {
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let r = 0,
+        g = 0,
+        b = 0,
+        count = 0;
+
+      for (let i = -radius; i <= radius; i++) {
+        const sampleX = Math.round(x + i * dx);
+        const sampleY = Math.round(y + i * dy);
+
+        if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
+          const idx = (sampleY * width + sampleX) * 4;
+          r += tempData[idx];
+          g += tempData[idx + 1];
+          b += tempData[idx + 2];
+          count++;
+        }
+      }
+
+      const idx = (y * width + x) * 4;
+      data[idx] = Math.round(r / count);
+      data[idx + 1] = Math.round(g / count);
+      data[idx + 2] = Math.round(b / count);
+    }
+  }
+};
+
+const applyRadialBlur = (
+  data: Uint8ClampedArray,
+  tempData: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number,
+  cx: number,
+  cy: number
+) => {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const angle = Math.atan2(dy, dx);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      let r = 0,
+        g = 0,
+        b = 0,
+        count = 0;
+
+      // Sample along the radial direction
+      for (let i = -radius; i <= radius; i++) {
+        const sampleDist = dist + i;
+        const sampleX = Math.round(cx + sampleDist * Math.cos(angle));
+        const sampleY = Math.round(cy + sampleDist * Math.sin(angle));
+
+        if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
+          const idx = (sampleY * width + sampleX) * 4;
+          r += tempData[idx];
+          g += tempData[idx + 1];
+          b += tempData[idx + 2];
+          count++;
+        }
+      }
+
+      const idx = (y * width + x) * 4;
+      data[idx] = Math.round(r / count);
+      data[idx + 1] = Math.round(g / count);
+      data[idx + 2] = Math.round(b / count);
+    }
+  }
+};
+
 // Define all available effects with their settings
 export const effectsConfig: Record<string, EffectConfig> = {
   // Basic Adjustments - Standardized to intuitive percentage-based ranges
@@ -3428,6 +4577,105 @@ export const effectsConfig: Record<string, EffectConfig> = {
       },
     ],
   },
+
+  // ============================================================================
+  // NEW UNIFIED EFFECTS
+  // ============================================================================
+
+  unifiedGlitch: {
+    label: 'Glitch Studio',
+    category: 'Distort',
+    settings: [
+      {
+        id: 'preset',
+        label: 'Style (0=RGB, 1=Chromatic, 2=Scanlines, 3=VHS, 4=Corrupt, 5=Databend, 6=PixelSort)',
+        min: 0,
+        max: 6,
+        defaultValue: 0,
+        step: 1,
+      },
+      { id: 'intensity', label: 'Intensity', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'amount', label: 'Amount', min: 1, max: 50, defaultValue: 10, step: 1 },
+      {
+        id: 'direction',
+        label: 'Direction (0=Horiz, 1=Vert, 2=Both)',
+        min: 0,
+        max: 2,
+        defaultValue: 0,
+        step: 1,
+      },
+      { id: 'blockSize', label: 'Block Size', min: 2, max: 32, defaultValue: 8, step: 1 },
+      { id: 'randomness', label: 'Randomness', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+    ],
+  },
+  unifiedVintage: {
+    label: 'Vintage Studio',
+    category: 'Color',
+    settings: [
+      {
+        id: 'preset',
+        label: 'Style (0=Sepia, 1=OldPhoto, 2=Faded, 3=CrossProc, 4=Scratched, 5=Polaroid)',
+        min: 0,
+        max: 5,
+        defaultValue: 0,
+        step: 1,
+      },
+      { id: 'intensity', label: 'Intensity', min: 0, max: 1, defaultValue: 0.7, step: 0.05 },
+      { id: 'vignette', label: 'Vignette', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'grain', label: 'Grain', min: 0, max: 1, defaultValue: 0.3, step: 0.05 },
+      { id: 'scratches', label: 'Scratches', min: 0, max: 1, defaultValue: 0, step: 0.05 },
+      { id: 'fade', label: 'Fade', min: 0, max: 1, defaultValue: 0, step: 0.05 },
+      { id: 'warmth', label: 'Warmth', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+    ],
+  },
+  unifiedWarp: {
+    label: 'Warp Studio',
+    category: 'Distort',
+    settings: [
+      {
+        id: 'preset',
+        label:
+          'Style (0=Pixel, 1=Swirl, 2=Kaleid, 3=Fisheye, 4=Sphere, 5=Pinch, 6=Wave, 7=Shatter)',
+        min: 0,
+        max: 7,
+        defaultValue: 1,
+        step: 1,
+      },
+      { id: 'amount', label: 'Amount', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'centerX', label: 'Center X', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'centerY', label: 'Center Y', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+      {
+        id: 'segments',
+        label: 'Segments (Kaleidoscope)',
+        min: 2,
+        max: 16,
+        defaultValue: 6,
+        step: 1,
+      },
+      { id: 'radius', label: 'Radius', min: 0.1, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'frequency', label: 'Frequency (Wave)', min: 5, max: 50, defaultValue: 10, step: 1 },
+    ],
+  },
+  unifiedBlur: {
+    label: 'Blur Studio',
+    category: 'Blur & Focus',
+    settings: [
+      {
+        id: 'preset',
+        label: 'Style (0=Gaussian, 1=Bokeh, 2=TiltShift, 3=Motion, 4=Radial)',
+        min: 0,
+        max: 4,
+        defaultValue: 0,
+        step: 1,
+      },
+      { id: 'radius', label: 'Blur Radius', min: 1, max: 50, defaultValue: 10, step: 1 },
+      { id: 'focusX', label: 'Focus X', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'focusY', label: 'Focus Y', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'focusSize', label: 'Focus Size', min: 0.1, max: 1, defaultValue: 0.3, step: 0.05 },
+      { id: 'angle', label: 'Angle (Motion)', min: 0, max: 360, defaultValue: 0, step: 15 },
+    ],
+  },
+
   oilPainting: {
     label: 'Oil Painting',
     category: 'Artistic',
@@ -6574,10 +7822,18 @@ const createDepthBlurEffect = (settings: Record<string, number>) => {
   };
 };
 
-// Reorganized effects categories for better UX
+// ============================================================================
+// CONSOLIDATED EFFECT CATEGORIES
+// ============================================================================
+// Phase 2: Redundant effects removed from UI, unified effects featured prominently
+// Legacy effects still work via applyEffect() for backwards compatibility
+
 export const effectCategories = {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // BASIC ADJUSTMENTS - Keep these separate for quick access
+  // ─────────────────────────────────────────────────────────────────────────────
   Adjust: {
-    icon: '',
+    icon: '⚙️',
     description: 'Basic image adjustments',
     effects: [
       'brightness',
@@ -6589,132 +7845,176 @@ export const effectCategories = {
       'relight',
     ],
   },
-  'Blur & Focus': {
-    icon: '',
-    description: 'Blur and sharpening effects',
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // UNIFIED STUDIOS - Rich preset-based effects (NEW)
+  // ─────────────────────────────────────────────────────────────────────────────
+  Studios: {
+    icon: '🎨',
+    description: 'Unified effect studios with multiple presets',
     effects: [
-      'blur',
-      'sharpen',
-      'bokeh',
-      'depthBlur',
-      'unifiedGlow',
-      'bloom',
-      'temporalEcho',
-      'tiltShiftMiniature',
+      'unifiedBlur', // Gaussian, Bokeh, Tilt-Shift, Motion, Radial
+      'unifiedGlow', // Bloom, Dreamy, Neon, Bioluminescence, Halation
+      'unifiedSketch', // Pencil, Crosshatch, Etched, Ink Wash, Bold Outline
+      'unifiedPattern', // Halftone, Dots, Screen, Dither, Stipple
+      'unifiedGlitch', // RGB Shift, Chromatic, Scanlines, VHS, Databend, Pixel Sort
+      'unifiedVintage', // Sepia, Old Photo, Faded, Cross Process, Scratched, Polaroid
+      'unifiedWarp', // Pixelate, Swirl, Kaleidoscope, Fisheye, Spherize, Wave, Shatter
+      'unifiedMono', // Grayscale, B&W, Duotone, Gradient Map
+      'advancedDithering', // Floyd-Steinberg, Atkinson, Ordered, + Retro Palettes
     ],
   },
-  Artistic: {
-    icon: '',
-    description: 'Artistic transformations',
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STYLIZE - Artistic painting and drawing effects
+  // ─────────────────────────────────────────────────────────────────────────────
+  Stylize: {
+    icon: '🖌️',
+    description: 'Artistic painting and stylization',
     effects: [
-      'unifiedSketch',
-      'unifiedPattern',
-      'stippling',
-      'pencilSketch',
       'watercolor',
       'oilPainting',
       'toon',
       'posterEdges',
       'cutout',
       'stainedGlass',
-      'doubleExposure',
-      'halftone',
-      'crosshatch',
-      'dotScreen',
       'crystallize',
-      'paperCutArt',
-      'retroDithering',
-      'advancedDithering',
-      'atkinsonDithering',
-      'orderedDithering',
-      'blueNoiseDithering',
-      'halftonePattern',
-      'retroPalette',
-      'topographicContours',
-      'weavePattern',
-      'neonGlowEdges',
-      'iridescentSheen',
-      'chromaticGrain',
-      'halationGlow',
-      'etchedLines',
-      'inkWash',
-      'retroRaster',
-      'crystalFacet',
-      'thermalPalette',
-      'paperRelief',
-      'inkOutlinePop',
     ],
   },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // COLOR - Color grading and manipulation
+  // ─────────────────────────────────────────────────────────────────────────────
   Color: {
-    icon: '',
-    description: 'Color grading and effects',
+    icon: '🎨',
+    description: 'Color grading and manipulation',
     effects: [
-      'unifiedMono',
-      'blackAndWhite',
-      'grayscale',
-      'sepia',
       'invert',
-      'duotone',
-      'gradientMap',
       'toneCurve',
       'cinematicLut',
-      'holographicInterference',
       'selectiveColor',
-      'colorQuantization',
       'heatmap',
+      'thermalPalette',
+      'holographicInterference',
     ],
   },
-  Distort: {
-    icon: '',
-    description: 'Warping and distortion',
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TEXTURE - Overlays and texture effects
+  // ─────────────────────────────────────────────────────────────────────────────
+  Texture: {
+    icon: '📐',
+    description: 'Textures, overlays, and noise',
     effects: [
-      'pixelate',
-      'swirl',
-      'kaleidoscope',
-      'kaleidoscopeFracture',
-      'fisheyeWarp',
-      'pixelExplosion',
-      'chromaticGlitch',
-      'databending',
-      'dispersionShatter',
+      'noise',
+      'fractalNoise',
+      'chromaticGrain',
+      'paperRelief',
+      'weavePattern',
+      'topographicContours',
     ],
   },
-  Simulate: {
-    icon: '',
-    description: 'Real-world simulations',
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SPECIAL FX - Unique simulation effects
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Special FX': {
+    icon: '✨',
+    description: 'Special effects and simulations',
     effects: [
+      'doubleExposure',
       'liquidMetal',
       'neuralDream',
       'magneticField',
       'inkBleed',
-      'vignette',
-      'chromaticAberration',
-      'scanLines',
-      'scratchedFilm',
       'anaglyph',
-      'bioluminescence',
-    ],
-  },
-  Overlay: {
-    icon: '',
-    description: 'Overlays and filters',
-    effects: [
-      'noise',
-      'threshold',
-      'posterize',
-      'oldPhoto',
-      'lensFlare',
-      'edgeDetection',
-      'fractalNoise',
+      'asciiArt',
       'circuitBoard',
+      'iridescentSheen',
+      'crystalFacet',
+      'paperCutArt',
     ],
   },
-  Mathematical: {
-    icon: '',
-    description: 'Mathematical and fractal patterns',
-    effects: ['mandelbrot', 'juliaSet', 'voronoi'],
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // UTILITY - Edge detection, thresholds, etc.
+  // ─────────────────────────────────────────────────────────────────────────────
+  Utility: {
+    icon: '🔧',
+    description: 'Utility effects and edge detection',
+    effects: ['threshold', 'posterize', 'edgeDetection', 'sharpen', 'vignette', 'lensFlare'],
   },
-  // 3D Effects category intentionally omitted in UI categories for now
+};
+
+// ============================================================================
+// LEGACY EFFECT ALIASES
+// ============================================================================
+// These effects are now part of unified effects but kept for backwards compatibility.
+// They won't appear in the UI but will still work if called directly.
+export const legacyEffectAliases: Record<string, { unified: string; preset: number }> = {
+  // Blur aliases → unifiedBlur
+  blur: { unified: 'unifiedBlur', preset: 0 }, // Gaussian
+  bokeh: { unified: 'unifiedBlur', preset: 1 }, // Bokeh
+  depthBlur: { unified: 'unifiedBlur', preset: 2 }, // Tilt-Shift
+  tiltShiftMiniature: { unified: 'unifiedBlur', preset: 2 },
+
+  // Glow aliases → unifiedGlow
+  bloom: { unified: 'unifiedGlow', preset: 0 },
+  neonGlowEdges: { unified: 'unifiedGlow', preset: 2 },
+  halationGlow: { unified: 'unifiedGlow', preset: 4 },
+  bioluminescence: { unified: 'unifiedGlow', preset: 3 },
+
+  // Sketch aliases → unifiedSketch
+  pencilSketch: { unified: 'unifiedSketch', preset: 0 },
+  crosshatch: { unified: 'unifiedSketch', preset: 1 },
+  etchedLines: { unified: 'unifiedSketch', preset: 2 },
+  inkWash: { unified: 'unifiedSketch', preset: 3 },
+  inkOutlinePop: { unified: 'unifiedSketch', preset: 4 },
+
+  // Pattern aliases → unifiedPattern
+  halftone: { unified: 'unifiedPattern', preset: 0 },
+  dotScreen: { unified: 'unifiedPattern', preset: 1 },
+  stippling: { unified: 'unifiedPattern', preset: 3 },
+
+  // Glitch aliases → unifiedGlitch
+  rgbShift: { unified: 'unifiedGlitch', preset: 0 },
+  chromaticAberration: { unified: 'unifiedGlitch', preset: 1 },
+  scanLines: { unified: 'unifiedGlitch', preset: 2 },
+  glitchArt: { unified: 'unifiedGlitch', preset: 4 },
+  chromaticGlitch: { unified: 'unifiedGlitch', preset: 4 },
+  databending: { unified: 'unifiedGlitch', preset: 5 },
+  pixelSort: { unified: 'unifiedGlitch', preset: 6 },
+
+  // Vintage aliases → unifiedVintage
+  sepia: { unified: 'unifiedVintage', preset: 0 },
+  oldPhoto: { unified: 'unifiedVintage', preset: 1 },
+  scratchedFilm: { unified: 'unifiedVintage', preset: 4 },
+  retroRaster: { unified: 'unifiedVintage', preset: 2 },
+
+  // Warp aliases → unifiedWarp
+  pixelate: { unified: 'unifiedWarp', preset: 0 },
+  swirl: { unified: 'unifiedWarp', preset: 1 },
+  kaleidoscope: { unified: 'unifiedWarp', preset: 2 },
+  kaleidoscopeFracture: { unified: 'unifiedWarp', preset: 2 },
+  fisheyeWarp: { unified: 'unifiedWarp', preset: 3 },
+  pixelExplosion: { unified: 'unifiedWarp', preset: 7 },
+  dispersionShatter: { unified: 'unifiedWarp', preset: 7 },
+  geometric: { unified: 'unifiedWarp', preset: 6 },
+
+  // Mono aliases → unifiedMono
+  grayscale: { unified: 'unifiedMono', preset: 0 },
+  blackAndWhite: { unified: 'unifiedMono', preset: 1 },
+  duotone: { unified: 'unifiedMono', preset: 2 },
+  gradientMap: { unified: 'unifiedMono', preset: 4 },
+
+  // Dithering aliases → advancedDithering
+  retroDithering: { unified: 'advancedDithering', preset: 0 },
+  atkinsonDithering: { unified: 'advancedDithering', preset: 1 },
+  orderedDithering: { unified: 'advancedDithering', preset: 2 },
+  blueNoiseDithering: { unified: 'advancedDithering', preset: 5 },
+  halftonePattern: { unified: 'advancedDithering', preset: 2 },
+  retroPalette: { unified: 'advancedDithering', preset: 1 },
+  colorQuantization: { unified: 'advancedDithering', preset: 0 },
 };
 
 // Helper function to get category for an effect
