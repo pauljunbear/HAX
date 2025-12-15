@@ -486,6 +486,18 @@ export const applyEffect = async (
         return [createDispersionShatterEffect(settings), {}];
       case 'retroDithering':
         return [createRetroDitheringEffect(settings), {}];
+      case 'advancedDithering':
+        return [createAdvancedDitheringEffect(settings), {}];
+      case 'atkinsonDithering':
+        return [createAtkinsonDitheringEffect(settings), {}];
+      case 'orderedDithering':
+        return [createOrderedDitheringEffect(settings), {}];
+      case 'blueNoiseDithering':
+        return [createBlueNoiseDitheringEffect(settings), {}];
+      case 'halftonePattern':
+        return [createHalftonePatternEffect(settings), {}];
+      case 'retroPalette':
+        return [createRetroPaletteEffect(settings), {}];
       case 'topographicContours':
         return [createTopographicContoursEffect(settings), {}];
       case 'weavePattern':
@@ -4114,6 +4126,219 @@ export const effectsConfig: Record<string, EffectConfig> = {
     category: 'Artistic',
     settings: [{ id: 'levels', label: 'Color Levels', min: 2, max: 8, defaultValue: 4, step: 1 }],
   },
+  advancedDithering: {
+    label: 'Advanced Dithering',
+    category: 'Artistic',
+    settings: [
+      {
+        id: 'algorithm',
+        label:
+          'Algorithm (0=Floyd-Steinberg, 1=Atkinson, 2=Ordered, 3=Stucki, 4=Sierra, 5=Blue Noise)',
+        min: 0,
+        max: 5,
+        defaultValue: 1,
+        step: 1,
+      },
+      {
+        id: 'palette',
+        label: 'Palette (0=B&W, 1=4-Color, 2=8-Color, 3=16-Color, 4=GameBoy, 5=CGA)',
+        min: 0,
+        max: 5,
+        defaultValue: 0,
+        step: 1,
+      },
+      {
+        id: 'threshold',
+        label: 'Threshold',
+        min: 0,
+        max: 1,
+        defaultValue: 0.5,
+        step: 0.01,
+      },
+      {
+        id: 'patternScale',
+        label: 'Pattern Scale',
+        min: 1,
+        max: 8,
+        defaultValue: 2,
+        step: 1,
+      },
+      {
+        id: 'contrast',
+        label: 'Contrast Boost',
+        min: 0,
+        max: 2,
+        defaultValue: 1,
+        step: 0.05,
+      },
+    ],
+  },
+  atkinsonDithering: {
+    label: 'Atkinson Dithering',
+    category: 'Artistic',
+    settings: [
+      {
+        id: 'colorMode',
+        label: 'Color Mode (0=B&W, 1=Grayscale, 2=Color)',
+        min: 0,
+        max: 2,
+        defaultValue: 0,
+        step: 1,
+      },
+      {
+        id: 'levels',
+        label: 'Color Levels',
+        min: 2,
+        max: 16,
+        defaultValue: 2,
+        step: 1,
+      },
+      {
+        id: 'threshold',
+        label: 'Threshold',
+        min: 0,
+        max: 1,
+        defaultValue: 0.5,
+        step: 0.01,
+      },
+    ],
+  },
+  orderedDithering: {
+    label: 'Ordered (Bayer) Dithering',
+    category: 'Artistic',
+    settings: [
+      {
+        id: 'matrixSize',
+        label: 'Matrix Size (2, 4, or 8)',
+        min: 2,
+        max: 8,
+        defaultValue: 4,
+        step: 2,
+      },
+      {
+        id: 'colorMode',
+        label: 'Color Mode (0=B&W, 1=Grayscale, 2=Color)',
+        min: 0,
+        max: 2,
+        defaultValue: 0,
+        step: 1,
+      },
+      {
+        id: 'levels',
+        label: 'Color Levels',
+        min: 2,
+        max: 16,
+        defaultValue: 2,
+        step: 1,
+      },
+      {
+        id: 'spread',
+        label: 'Spread',
+        min: 0,
+        max: 1,
+        defaultValue: 0.5,
+        step: 0.01,
+      },
+    ],
+  },
+  blueNoiseDithering: {
+    label: 'Blue Noise Dithering',
+    category: 'Artistic',
+    settings: [
+      {
+        id: 'colorMode',
+        label: 'Color Mode (0=B&W, 1=Grayscale, 2=Color)',
+        min: 0,
+        max: 2,
+        defaultValue: 0,
+        step: 1,
+      },
+      {
+        id: 'levels',
+        label: 'Color Levels',
+        min: 2,
+        max: 16,
+        defaultValue: 2,
+        step: 1,
+      },
+      {
+        id: 'noiseScale',
+        label: 'Noise Scale',
+        min: 0.5,
+        max: 4,
+        defaultValue: 1,
+        step: 0.1,
+      },
+    ],
+  },
+  halftonePattern: {
+    label: 'Halftone Pattern',
+    category: 'Artistic',
+    settings: [
+      {
+        id: 'dotSize',
+        label: 'Dot Size',
+        min: 2,
+        max: 20,
+        defaultValue: 6,
+        step: 1,
+      },
+      {
+        id: 'angle',
+        label: 'Angle',
+        min: 0,
+        max: 90,
+        defaultValue: 45,
+        step: 5,
+      },
+      {
+        id: 'colorMode',
+        label: 'Color Mode (0=B&W, 1=CMYK)',
+        min: 0,
+        max: 1,
+        defaultValue: 0,
+        step: 1,
+      },
+      {
+        id: 'contrast',
+        label: 'Contrast',
+        min: 0.5,
+        max: 2,
+        defaultValue: 1,
+        step: 0.05,
+      },
+    ],
+  },
+  retroPalette: {
+    label: 'Retro Palette',
+    category: 'Artistic',
+    settings: [
+      {
+        id: 'palette',
+        label: 'Palette (0=GameBoy, 1=CGA, 2=EGA, 3=C64, 4=NES, 5=Macintosh)',
+        min: 0,
+        max: 5,
+        defaultValue: 0,
+        step: 1,
+      },
+      {
+        id: 'dithering',
+        label: 'Dithering (0=None, 1=Atkinson, 2=Ordered)',
+        min: 0,
+        max: 2,
+        defaultValue: 1,
+        step: 1,
+      },
+      {
+        id: 'ditherStrength',
+        label: 'Dither Strength',
+        min: 0,
+        max: 1,
+        defaultValue: 0.8,
+        step: 0.05,
+      },
+    ],
+  },
   topographicContours: {
     label: 'Topographic Contours',
     category: 'Artistic',
@@ -6399,6 +6624,12 @@ export const effectCategories = {
       'crystallize',
       'paperCutArt',
       'retroDithering',
+      'advancedDithering',
+      'atkinsonDithering',
+      'orderedDithering',
+      'blueNoiseDithering',
+      'halftonePattern',
+      'retroPalette',
       'topographicContours',
       'weavePattern',
       'neonGlowEdges',
@@ -6948,6 +7179,824 @@ const createRetroDitheringEffect = (settings: Record<string, number>) => {
               data[idx + (width + 1) * 4 + c] += (error * 1) / 16;
             }
           }
+        }
+      }
+    }
+  };
+};
+
+// ============================================================================
+// ADVANCED DITHERING EFFECTS
+// ============================================================================
+
+// Bayer matrices for ordered dithering
+const BAYER_2x2 = [
+  [0, 2],
+  [3, 1],
+];
+
+const BAYER_4x4 = [
+  [0, 8, 2, 10],
+  [12, 4, 14, 6],
+  [3, 11, 1, 9],
+  [15, 7, 13, 5],
+];
+
+const BAYER_8x8 = [
+  [0, 32, 8, 40, 2, 34, 10, 42],
+  [48, 16, 56, 24, 50, 18, 58, 26],
+  [12, 44, 4, 36, 14, 46, 6, 38],
+  [60, 28, 52, 20, 62, 30, 54, 22],
+  [3, 35, 11, 43, 1, 33, 9, 41],
+  [51, 19, 59, 27, 49, 17, 57, 25],
+  [15, 47, 7, 39, 13, 45, 5, 37],
+  [63, 31, 55, 23, 61, 29, 53, 21],
+];
+
+// Retro palette definitions
+const PALETTES = {
+  // Game Boy - 4 shades of green
+  gameboy: [
+    [15, 56, 15],
+    [48, 98, 48],
+    [139, 172, 15],
+    [155, 188, 15],
+  ],
+  // CGA Palette (mode 4, high intensity)
+  cga: [
+    [0, 0, 0],
+    [85, 255, 255],
+    [255, 85, 255],
+    [255, 255, 255],
+  ],
+  // EGA 16-color palette
+  ega: [
+    [0, 0, 0],
+    [0, 0, 170],
+    [0, 170, 0],
+    [0, 170, 170],
+    [170, 0, 0],
+    [170, 0, 170],
+    [170, 85, 0],
+    [170, 170, 170],
+    [85, 85, 85],
+    [85, 85, 255],
+    [85, 255, 85],
+    [85, 255, 255],
+    [255, 85, 85],
+    [255, 85, 255],
+    [255, 255, 85],
+    [255, 255, 255],
+  ],
+  // Commodore 64 palette
+  c64: [
+    [0, 0, 0],
+    [255, 255, 255],
+    [136, 57, 50],
+    [103, 182, 189],
+    [139, 63, 150],
+    [85, 160, 73],
+    [64, 49, 141],
+    [191, 206, 114],
+    [139, 84, 41],
+    [87, 66, 0],
+    [184, 105, 98],
+    [80, 80, 80],
+    [120, 120, 120],
+    [148, 224, 137],
+    [120, 105, 196],
+    [159, 159, 159],
+  ],
+  // NES palette (simplified)
+  nes: [
+    [0, 0, 0],
+    [252, 252, 252],
+    [248, 56, 0],
+    [0, 88, 248],
+    [68, 40, 188],
+    [148, 0, 132],
+    [168, 0, 32],
+    [0, 120, 0],
+    [0, 168, 0],
+    [0, 168, 68],
+    [0, 136, 136],
+    [248, 184, 0],
+    [188, 188, 188],
+    [124, 124, 124],
+    [168, 228, 252],
+    [216, 248, 120],
+  ],
+  // Original Macintosh 1-bit palette
+  macintosh: [
+    [0, 0, 0],
+    [255, 255, 255],
+  ],
+};
+
+// Find nearest color in palette
+const findNearestColor = (r: number, g: number, b: number, palette: number[][]): number[] => {
+  let minDist = Infinity;
+  let nearest = palette[0];
+
+  for (const color of palette) {
+    const dr = r - color[0];
+    const dg = g - color[1];
+    const db = b - color[2];
+    const dist = dr * dr + dg * dg + db * db;
+
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = color;
+    }
+  }
+
+  return nearest;
+};
+
+// Quantize to N levels
+const quantize = (value: number, levels: number): number => {
+  return Math.round((value / 255) * (levels - 1)) * (255 / (levels - 1));
+};
+
+// Advanced Dithering Effect - Multiple algorithms in one
+const createAdvancedDitheringEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const algorithm = Math.floor(settings.algorithm ?? 1);
+    const paletteType = Math.floor(settings.palette ?? 0);
+    const threshold = settings.threshold ?? 0.5;
+    const patternScale = Math.floor(settings.patternScale ?? 2);
+    const contrast = settings.contrast ?? 1;
+
+    // Pre-apply contrast
+    for (let i = 0; i < data.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        data[i + c] = Math.max(
+          0,
+          Math.min(255, ((data[i + c] / 255 - 0.5) * contrast + 0.5) * 255)
+        );
+      }
+    }
+
+    // Determine color levels based on palette
+    let levels: number;
+    switch (paletteType) {
+      case 0:
+        levels = 2;
+        break; // B&W
+      case 1:
+        levels = 4;
+        break;
+      case 2:
+        levels = 8;
+        break;
+      case 3:
+        levels = 16;
+        break;
+      case 4:
+        levels = 4;
+        break; // GameBoy
+      case 5:
+        levels = 4;
+        break; // CGA
+      default:
+        levels = 2;
+    }
+
+    // Apply selected algorithm
+    switch (algorithm) {
+      case 0: // Floyd-Steinberg
+        applyFloydSteinberg(data, width, height, levels);
+        break;
+      case 1: // Atkinson
+        applyAtkinson(data, width, height, levels);
+        break;
+      case 2: // Ordered (Bayer)
+        applyOrdered(data, width, height, levels, patternScale, threshold);
+        break;
+      case 3: // Stucki
+        applyStucki(data, width, height, levels);
+        break;
+      case 4: // Sierra
+        applySierra(data, width, height, levels);
+        break;
+      case 5: // Blue Noise
+        applyBlueNoise(data, width, height, levels, 1);
+        break;
+    }
+  };
+};
+
+// Floyd-Steinberg dithering algorithm
+const applyFloydSteinberg = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  levels: number
+) => {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      for (let c = 0; c < 3; c++) {
+        const oldVal = data[idx + c];
+        const newVal = quantize(oldVal, levels);
+        data[idx + c] = newVal;
+        const error = oldVal - newVal;
+
+        if (x < width - 1) {
+          data[idx + 4 + c] = Math.max(0, Math.min(255, data[idx + 4 + c] + (error * 7) / 16));
+        }
+        if (y < height - 1) {
+          if (x > 0) {
+            data[idx + (width - 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width - 1) * 4 + c] + (error * 3) / 16)
+            );
+          }
+          data[idx + width * 4 + c] = Math.max(
+            0,
+            Math.min(255, data[idx + width * 4 + c] + (error * 5) / 16)
+          );
+          if (x < width - 1) {
+            data[idx + (width + 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width + 1) * 4 + c] + (error * 1) / 16)
+            );
+          }
+        }
+      }
+    }
+  }
+};
+
+// Atkinson dithering - Classic Mac look, only diffuses 6/8 of error
+const applyAtkinson = (data: Uint8ClampedArray, width: number, height: number, levels: number) => {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      for (let c = 0; c < 3; c++) {
+        const oldVal = data[idx + c];
+        const newVal = quantize(oldVal, levels);
+        data[idx + c] = newVal;
+        const error = (oldVal - newVal) / 8; // Only 6/8 of error is distributed
+
+        // Distribute error to 6 neighbors (Atkinson pattern)
+        if (x < width - 1) {
+          data[idx + 4 + c] = Math.max(0, Math.min(255, data[idx + 4 + c] + error));
+        }
+        if (x < width - 2) {
+          data[idx + 8 + c] = Math.max(0, Math.min(255, data[idx + 8 + c] + error));
+        }
+        if (y < height - 1) {
+          if (x > 0) {
+            data[idx + (width - 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width - 1) * 4 + c] + error)
+            );
+          }
+          data[idx + width * 4 + c] = Math.max(0, Math.min(255, data[idx + width * 4 + c] + error));
+          if (x < width - 1) {
+            data[idx + (width + 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width + 1) * 4 + c] + error)
+            );
+          }
+        }
+        if (y < height - 2) {
+          data[idx + width * 2 * 4 + c] = Math.max(
+            0,
+            Math.min(255, data[idx + width * 2 * 4 + c] + error)
+          );
+        }
+      }
+    }
+  }
+};
+
+// Ordered (Bayer) dithering
+const applyOrdered = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  levels: number,
+  scale: number,
+  threshold: number
+) => {
+  const matrix = scale <= 2 ? BAYER_2x2 : scale <= 4 ? BAYER_4x4 : BAYER_8x8;
+  const matrixSize = matrix.length;
+  const maxMatrixValue = matrixSize * matrixSize;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const mx = x % matrixSize;
+      const my = y % matrixSize;
+      const bayerValue = matrix[my][mx] / maxMatrixValue;
+
+      for (let c = 0; c < 3; c++) {
+        const oldVal = data[idx + c] / 255;
+        const thresholdOffset = (bayerValue - 0.5) * threshold;
+        const newVal = quantize((oldVal + thresholdOffset) * 255, levels);
+        data[idx + c] = newVal;
+      }
+    }
+  }
+};
+
+// Stucki dithering - Higher quality, larger diffusion kernel
+const applyStucki = (data: Uint8ClampedArray, width: number, height: number, levels: number) => {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      for (let c = 0; c < 3; c++) {
+        const oldVal = data[idx + c];
+        const newVal = quantize(oldVal, levels);
+        data[idx + c] = newVal;
+        const error = oldVal - newVal;
+
+        // Stucki kernel (42 divisor)
+        // Current row
+        if (x < width - 1)
+          data[idx + 4 + c] = Math.max(0, Math.min(255, data[idx + 4 + c] + (error * 8) / 42));
+        if (x < width - 2)
+          data[idx + 8 + c] = Math.max(0, Math.min(255, data[idx + 8 + c] + (error * 4) / 42));
+
+        // Next row
+        if (y < height - 1) {
+          if (x > 1)
+            data[idx + (width - 2) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width - 2) * 4 + c] + (error * 2) / 42)
+            );
+          if (x > 0)
+            data[idx + (width - 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width - 1) * 4 + c] + (error * 4) / 42)
+            );
+          data[idx + width * 4 + c] = Math.max(
+            0,
+            Math.min(255, data[idx + width * 4 + c] + (error * 8) / 42)
+          );
+          if (x < width - 1)
+            data[idx + (width + 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width + 1) * 4 + c] + (error * 4) / 42)
+            );
+          if (x < width - 2)
+            data[idx + (width + 2) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width + 2) * 4 + c] + (error * 2) / 42)
+            );
+        }
+
+        // Two rows down
+        if (y < height - 2) {
+          if (x > 1)
+            data[idx + (width * 2 - 2) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width * 2 - 2) * 4 + c] + (error * 1) / 42)
+            );
+          if (x > 0)
+            data[idx + (width * 2 - 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width * 2 - 1) * 4 + c] + (error * 2) / 42)
+            );
+          data[idx + width * 2 * 4 + c] = Math.max(
+            0,
+            Math.min(255, data[idx + width * 2 * 4 + c] + (error * 4) / 42)
+          );
+          if (x < width - 1)
+            data[idx + (width * 2 + 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width * 2 + 1) * 4 + c] + (error * 2) / 42)
+            );
+          if (x < width - 2)
+            data[idx + (width * 2 + 2) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width * 2 + 2) * 4 + c] + (error * 1) / 42)
+            );
+        }
+      }
+    }
+  }
+};
+
+// Sierra dithering - Good balance between quality and speed
+const applySierra = (data: Uint8ClampedArray, width: number, height: number, levels: number) => {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+
+      for (let c = 0; c < 3; c++) {
+        const oldVal = data[idx + c];
+        const newVal = quantize(oldVal, levels);
+        data[idx + c] = newVal;
+        const error = oldVal - newVal;
+
+        // Sierra kernel (32 divisor)
+        if (x < width - 1)
+          data[idx + 4 + c] = Math.max(0, Math.min(255, data[idx + 4 + c] + (error * 5) / 32));
+        if (x < width - 2)
+          data[idx + 8 + c] = Math.max(0, Math.min(255, data[idx + 8 + c] + (error * 3) / 32));
+
+        if (y < height - 1) {
+          if (x > 1)
+            data[idx + (width - 2) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width - 2) * 4 + c] + (error * 2) / 32)
+            );
+          if (x > 0)
+            data[idx + (width - 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width - 1) * 4 + c] + (error * 4) / 32)
+            );
+          data[idx + width * 4 + c] = Math.max(
+            0,
+            Math.min(255, data[idx + width * 4 + c] + (error * 5) / 32)
+          );
+          if (x < width - 1)
+            data[idx + (width + 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width + 1) * 4 + c] + (error * 4) / 32)
+            );
+          if (x < width - 2)
+            data[idx + (width + 2) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width + 2) * 4 + c] + (error * 2) / 32)
+            );
+        }
+
+        if (y < height - 2) {
+          if (x > 0)
+            data[idx + (width * 2 - 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width * 2 - 1) * 4 + c] + (error * 2) / 32)
+            );
+          data[idx + width * 2 * 4 + c] = Math.max(
+            0,
+            Math.min(255, data[idx + width * 2 * 4 + c] + (error * 3) / 32)
+          );
+          if (x < width - 1)
+            data[idx + (width * 2 + 1) * 4 + c] = Math.max(
+              0,
+              Math.min(255, data[idx + (width * 2 + 1) * 4 + c] + (error * 2) / 32)
+            );
+        }
+      }
+    }
+  }
+};
+
+// Blue noise dithering - Organic, visually pleasing patterns
+const applyBlueNoise = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  levels: number,
+  scale: number
+) => {
+  // Generate blue noise using void and cluster algorithm approximation
+  const blueNoise = generateBlueNoise(width, height, scale);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const noiseIdx = y * width + x;
+      const noiseValue = blueNoise[noiseIdx];
+
+      for (let c = 0; c < 3; c++) {
+        const oldVal = data[idx + c] / 255;
+        const threshold = (noiseValue - 0.5) * (1 / levels);
+        const newVal = quantize((oldVal + threshold) * 255, levels);
+        data[idx + c] = newVal;
+      }
+    }
+  }
+};
+
+// Generate blue noise texture
+const generateBlueNoise = (width: number, height: number, scale: number): Float32Array => {
+  const noise = new Float32Array(width * height);
+
+  // Use interleaved gradient noise as approximation of blue noise
+  // This creates a more organic pattern than Bayer
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x;
+      // Interleaved gradient noise formula
+      const fx = (x / scale) * 0.06711056;
+      const fy = (y / scale) * 0.00583715;
+      noise[idx] = (52.9829189 * ((fx + fy) % 1)) % 1;
+    }
+  }
+
+  return noise;
+};
+
+// Standalone Atkinson Dithering Effect
+const createAtkinsonDitheringEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const colorMode = Math.floor(settings.colorMode ?? 0);
+    const levels = Math.floor(settings.levels ?? 2);
+    const threshold = settings.threshold ?? 0.5;
+
+    // Convert to grayscale first if B&W mode
+    if (colorMode === 0 || colorMode === 1) {
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        // Apply threshold adjustment
+        const adjusted = Math.max(
+          0,
+          Math.min(255, ((gray / 255 - 0.5) * (1 + threshold) + 0.5) * 255)
+        );
+        data[i] = data[i + 1] = data[i + 2] = adjusted;
+      }
+    }
+
+    const effectiveLevels = colorMode === 0 ? 2 : levels;
+    applyAtkinson(data, width, height, effectiveLevels);
+  };
+};
+
+// Standalone Ordered Dithering Effect
+const createOrderedDitheringEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const matrixSize = Math.floor(settings.matrixSize ?? 4);
+    const colorMode = Math.floor(settings.colorMode ?? 0);
+    const levels = Math.floor(settings.levels ?? 2);
+    const spread = settings.spread ?? 0.5;
+
+    // Convert to grayscale first if B&W mode
+    if (colorMode === 0 || colorMode === 1) {
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        data[i] = data[i + 1] = data[i + 2] = gray;
+      }
+    }
+
+    const effectiveLevels = colorMode === 0 ? 2 : levels;
+    applyOrdered(data, width, height, effectiveLevels, matrixSize, spread);
+  };
+};
+
+// Standalone Blue Noise Dithering Effect
+const createBlueNoiseDitheringEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const colorMode = Math.floor(settings.colorMode ?? 0);
+    const levels = Math.floor(settings.levels ?? 2);
+    const noiseScale = settings.noiseScale ?? 1;
+
+    // Convert to grayscale first if B&W mode
+    if (colorMode === 0 || colorMode === 1) {
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        data[i] = data[i + 1] = data[i + 2] = gray;
+      }
+    }
+
+    const effectiveLevels = colorMode === 0 ? 2 : levels;
+    applyBlueNoise(data, width, height, effectiveLevels, noiseScale);
+  };
+};
+
+// Halftone Pattern Effect
+const createHalftonePatternEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const dotSize = Math.floor(settings.dotSize ?? 6);
+    const angle = ((settings.angle ?? 45) * Math.PI) / 180;
+    const colorMode = Math.floor(settings.colorMode ?? 0);
+    const contrast = settings.contrast ?? 1;
+
+    // Create temporary buffer
+    const tempData = new Uint8ClampedArray(data.length);
+
+    // Fill with white background
+    for (let i = 0; i < tempData.length; i += 4) {
+      tempData[i] = tempData[i + 1] = tempData[i + 2] = 255;
+      tempData[i + 3] = data[i + 3];
+    }
+
+    const cosAngle = Math.cos(angle);
+    const sinAngle = Math.sin(angle);
+
+    if (colorMode === 0) {
+      // B&W halftone
+      for (let cellY = 0; cellY < Math.ceil(height / dotSize) + 1; cellY++) {
+        for (let cellX = 0; cellX < Math.ceil(width / dotSize) + 1; cellX++) {
+          const cx = cellX * dotSize;
+          const cy = cellY * dotSize;
+
+          // Rotate grid
+          const rcx = cx * cosAngle - cy * sinAngle;
+          const rcy = cx * sinAngle + cy * cosAngle;
+
+          // Get average brightness in cell
+          let totalBrightness = 0;
+          let count = 0;
+
+          for (let dy = 0; dy < dotSize; dy++) {
+            for (let dx = 0; dx < dotSize; dx++) {
+              const px = Math.floor(rcx + dx);
+              const py = Math.floor(rcy + dy);
+
+              if (px >= 0 && px < width && py >= 0 && py < height) {
+                const idx = (py * width + px) * 4;
+                const brightness =
+                  (data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114) / 255;
+                totalBrightness += brightness;
+                count++;
+              }
+            }
+          }
+
+          if (count === 0) continue;
+
+          const avgBrightness = totalBrightness / count;
+          const adjustedBrightness = Math.pow(avgBrightness, 1 / contrast);
+          const radius = (dotSize / 2) * (1 - adjustedBrightness);
+
+          // Draw dot
+          for (let dy = -dotSize; dy <= dotSize; dy++) {
+            for (let dx = -dotSize; dx <= dotSize; dx++) {
+              const px = Math.floor(rcx + dotSize / 2 + dx);
+              const py = Math.floor(rcy + dotSize / 2 + dy);
+
+              if (px >= 0 && px < width && py >= 0 && py < height) {
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist <= radius) {
+                  const idx = (py * width + px) * 4;
+                  tempData[idx] = tempData[idx + 1] = tempData[idx + 2] = 0;
+                }
+              }
+            }
+          }
+        }
+      }
+    } else {
+      // CMYK halftone
+      const channels = [
+        { offset: 0, color: [0, 255, 255], angle: 15 }, // Cyan
+        { offset: 1, color: [255, 0, 255], angle: 75 }, // Magenta
+        { offset: 2, color: [255, 255, 0], angle: 0 }, // Yellow
+        { offset: 3, color: [0, 0, 0], angle: 45 }, // Black
+      ];
+
+      for (const channel of channels) {
+        const chAngle = ((channel.angle + (settings.angle ?? 0)) * Math.PI) / 180;
+        const chCos = Math.cos(chAngle);
+        const chSin = Math.sin(chAngle);
+
+        for (let cellY = 0; cellY < Math.ceil(height / dotSize) + 1; cellY++) {
+          for (let cellX = 0; cellX < Math.ceil(width / dotSize) + 1; cellX++) {
+            const cx = cellX * dotSize;
+            const cy = cellY * dotSize;
+
+            const rcx = cx * chCos - cy * chSin;
+            const rcy = cx * chSin + cy * chCos;
+
+            let totalValue = 0;
+            let count = 0;
+
+            for (let dy = 0; dy < dotSize; dy++) {
+              for (let dx = 0; dx < dotSize; dx++) {
+                const px = Math.floor(rcx + dx);
+                const py = Math.floor(rcy + dy);
+
+                if (px >= 0 && px < width && py >= 0 && py < height) {
+                  const idx = (py * width + px) * 4;
+                  if (channel.offset < 3) {
+                    totalValue += 255 - data[idx + channel.offset];
+                  } else {
+                    const minRGB = Math.min(data[idx], data[idx + 1], data[idx + 2]);
+                    totalValue += 255 - minRGB;
+                  }
+                  count++;
+                }
+              }
+            }
+
+            if (count === 0) continue;
+
+            const avgValue = totalValue / count / 255;
+            const radius = (dotSize / 2) * avgValue;
+
+            for (let dy = -dotSize; dy <= dotSize; dy++) {
+              for (let dx = -dotSize; dx <= dotSize; dx++) {
+                const px = Math.floor(rcx + dotSize / 2 + dx);
+                const py = Math.floor(rcy + dotSize / 2 + dy);
+
+                if (px >= 0 && px < width && py >= 0 && py < height) {
+                  const dist = Math.sqrt(dx * dx + dy * dy);
+                  if (dist <= radius) {
+                    const idx = (py * width + px) * 4;
+                    tempData[idx] = Math.min(tempData[idx], channel.color[0]);
+                    tempData[idx + 1] = Math.min(tempData[idx + 1], channel.color[1]);
+                    tempData[idx + 2] = Math.min(tempData[idx + 2], channel.color[2]);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    data.set(tempData);
+  };
+};
+
+// Retro Palette Effect - Apply classic gaming palettes with dithering
+const createRetroPaletteEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const paletteType = Math.floor(settings.palette ?? 0);
+    const ditheringType = Math.floor(settings.dithering ?? 1);
+    const ditherStrength = settings.ditherStrength ?? 0.8;
+
+    // Select palette
+    const paletteNames: (keyof typeof PALETTES)[] = [
+      'gameboy',
+      'cga',
+      'ega',
+      'c64',
+      'nes',
+      'macintosh',
+    ];
+    const palette = PALETTES[paletteNames[paletteType]] || PALETTES.gameboy;
+
+    if (ditheringType === 0) {
+      // No dithering - simple nearest color
+      for (let i = 0; i < data.length; i += 4) {
+        const nearest = findNearestColor(data[i], data[i + 1], data[i + 2], palette);
+        data[i] = nearest[0];
+        data[i + 1] = nearest[1];
+        data[i + 2] = nearest[2];
+      }
+    } else if (ditheringType === 1) {
+      // Atkinson dithering with palette
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+
+          const oldR = data[idx];
+          const oldG = data[idx + 1];
+          const oldB = data[idx + 2];
+
+          const nearest = findNearestColor(oldR, oldG, oldB, palette);
+          data[idx] = nearest[0];
+          data[idx + 1] = nearest[1];
+          data[idx + 2] = nearest[2];
+
+          const errorR = ((oldR - nearest[0]) * ditherStrength) / 8;
+          const errorG = ((oldG - nearest[1]) * ditherStrength) / 8;
+          const errorB = ((oldB - nearest[2]) * ditherStrength) / 8;
+
+          // Atkinson diffusion pattern
+          const diffuse = (offset: number) => {
+            if (idx + offset >= 0 && idx + offset < data.length - 3) {
+              data[idx + offset] = Math.max(0, Math.min(255, data[idx + offset] + errorR));
+              data[idx + offset + 1] = Math.max(0, Math.min(255, data[idx + offset + 1] + errorG));
+              data[idx + offset + 2] = Math.max(0, Math.min(255, data[idx + offset + 2] + errorB));
+            }
+          };
+
+          if (x < width - 1) diffuse(4);
+          if (x < width - 2) diffuse(8);
+          if (y < height - 1) {
+            if (x > 0) diffuse((width - 1) * 4);
+            diffuse(width * 4);
+            if (x < width - 1) diffuse((width + 1) * 4);
+          }
+          if (y < height - 2) diffuse(width * 2 * 4);
+        }
+      }
+    } else {
+      // Ordered dithering with palette
+      const matrix = BAYER_4x4;
+      const matrixSize = 4;
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const idx = (y * width + x) * 4;
+          const mx = x % matrixSize;
+          const my = y % matrixSize;
+          const bayerValue = (matrix[my][mx] / 16 - 0.5) * ditherStrength * 64;
+
+          const r = Math.max(0, Math.min(255, data[idx] + bayerValue));
+          const g = Math.max(0, Math.min(255, data[idx + 1] + bayerValue));
+          const b = Math.max(0, Math.min(255, data[idx + 2] + bayerValue));
+
+          const nearest = findNearestColor(r, g, b, palette);
+          data[idx] = nearest[0];
+          data[idx + 1] = nearest[1];
+          data[idx + 2] = nearest[2];
         }
       }
     }
