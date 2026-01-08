@@ -226,15 +226,23 @@ const cleanupTemporaryStage = (resources: TemporaryStageResources | null | undef
   }
 };
 
+export type ExportOptions = {
+  format?: 'png' | 'jpeg';
+  quality?: number; // 1-100 for JPEG (ignored for PNG)
+};
+
 export type ImageEditorHandle = {
-  exportImage: (format?: string) => void;
+  exportImage: (formatOrOptions?: string | ExportOptions) => void;
   reset: () => void;
   getStage: () => Konva.Stage | null;
+  /** Get estimated file size in bytes for a given format and quality */
+  estimateFileSize: (format: 'png' | 'jpeg', quality?: number) => Promise<number>;
 };
 
 const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
   ({ selectedImage, effectLayers, onExportComplete }, ref) => {
     const stageRef = useRef<Konva.Stage | null>(null);
+    const imageNodeRef = useRef<Konva.Image | null>(null);
     const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
     const imageUrlToUse = selectedImage ?? uploadedImageUrl ?? '';
     const [image] = useImage(imageUrlToUse);
@@ -352,7 +360,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
     );
 
     const exportWithFormat = useCallback(
-      async (format: 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4') => {
+      async (format: 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4', quality?: number) => {
         if (!stageRef.current || !image) {
           return;
         }
@@ -366,7 +374,13 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         }
 
         const mime = normalizedFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
-        const exportQuality = normalizedFormat === 'jpeg' ? JPEG_EXPORT_QUALITY : undefined;
+        // Quality: use provided value (1-100) normalized to 0-1, or default
+        const exportQuality =
+          normalizedFormat === 'jpeg'
+            ? quality !== undefined
+              ? Math.max(0.01, Math.min(1, quality / 100))
+              : JPEG_EXPORT_QUALITY
+            : undefined;
         if (!(image instanceof HTMLImageElement)) {
           console.error('Base image element unavailable for export');
           return;
@@ -387,7 +401,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
 
             if (dataURL && dataURL !== 'data:,') {
               const link = document.createElement('a');
-              link.download = `hax-export-${Date.now()}.${normalizedFormat === 'jpeg' ? 'jpg' : normalizedFormat}`;
+              link.download = `hax-export-${Date.now()}.${normalizedFormat === 'jpeg' ? 'jpg' : 'png'}`;
               link.href = dataURL;
               document.body.appendChild(link);
               link.click();
@@ -430,15 +444,72 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
       [image, applyEffectsToNode, onExportComplete]
     );
 
+    // Estimate file size for a given format and quality
+    const estimateFileSize = useCallback(
+      async (format: 'png' | 'jpeg', quality?: number): Promise<number> => {
+        if (!stageRef.current || !image) {
+          return 0;
+        }
+
+        const existingImageNode = stageRef.current.findOne('Image') as Konva.Image | null;
+        if (!existingImageNode) {
+          return 0;
+        }
+
+        const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+        const exportQuality =
+          format === 'jpeg'
+            ? quality !== undefined
+              ? Math.max(0.01, Math.min(1, quality / 100))
+              : JPEG_EXPORT_QUALITY
+            : undefined;
+
+        try {
+          const dataURL = stageRef.current.toDataURL({
+            mimeType: mime,
+            pixelRatio: Math.max(1, image.width / existingImageNode.width()),
+            quality: exportQuality,
+          });
+
+          if (!dataURL || dataURL === 'data:,') {
+            return 0;
+          }
+
+          // Calculate byte size from base64 data URL
+          // Format: data:image/xxx;base64,XXXXX
+          const base64Data = dataURL.split(',')[1];
+          if (!base64Data) return 0;
+
+          // Base64 encoding: 4 characters represent 3 bytes
+          const byteSize = Math.ceil((base64Data.length * 3) / 4);
+          return byteSize;
+        } catch {
+          return 0;
+        }
+      },
+      [image]
+    );
+
     useImperativeHandle(ref, () => {
       return {
-        exportImage: (format?: string) => {
-          exportWithFormat((format as 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4') || 'png');
+        exportImage: (formatOrOptions?: string | ExportOptions) => {
+          let format: 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4' = 'png';
+          let quality: number | undefined;
+
+          if (typeof formatOrOptions === 'string') {
+            format = (formatOrOptions as 'png' | 'jpeg' | 'gif' | 'webm' | 'mp4') || 'png';
+          } else if (formatOrOptions) {
+            format = formatOrOptions.format || 'png';
+            quality = formatOrOptions.quality;
+          }
+
+          exportWithFormat(format, quality);
         },
         reset: () => {},
         getStage: () => stageRef.current,
+        estimateFileSize,
       };
-    }, [exportWithFormat]);
+    }, [exportWithFormat, estimateFileSize]);
 
     useEffect(() => {
       const container = containerRef.current;
@@ -476,9 +547,14 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
       };
     }, []);
 
+    // Stable ref callback for the Konva Image node
+    const setImageNodeRef = useCallback((node: Konva.Image | null) => {
+      imageNodeRef.current = node;
+    }, []);
+
     useEffect(() => {
       if (!image) return;
-      const node = stageRef.current?.findOne<Konva.Image>('Image');
+      const node = imageNodeRef.current ?? stageRef.current?.findOne<Konva.Image>('Image');
       if (!node) return;
 
       node.clearCache();
@@ -495,7 +571,8 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
 
     useEffect(() => {
       if (!image) return;
-      const imageNode = stageRef.current?.findOne('Image') as Konva.Image | undefined;
+      const imageNode =
+        imageNodeRef.current ?? (stageRef.current?.findOne('Image') as Konva.Image | undefined);
       if (!imageNode) return;
 
       const myVersion = ++versionRef.current;
@@ -613,11 +690,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
                         listening={false}
                         perfectDrawEnabled={false}
                         filters={[]}
-                        ref={node => {
-                          if (node) {
-                            void applyEffectsToNode(node);
-                          }
-                        }}
+                        ref={setImageNodeRef}
                       />
                     )}
                   </Layer>

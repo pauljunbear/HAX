@@ -178,17 +178,42 @@ export default function EditorApp() {
     [effectLayers, updateLayer]
   );
 
-  const handleExport = useCallback((format: string) => {
+  const handleExport = useCallback((format: string, quality?: number) => {
     if (!imageEditorRef.current) {
       return;
     }
 
     try {
-      imageEditorRef.current.exportImage(format);
+      // Use the new options format if quality is provided
+      if (quality !== undefined) {
+        imageEditorRef.current.exportImage({
+          format:
+            format.toLowerCase() === 'jpg' ? 'jpeg' : (format.toLowerCase() as 'png' | 'jpeg'),
+          quality,
+        });
+      } else {
+        imageEditorRef.current.exportImage(format);
+      }
     } catch (error) {
       console.error('exportImage failed', error);
     }
   }, []);
+
+  const handleEstimateFileSize = useCallback(
+    async (format: 'png' | 'jpeg', quality?: number): Promise<number> => {
+      if (!imageEditorRef.current) {
+        return 0;
+      }
+
+      try {
+        return await imageEditorRef.current.estimateFileSize(format, quality);
+      } catch (error) {
+        console.error('estimateFileSize failed', error);
+        return 0;
+      }
+    },
+    []
+  );
 
   if (!isReady) {
     return null; // Or a very minimal loader
@@ -226,6 +251,7 @@ export default function EditorApp() {
             onToggleLayerVisibility={handleToggleLayerVisibility}
             onReorderLayers={reorderLayers}
             onExport={handleExport}
+            onEstimateFileSize={handleEstimateFileSize}
           >
             <div id="main-content" className="w-full h-full">
               {imageLoading ? (
