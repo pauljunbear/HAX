@@ -304,6 +304,38 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                         );
                       }
 
+                      // Check if this is a preset/style setting with named presets
+                      const isPresetSetting =
+                        (setting.id === 'preset' || setting.id === 'style') &&
+                        activeEffectConfig?.presetNames &&
+                        activeEffectConfig.presetNames.length > 0;
+
+                      if (isPresetSetting) {
+                        const presetNames = activeEffectConfig!.presetNames!;
+                        return (
+                          <div key={setting.id} className="glass-card p-4">
+                            <label className="text-sm font-medium control-panel-label block mb-3">
+                              {setting.label}
+                            </label>
+                            <div className="flex flex-wrap gap-2">
+                              {presetNames.map((name, index) => (
+                                <button
+                                  key={name}
+                                  onClick={() => onSettingChange?.(setting.id, index)}
+                                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                                    Math.round(setting.currentValue) === index
+                                      ? 'bg-primary text-primary-foreground shadow-md'
+                                      : 'glass-button hover:bg-muted'
+                                  }`}
+                                >
+                                  {name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+
                       // Regular slider for non-color settings
                       return (
                         <div key={setting.id} className="glass-card p-4">
