@@ -1663,120 +1663,130 @@ const createUnifiedGlowEffect = (settings: Record<string, number>) => {
   };
 };
 
-// Add Kuwahara filter implementation
+// Add Kuwahara filter implementation (OPTIMIZED)
 // Adapted from https://github.com/ogus/kuwahara
+// Optimizations: single-pass mean/variance, no object allocation in hot loop, x*x instead of Math.pow
 const createKuwaharaEffect = (settings: Record<string, number>) => {
   const radius = Math.round(settings.radius || 5); // Radius for the filter kernel
   const opacity = settings.opacity ?? 1;
-
-  // Helper function to calculate mean and variance for a region
-  const calculateMeanVariance = (
-    imageData: KonvaImageData,
-    x: number,
-    y: number,
-    radius: number,
-    quadrant: number
-  ) => {
-    const { data, width, height } = imageData;
-    let meanR = 0,
-      meanG = 0,
-      meanB = 0;
-    let varianceR = 0,
-      varianceG = 0,
-      varianceB = 0;
-    let count = 0;
-
-    let startX = x - radius,
-      startY = y - radius;
-    let endX = x + radius,
-      endY = y + radius;
-
-    // Adjust start/end based on quadrant (0: TL, 1: TR, 2: BL, 3: BR)
-    if (quadrant === 0) {
-      endX = x;
-      endY = y;
-    }
-    if (quadrant === 1) {
-      startX = x;
-      endY = y;
-    }
-    if (quadrant === 2) {
-      endX = x;
-      startY = y;
-    }
-    if (quadrant === 3) {
-      startX = x;
-      startY = y;
-    }
-
-    for (let cy = startY; cy <= endY; cy++) {
-      for (let cx = startX; cx <= endX; cx++) {
-        const px = Math.min(width - 1, Math.max(0, cx));
-        const py = Math.min(height - 1, Math.max(0, cy));
-        const index = (py * width + px) * 4;
-
-        meanR += data[index];
-        meanG += data[index + 1];
-        meanB += data[index + 2];
-        count++;
-      }
-    }
-
-    if (count === 0) return { mean: { r: 0, g: 0, b: 0 }, variance: Infinity };
-
-    meanR /= count;
-    meanG /= count;
-    meanB /= count;
-
-    // Calculate variance
-    for (let cy = startY; cy <= endY; cy++) {
-      for (let cx = startX; cx <= endX; cx++) {
-        const px = Math.min(width - 1, Math.max(0, cx));
-        const py = Math.min(height - 1, Math.max(0, cy));
-        const index = (py * width + px) * 4;
-
-        varianceR += Math.pow(data[index] - meanR, 2);
-        varianceG += Math.pow(data[index + 1] - meanG, 2);
-        varianceB += Math.pow(data[index + 2] - meanB, 2);
-      }
-    }
-
-    // Use combined variance (or just luminance variance for simplicity/performance)
-    const totalVariance = (varianceR + varianceG + varianceB) / count;
-
-    return { mean: { r: meanR, g: meanG, b: meanB }, variance: totalVariance };
-  };
 
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
 
+    // Pre-calculate quadrant offsets (TL, TR, BL, BR)
+    // quadrant 0: top-left     (x-r to x, y-r to y)
+    // quadrant 1: top-right    (x to x+r, y-r to y)
+    // quadrant 2: bottom-left  (x-r to x, y to y+r)
+    // quadrant 3: bottom-right (x to x+r, y to y+r)
+
+    // Reusable arrays for quadrant results (avoid object allocation)
+    const quadMeanR = new Float64Array(4);
+    const quadMeanG = new Float64Array(4);
+    const quadMeanB = new Float64Array(4);
+    const quadVariance = new Float64Array(4);
+
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        let minVariance = Infinity;
-        let bestMean = { r: 0, g: 0, b: 0 };
+        // Calculate all 4 quadrants using single-pass variance formula:
+        // variance = E[X²] - E[X]² = (sumSq / n) - (sum / n)²
+        for (let q = 0; q < 4; q++) {
+          // Determine quadrant bounds
+          let startX: number, endX: number, startY: number, endY: number;
+          if (q === 0) {
+            startX = x - radius;
+            endX = x;
+            startY = y - radius;
+            endY = y;
+          } else if (q === 1) {
+            startX = x;
+            endX = x + radius;
+            startY = y - radius;
+            endY = y;
+          } else if (q === 2) {
+            startX = x - radius;
+            endX = x;
+            startY = y;
+            endY = y + radius;
+          } else {
+            startX = x;
+            endX = x + radius;
+            startY = y;
+            endY = y + radius;
+          }
 
-        // Calculate mean and variance for each quadrant
-        for (let quadrant = 0; quadrant < 4; quadrant++) {
-          const { mean, variance } = calculateMeanVariance(
-            { data: tempData, width, height },
-            x,
-            y,
-            radius,
-            quadrant
-          );
-          if (variance < minVariance) {
-            minVariance = variance;
-            bestMean = mean;
+          // Clamp to image bounds
+          startX = Math.max(0, startX);
+          startY = Math.max(0, startY);
+          endX = Math.min(width - 1, endX);
+          endY = Math.min(height - 1, endY);
+
+          let sumR = 0,
+            sumG = 0,
+            sumB = 0;
+          let sumSqR = 0,
+            sumSqG = 0,
+            sumSqB = 0;
+          let count = 0;
+
+          // Single pass: accumulate sum and sum of squares
+          for (let cy = startY; cy <= endY; cy++) {
+            const rowOffset = cy * width;
+            for (let cx = startX; cx <= endX; cx++) {
+              const index = (rowOffset + cx) * 4;
+              const r = tempData[index];
+              const g = tempData[index + 1];
+              const b = tempData[index + 2];
+
+              sumR += r;
+              sumG += g;
+              sumB += b;
+              sumSqR += r * r;
+              sumSqG += g * g;
+              sumSqB += b * b;
+              count++;
+            }
+          }
+
+          if (count === 0) {
+            quadMeanR[q] = 0;
+            quadMeanG[q] = 0;
+            quadMeanB[q] = 0;
+            quadVariance[q] = Infinity;
+          } else {
+            const invCount = 1 / count;
+            const meanR = sumR * invCount;
+            const meanG = sumG * invCount;
+            const meanB = sumB * invCount;
+
+            quadMeanR[q] = meanR;
+            quadMeanG[q] = meanG;
+            quadMeanB[q] = meanB;
+
+            // variance = E[X²] - E[X]²
+            const varR = sumSqR * invCount - meanR * meanR;
+            const varG = sumSqG * invCount - meanG * meanG;
+            const varB = sumSqB * invCount - meanB * meanB;
+            quadVariance[q] = varR + varG + varB;
           }
         }
 
-        // Set the pixel color to the mean of the quadrant with the minimum variance
+        // Find quadrant with minimum variance
+        let minQ = 0;
+        let minVar = quadVariance[0];
+        for (let q = 1; q < 4; q++) {
+          if (quadVariance[q] < minVar) {
+            minVar = quadVariance[q];
+            minQ = q;
+          }
+        }
+
+        // Set pixel to the mean of the best quadrant
         const index = (y * width + x) * 4;
-        data[index] = Math.round(bestMean.r);
-        data[index + 1] = Math.round(bestMean.g);
-        data[index + 2] = Math.round(bestMean.b);
+        data[index] = Math.round(quadMeanR[minQ]);
+        data[index + 1] = Math.round(quadMeanG[minQ]);
+        data[index + 2] = Math.round(quadMeanB[minQ]);
       }
     }
 
@@ -1797,24 +1807,30 @@ const createVignetteEffect = (settings: Record<string, number>) => {
     const falloff = settings.falloff ?? 0.5; // 0.1 to 1 (controls hardness)
     const centerX = width / 2;
     const centerY = height / 2;
-    const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+    const maxDistSq = centerX * centerX + centerY * centerY;
 
-    // Pre-calculate for efficiency
-    const scale = maxDist * falloff;
+    // Pre-calculate for efficiency - use squared distance to avoid sqrt per pixel
+    const scaleSq = maxDistSq * falloff * falloff;
+    const invScaleSq = 1 / scaleSq;
     const invAmount = 1.0 - amount;
 
     for (let y = 0; y < height; y++) {
+      const dy = y - centerY;
+      const dySq = dy * dy;
+      const rowOffset = y * width;
+
       for (let x = 0; x < width; x++) {
         const dx = x - centerX;
-        const dy = y - centerY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+        const distSq = dx * dx + dySq;
 
-        // Calculate vignette factor (0 at edge, 1 at center)
-        const factor = Math.max(0, Math.min(1, 1.0 - dist / scale));
-        // Apply vignette: lerp between original color and black based on factor and amount
+        // Use squared distance with sqrt only for the factor calculation
+        // This is still one sqrt per pixel, but we've optimized the loop structure
+        // For fully sqrt-free, use quadratic falloff: factor = 1 - distSq/scaleSq
+        const normalizedDist = Math.sqrt(distSq * invScaleSq);
+        const factor = Math.max(0, Math.min(1, 1.0 - normalizedDist));
         const multiplier = factor * amount + invAmount;
 
-        const index = (y * width + x) * 4;
+        const index = (rowOffset + x) * 4;
         data[index] *= multiplier;
         data[index + 1] *= multiplier;
         data[index + 2] *= multiplier;
@@ -1823,7 +1839,8 @@ const createVignetteEffect = (settings: Record<string, number>) => {
   };
 };
 
-// Add improved Chromatic Aberration effect function
+// Add improved Chromatic Aberration effect function (OPTIMIZED)
+// Moved constant offset calculations outside the loop
 const createChromaticAberrationEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const data = imageData.data;
@@ -1831,35 +1848,44 @@ const createChromaticAberrationEffect = (settings: Record<string, number>) => {
     const height = imageData.height;
     const amount = settings.amount ?? 5;
     const angleRad = (settings.angle ?? 45) * (Math.PI / 180);
+
+    // Pre-calculate constant offsets OUTSIDE the loop (these don't change per pixel)
     const cosAngle = Math.cos(angleRad);
     const sinAngle = Math.sin(angleRad);
+    const rOffsetX = Math.round(amount * cosAngle);
+    const rOffsetY = Math.round(amount * sinAngle);
+    const bOffsetX = -rOffsetX;
+    const bOffsetY = -rOffsetY;
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const index = (y * width + x) * 4;
+    // Pre-calculate max bounds for clamping
+    const maxX = width - 1;
+    const maxY = height - 1;
 
-        // Calculate offsets for R and B channels based on angle and amount
-        const rOffsetX = Math.round(amount * cosAngle);
-        const rOffsetY = Math.round(amount * sinAngle);
-        const bOffsetX = -Math.round(amount * cosAngle);
-        const bOffsetY = -Math.round(amount * sinAngle);
+    for (let y = 0; y < height; y++) {
+      const rowOffset = y * width;
+      // Pre-calculate clamped Y values for this row
+      const rY = Math.min(maxY, Math.max(0, y + rOffsetY));
+      const bY = Math.min(maxY, Math.max(0, y + bOffsetY));
+      const rRowOffset = rY * width;
+      const bRowOffset = bY * width;
+
+      for (let x = 0; x < width; x++) {
+        const index = (rowOffset + x) * 4;
 
         // Sample Red channel from offset position
-        const rX = Math.min(width - 1, Math.max(0, x + rOffsetX));
-        const rY = Math.min(height - 1, Math.max(0, y + rOffsetY));
-        const rIndex = (rY * width + rX) * 4;
+        const rX = Math.min(maxX, Math.max(0, x + rOffsetX));
+        const rIndex = (rRowOffset + rX) * 4;
         data[index] = tempData[rIndex]; // Red
 
         // Green channel remains at original position
         data[index + 1] = tempData[index + 1]; // Green
 
         // Sample Blue channel from offset position
-        const bX = Math.min(width - 1, Math.max(0, x + bOffsetX));
-        const bY = Math.min(height - 1, Math.max(0, y + bOffsetY));
-        const bIndex = (bY * width + bX) * 4;
+        const bX = Math.min(maxX, Math.max(0, x + bOffsetX));
+        const bIndex = (bRowOffset + bX) * 4;
         data[index + 2] = tempData[bIndex + 2]; // Blue
 
         data[index + 3] = tempData[index + 3]; // Alpha
