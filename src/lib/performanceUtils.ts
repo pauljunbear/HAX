@@ -1,10 +1,23 @@
 'use client';
 
+// Minimal interface for particle containers (tsparticles or similar)
+interface ParticleContainer {
+  pause?: () => void;
+  resume?: () => void;
+  destroy?: () => void;
+}
+
+// Minimal interface for Three.js canvas/renderer
+interface ThreeCanvas {
+  dispose?: () => void;
+  forceContextLoss?: () => void;
+}
+
 // Performance monitoring and cleanup utilities
 export class PerformanceManager {
   private static instance: PerformanceManager;
-  private particleContainers: Set<any> = new Set();
-  private threeCanvases: Set<any> = new Set();
+  private particleContainers: Set<ParticleContainer> = new Set();
+  private threeCanvases: Set<ThreeCanvas> = new Set();
   private animationFrames: Set<number> = new Set();
   private timers: Set<number> = new Set();
 
@@ -16,9 +29,10 @@ export class PerformanceManager {
   }
 
   // Register particle container for cleanup
-  public registerParticleContainer(container: any): void {
+  public registerParticleContainer(container: ParticleContainer): void {
     try {
-      if (container && this.particleContainers.size < 10) { // Limit to prevent memory issues
+      if (container && this.particleContainers.size < 10) {
+        // Limit to prevent memory issues
         this.particleContainers.add(container);
       }
     } catch (error) {
@@ -27,7 +41,7 @@ export class PerformanceManager {
   }
 
   // Unregister particle container
-  public unregisterParticleContainer(container: any): void {
+  public unregisterParticleContainer(container: ParticleContainer): void {
     try {
       this.particleContainers.delete(container);
     } catch (error) {
@@ -36,12 +50,12 @@ export class PerformanceManager {
   }
 
   // Register Three.js canvas for cleanup
-  public registerThreeCanvas(canvas: any): void {
+  public registerThreeCanvas(canvas: ThreeCanvas): void {
     this.threeCanvases.add(canvas);
   }
 
   // Unregister Three.js canvas
-  public unregisterThreeCanvas(canvas: any): void {
+  public unregisterThreeCanvas(canvas: ThreeCanvas): void {
     this.threeCanvases.delete(canvas);
   }
 
@@ -69,8 +83,6 @@ export class PerformanceManager {
 
   // Emergency cleanup - pause all effects
   public pauseAllEffects(): void {
-    console.log('Pausing all effects for performance...');
-    
     // Pause all particle containers
     this.particleContainers.forEach(container => {
       try {
@@ -97,8 +109,6 @@ export class PerformanceManager {
 
   // Resume all effects
   public resumeAllEffects(): void {
-    console.log('Resuming all effects...');
-    
     // Resume all particle containers
     this.particleContainers.forEach(container => {
       try {
@@ -113,8 +123,6 @@ export class PerformanceManager {
 
   // Complete cleanup - destroy all effects
   public cleanupAllEffects(): void {
-    console.log('Performing complete effects cleanup...');
-    
     // Destroy all particle containers
     this.particleContainers.forEach(container => {
       try {
@@ -151,9 +159,9 @@ export class PerformanceManager {
     });
     this.timers.clear();
 
-    // Force garbage collection if available
-    if ('gc' in window) {
-      (window as any).gc();
+    // Force garbage collection if available (V8 debug mode only)
+    if ('gc' in window && typeof (window as Window & { gc?: () => void }).gc === 'function') {
+      (window as Window & { gc?: () => void }).gc?.();
     }
   }
 
@@ -170,14 +178,15 @@ export class PerformanceManager {
       threeCanvases: this.threeCanvases.size,
       animationFrames: this.animationFrames.size,
       timers: this.timers.size,
-      memoryUsage: (performance as any).memory?.usedJSHeapSize || undefined
+      memoryUsage: (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory
+        ?.usedJSHeapSize,
     };
   }
 
   // Check if performance is degraded
   public isPerformanceDegraded(): boolean {
     const metrics = this.getPerformanceMetrics();
-    
+
     // Consider performance degraded if too many effects are running
     return (
       metrics.particleContainers > 3 ||
@@ -199,22 +208,20 @@ export const isPerformanceDegraded = () => performanceManager.isPerformanceDegra
 
 // Performance reset function for UI
 export const resetPerformance = (): void => {
-  console.log('Resetting performance...');
-  
   // Cleanup all effects
   cleanupAllEffects();
-  
+
   // Wait a moment then force a reload if needed
   setTimeout(() => {
     if (isPerformanceDegraded()) {
       console.warn('Performance still degraded, consider refreshing the page');
-      
+
       // Show user notification
       if (typeof window !== 'undefined') {
         const shouldReload = confirm(
           'The app is running slowly. Would you like to refresh the page to reset performance?'
         );
-        
+
         if (shouldReload) {
           window.location.reload();
         }
@@ -231,12 +238,12 @@ export const usePerformanceMonitor = () => {
     cleanupEffects: cleanupAllEffects,
     resetPerformance,
     getMetrics: getPerformanceMetrics,
-    isDegraded: isPerformanceDegraded
+    isDegraded: isPerformanceDegraded,
   };
 };
 
 // Throttle function for performance
-export const throttle = <T extends (...args: any[]) => any>(
+export const throttle = <T extends (...args: unknown[]) => unknown>(
   func: T,
   delay: number
 ): ((...args: Parameters<T>) => void) => {
@@ -253,18 +260,21 @@ export const throttle = <T extends (...args: any[]) => any>(
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
-      
-      timeoutId = window.setTimeout(() => {
-        func(...args);
-        lastExecTime = Date.now();
-        timeoutId = null;
-      }, delay - (currentTime - lastExecTime));
+
+      timeoutId = window.setTimeout(
+        () => {
+          func(...args);
+          lastExecTime = Date.now();
+          timeoutId = null;
+        },
+        delay - (currentTime - lastExecTime)
+      );
     }
   };
 };
 
 // Debounce function for performance
-export const debounce = <T extends (...args: any[]) => any>(
+export const debounce = <T extends (...args: unknown[]) => unknown>(
   func: T,
   delay: number
 ): ((...args: Parameters<T>) => void) => {
@@ -280,4 +290,4 @@ export const debounce = <T extends (...args: any[]) => any>(
       timeoutId = null;
     }, delay);
   };
-}; 
+};

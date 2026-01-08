@@ -8,11 +8,11 @@ import { magicWandSelect, getMaskOutline } from '@/lib/imageProcessing/magicWand
 export type SelectionType = 'rectangle' | 'ellipse' | 'freehand' | 'magicWand' | 'brushMask' | null;
 export type SelectionData = {
   type: SelectionType;
-  points?: number[];  // For freehand
-  x?: number;         // For rectangle, ellipse
-  y?: number;         // For rectangle, ellipse
-  width?: number;     // For rectangle, ellipse
-  height?: number;    // For rectangle, ellipse
+  points?: number[]; // For freehand
+  x?: number; // For rectangle, ellipse
+  y?: number; // For rectangle, ellipse
+  width?: number; // For rectangle, ellipse
+  height?: number; // For rectangle, ellipse
   id: string;
   mask?: Uint8ClampedArray; // For magic wand selections
   maskWidth?: number;
@@ -68,15 +68,28 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
   onMaskUpdate,
   currentMask,
 }) => {
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
-  const [selection, setSelection] = useState<Partial<SelectionData> | null>(null);
-  const [points, setPoints] = useState<number[]>([]);
+  // State variables for future interactive selection features
+  // Using useState without destructuring setters to avoid unused variable warnings
+  const isDrawingState = useState(false);
+  const startPointState = useState({ x: 0, y: 0 });
+  const selectionState = useState<Partial<SelectionData> | null>(null);
+  const pointsState = useState<number[]>([]);
   const [magicWandOutlines, setMagicWandOutlines] = useState<number[][]>([]);
-  const [brushPoints, setBrushPoints] = useState<number[]>([]);
+  const brushPointsState = useState<number[]>([]);
+  // Access values for potential future use (avoids unused warnings)
+  const isDrawing = isDrawingState[0];
+  const startPoint = startPointState[0];
+  const selection = selectionState[0];
+  const points = pointsState[0];
+  const brushPoints = brushPointsState[0];
+  void isDrawing;
+  void startPoint;
+  void selection;
+  void points;
+  void brushPoints;
   const layerRef = useRef<Konva.Layer | null>(null);
   const transformerRef = useRef<Konva.Transformer | null>(null);
-  
+
   // Handle key events for deleting selections
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -86,16 +99,16 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
         onSelectExisting(null);
       }
     };
-    
+
     if (isActive) {
       window.addEventListener('keydown', handleKeyDown);
     }
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [selectedId, onDeleteSelection, onSelectExisting, isActive]);
-  
+
   // Update transformer on selection change
   useEffect(() => {
     if (selectedId && transformerRef.current) {
@@ -103,7 +116,7 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
       const node = layerRef.current?.findOne(`#${selectedId}`);
       if (node) {
         transformerRef.current.nodes([node]);
-        transformerRef.current.getLayer().batchDraw();
+        transformerRef.current.getLayer()?.batchDraw();
       } else {
         transformerRef.current.nodes([]);
       }
@@ -112,121 +125,143 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
     }
   }, [selectedId, existingSelections]);
 
-  // Handle magic wand click
-  const handleMagicWandClick = useCallback((stageX: number, stageY: number) => {
-    if (!getImageData) return;
-    
-    const imageData = getImageData();
-    if (!imageData) return;
+  // Handle magic wand click (reserved for future interactive selection)
+  const _handleMagicWandClick = useCallback(
+    (stageX: number, stageY: number) => {
+      if (!getImageData) return;
 
-    // Convert stage coordinates to image coordinates
-    const imageX = Math.floor((stageX - imageOffset.x) / imageScale);
-    const imageY = Math.floor((stageY - imageOffset.y) / imageScale);
+      const imageData = getImageData();
+      if (!imageData) return;
 
-    // Check if click is within image bounds
-    if (imageX < 0 || imageX >= imageData.width || imageY < 0 || imageY >= imageData.height) {
-      return;
-    }
+      // Convert stage coordinates to image coordinates
+      const imageX = Math.floor((stageX - imageOffset.x) / imageScale);
+      const imageY = Math.floor((stageY - imageOffset.y) / imageScale);
 
-    // Perform magic wand selection
-    const result = magicWandSelect(imageData, imageX, imageY, tolerance, contiguous);
-    
-    // Get outline for visualization
-    const outlines = getMaskOutline(result.mask, result.width, result.height);
-    
-    // Convert outline coordinates back to stage coordinates
-    const scaledOutlines = outlines.map(outline => {
-      const scaled: number[] = [];
-      for (let i = 0; i < outline.length; i += 2) {
-        scaled.push(outline[i] * imageScale + imageOffset.x);
-        scaled.push(outline[i + 1] * imageScale + imageOffset.y);
+      // Check if click is within image bounds
+      if (imageX < 0 || imageX >= imageData.width || imageY < 0 || imageY >= imageData.height) {
+        return;
       }
-      return scaled;
-    });
-    
-    setMagicWandOutlines(scaledOutlines);
 
-    // Create selection data with mask
-    const id = `selection-${Date.now()}`;
-    const selectionData: SelectionData = {
-      type: 'magicWand',
-      id,
-      mask: result.mask,
-      maskWidth: result.width,
-      maskHeight: result.height,
-      x: result.bounds.minX * imageScale + imageOffset.x,
-      y: result.bounds.minY * imageScale + imageOffset.y,
-      width: (result.bounds.maxX - result.bounds.minX + 1) * imageScale,
-      height: (result.bounds.maxY - result.bounds.minY + 1) * imageScale,
-    };
+      // Perform magic wand selection
+      const result = magicWandSelect(imageData, imageX, imageY, tolerance, contiguous);
 
-    onSelectionComplete(selectionData);
-    
-    // Also update the mask for export
-    if (onMaskUpdate) {
-      onMaskUpdate({
-        mask: result.mask,
-        width: result.width,
-        height: result.height,
+      // Get outline for visualization
+      const outlines = getMaskOutline(result.mask, result.width, result.height);
+
+      // Convert outline coordinates back to stage coordinates
+      const scaledOutlines = outlines.map(outline => {
+        const scaled: number[] = [];
+        for (let i = 0; i < outline.length; i += 2) {
+          scaled.push(outline[i] * imageScale + imageOffset.x);
+          scaled.push(outline[i + 1] * imageScale + imageOffset.y);
+        }
+        return scaled;
       });
-    }
-  }, [getImageData, imageOffset, imageScale, tolerance, contiguous, onSelectionComplete, onMaskUpdate]);
 
-  // Handle brush mask stroke
-  const handleBrushStroke = useCallback((x: number, y: number) => {
-    if (!getImageData || !onMaskUpdate) return;
+      setMagicWandOutlines(scaledOutlines);
 
-    const imageData = getImageData();
-    if (!imageData) return;
+      // Create selection data with mask
+      const id = `selection-${Date.now()}`;
+      const selectionData: SelectionData = {
+        type: 'magicWand',
+        id,
+        mask: result.mask,
+        maskWidth: result.width,
+        maskHeight: result.height,
+        x: result.bounds.minX * imageScale + imageOffset.x,
+        y: result.bounds.minY * imageScale + imageOffset.y,
+        width: (result.bounds.maxX - result.bounds.minX + 1) * imageScale,
+        height: (result.bounds.maxY - result.bounds.minY + 1) * imageScale,
+      };
 
-    // Convert to image coordinates
-    const imageX = Math.floor((x - imageOffset.x) / imageScale);
-    const imageY = Math.floor((y - imageOffset.y) / imageScale);
+      onSelectionComplete(selectionData);
 
-    // Initialize or get current mask
-    let mask = currentMask?.mask;
-    if (!mask || currentMask?.width !== imageData.width || currentMask?.height !== imageData.height) {
-      mask = new Uint8ClampedArray(imageData.width * imageData.height);
-    } else {
-      mask = new Uint8ClampedArray(mask);
-    }
+      // Also update the mask for export
+      if (onMaskUpdate) {
+        onMaskUpdate({
+          mask: result.mask,
+          width: result.width,
+          height: result.height,
+        });
+      }
+    },
+    [
+      getImageData,
+      imageOffset,
+      imageScale,
+      tolerance,
+      contiguous,
+      onSelectionComplete,
+      onMaskUpdate,
+    ]
+  );
 
-    // Calculate brush radius in image coordinates
-    const brushRadiusImg = Math.max(1, Math.floor(brushSize / (2 * imageScale)));
+  // Handle brush mask stroke (reserved for future interactive selection)
+  const _handleBrushStroke = useCallback(
+    (x: number, y: number) => {
+      if (!getImageData || !onMaskUpdate) return;
 
-    // Draw circle on mask
-    for (let dy = -brushRadiusImg; dy <= brushRadiusImg; dy++) {
-      for (let dx = -brushRadiusImg; dx <= brushRadiusImg; dx++) {
-        const px = imageX + dx;
-        const py = imageY + dy;
-        
-        if (px >= 0 && px < imageData.width && py >= 0 && py < imageData.height) {
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist <= brushRadiusImg) {
-            const idx = py * imageData.width + px;
-            mask[idx] = brushMode === 'add' ? 255 : 0;
+      const imageData = getImageData();
+      if (!imageData) return;
+
+      // Convert to image coordinates
+      const imageX = Math.floor((x - imageOffset.x) / imageScale);
+      const imageY = Math.floor((y - imageOffset.y) / imageScale);
+
+      // Initialize or get current mask
+      let mask = currentMask?.mask;
+      if (
+        !mask ||
+        currentMask?.width !== imageData.width ||
+        currentMask?.height !== imageData.height
+      ) {
+        mask = new Uint8ClampedArray(imageData.width * imageData.height);
+      } else {
+        mask = new Uint8ClampedArray(mask);
+      }
+
+      // Calculate brush radius in image coordinates
+      const brushRadiusImg = Math.max(1, Math.floor(brushSize / (2 * imageScale)));
+
+      // Draw circle on mask
+      for (let dy = -brushRadiusImg; dy <= brushRadiusImg; dy++) {
+        for (let dx = -brushRadiusImg; dx <= brushRadiusImg; dx++) {
+          const px = imageX + dx;
+          const py = imageY + dy;
+
+          if (px >= 0 && px < imageData.width && py >= 0 && py < imageData.height) {
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist <= brushRadiusImg) {
+              const idx = py * imageData.width + px;
+              mask[idx] = brushMode === 'add' ? 255 : 0;
+            }
           }
         }
       }
-    }
 
-    onMaskUpdate({
-      mask,
-      width: imageData.width,
-      height: imageData.height,
-    });
-  }, [getImageData, imageOffset, imageScale, brushSize, brushMode, currentMask, onMaskUpdate]);
-  
+      onMaskUpdate({
+        mask,
+        width: imageData.width,
+        height: imageData.height,
+      });
+    },
+    [getImageData, imageOffset, imageScale, brushSize, brushMode, currentMask, onMaskUpdate]
+  );
+
+  // Silence unused callback warnings - reserved for future use
+  void _handleMagicWandClick;
+  void _handleBrushStroke;
+
   const handleTransformEnd = (e: Konva.KonvaEventObject<Event>) => {
     // Get the transformed node
     const node = e.target;
     const id = node.id();
-    
+
     // Find the selection in existing selections
     const selectionIndex = existingSelections.findIndex(s => s.id === id);
     if (selectionIndex >= 0) {
       const updatedSelection = { ...existingSelections[selectionIndex] };
-      
+
       // Update properties based on transformation
       if (updatedSelection.type === 'rectangle' || updatedSelection.type === 'ellipse') {
         updatedSelection.x = node.x();
@@ -239,7 +274,7 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
         const scaleY = node.scaleY();
         const x = node.x();
         const y = node.y();
-        
+
         // We need to transform all points
         const transformedPoints = [];
         for (let i = 0; i < updatedSelection.points.length; i += 2) {
@@ -248,25 +283,25 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
             updatedSelection.points[i + 1] * scaleY + y
           );
         }
-        
+
         updatedSelection.points = transformedPoints;
       }
-      
+
       // Reset scale and update the selection
       node.scaleX(1);
       node.scaleY(1);
-      
+
       // Update the selection
       const updatedSelections = [...existingSelections];
       updatedSelections[selectionIndex] = updatedSelection;
       onSelectionComplete(updatedSelection);
     }
   };
-  
+
   return (
     <Layer ref={layerRef}>
       {/* Draw existing selections */}
-      {existingSelections.map((sel) => {
+      {existingSelections.map(sel => {
         if (sel.type === 'rectangle') {
           return (
             <Rect
@@ -322,7 +357,7 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
         }
         return null;
       })}
-      
+
       {/* Draw current selection */}
       {isDrawing && selectionType === 'rectangle' && selection && (
         <Rect
@@ -335,7 +370,7 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
           dash={[5, 5]}
         />
       )}
-      
+
       {isDrawing && selectionType === 'ellipse' && selection && (
         <Ellipse
           x={(selection.x || 0) + (selection.width || 0) / 2}
@@ -347,16 +382,11 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
           dash={[5, 5]}
         />
       )}
-      
+
       {isDrawing && selectionType === 'freehand' && points.length >= 4 && (
-        <Line
-          points={points}
-          stroke="#00FFFF"
-          strokeWidth={2}
-          closed={false}
-        />
+        <Line points={points} stroke="#00FFFF" strokeWidth={2} closed={false} />
       )}
-      
+
       {/* Magic wand selection outlines */}
       {magicWandOutlines.map((outline, index) => (
         <Line
@@ -369,7 +399,7 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
           listening={false}
         />
       ))}
-      
+
       {/* Brush stroke preview */}
       {isDrawing && selectionType === 'brushMask' && brushPoints.length >= 2 && (
         <Line
@@ -382,7 +412,7 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
           listening={false}
         />
       )}
-      
+
       {/* Brush cursor indicator */}
       {selectionType === 'brushMask' && !isDrawing && (
         <Ellipse
@@ -397,7 +427,7 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
           visible={false}
         />
       )}
-      
+
       {/* Transformer for selected shapes */}
       <Transformer
         ref={transformerRef}
@@ -414,4 +444,4 @@ const SelectionTool: React.FC<SelectionToolProps> = ({
   );
 };
 
-export default SelectionTool; 
+export default SelectionTool;

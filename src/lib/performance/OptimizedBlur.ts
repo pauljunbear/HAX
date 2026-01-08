@@ -43,7 +43,7 @@ function createGaussianKernel(radius: number, sigma?: number): Float32Array {
   // Cache (limit cache size)
   if (kernelCache.size > 50) {
     const firstKey = kernelCache.keys().next().value;
-    kernelCache.delete(firstKey);
+    if (firstKey) kernelCache.delete(firstKey);
   }
   kernelCache.set(key, kernel);
 
