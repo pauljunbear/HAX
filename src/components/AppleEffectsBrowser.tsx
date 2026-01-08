@@ -3,7 +3,8 @@
 import React, { useState, useMemo, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig, effectCategories, hiddenLegacyEffects } from '@/lib/effects';
-import { ChevronRight, Plus, Search } from 'lucide-react';
+import { ChevronRight, Plus, Search, Star, Clock } from 'lucide-react';
+import { useEffectFavorites } from '@/hooks/useEffectFavorites';
 
 interface AppleEffectsBrowserProps {
   activeEffect?: string | null;
@@ -49,7 +50,9 @@ interface EffectButtonProps {
   isActive: boolean;
   hasImage: boolean;
   isCompact: boolean;
+  isFavorite: boolean;
   onClick: (effectId: string) => void;
+  onToggleFavorite: (effectId: string) => void;
 }
 
 const EffectButton = memo(function EffectButton({
@@ -58,7 +61,9 @@ const EffectButton = memo(function EffectButton({
   isActive,
   hasImage,
   isCompact,
+  isFavorite,
   onClick,
+  onToggleFavorite,
 }: EffectButtonProps) {
   const [isHovered, setIsHovered] = useState(false);
   const gradient = useMemo(() => getEffectGradient(effectId), [effectId]);
@@ -67,6 +72,14 @@ const EffectButton = memo(function EffectButton({
     onClick(effectId);
   }, [onClick, effectId]);
 
+  const handleFavoriteClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onToggleFavorite(effectId);
+    },
+    [onToggleFavorite, effectId]
+  );
+
   return (
     <motion.button
       onClick={handleClick}
@@ -74,7 +87,7 @@ const EffectButton = memo(function EffectButton({
       onMouseLeave={() => setIsHovered(false)}
       disabled={!hasImage}
       className={`
-        effect-button-modern glass-button
+        effect-button-modern glass-button group relative
         ${isActive ? 'glass-active' : ''}
         ${!hasImage ? 'opacity-40 cursor-not-allowed' : ''}
         ${isCompact ? 'px-2 py-2 text-xs' : 'px-3 py-2 text-sm'}
@@ -93,13 +106,34 @@ const EffectButton = memo(function EffectButton({
 
       <span
         className={`
-          block relative z-10 transition-colors duration-200
+          block relative z-10 transition-colors duration-200 pr-5
           ${isCompact ? 'truncate' : ''}
           ${isHovered && !isActive ? 'text-white' : ''}
         `}
       >
         {label}
       </span>
+
+      {/* Favorite star button */}
+      <div
+        onClick={handleFavoriteClick}
+        className={`
+          absolute right-1.5 top-1/2 -translate-y-1/2 z-20
+          p-0.5 rounded transition-all duration-200
+          ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}
+          hover:opacity-100 hover:scale-110
+        `}
+      >
+        <Star
+          className={`w-3.5 h-3.5 transition-colors ${
+            isFavorite
+              ? 'fill-yellow-400 text-yellow-400'
+              : isHovered && !isActive
+                ? 'text-white/70'
+                : 'text-current'
+          }`}
+        />
+      </div>
     </motion.button>
   );
 });
@@ -111,10 +145,11 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   onNewImage,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const { favorites, recentlyUsed, isFavorite, toggleFavorite, addToRecent } = useEffectFavorites();
 
-  // Start with curated categories collapsed by default
+  // Start with curated categories collapsed by default, but Favorites expanded
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
-    () => new Set([...Object.keys(effectCategories), 'More'])
+    () => new Set([...Object.keys(effectCategories), 'More', 'Recently Used'])
   );
 
   // Group effects by category
@@ -188,9 +223,24 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
     (effectId: string) => {
       if (!hasImage) return;
       onEffectChange?.(effectId);
+      addToRecent(effectId);
     },
-    [hasImage, onEffectChange]
+    [hasImage, onEffectChange, addToRecent]
   );
+
+  // Get favorite effects as array
+  const favoriteEffects = useMemo(() => {
+    return [...favorites]
+      .filter(id => effectsConfig[id])
+      .map(id => [id, effectsConfig[id]] as [string, (typeof effectsConfig)[string]]);
+  }, [favorites]);
+
+  // Get recently used effects as array
+  const recentEffects = useMemo(() => {
+    return recentlyUsed
+      .filter(id => effectsConfig[id])
+      .map(id => [id, effectsConfig[id]] as [string, (typeof effectsConfig)[string]]);
+  }, [recentlyUsed]);
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -250,6 +300,124 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
             </div>
           )}
 
+          {/* Favorites Section */}
+          {hasImage && favoriteEffects.length > 0 && !searchTerm && (
+            <div key="Favorites">
+              <button
+                onClick={() => toggleCategory('Favorites')}
+                className={`
+                  w-full flex items-center justify-between px-3 py-2.5 text-left
+                  transition-all rounded-xl group relative overflow-hidden glass-effect-button
+                  ${!collapsedCategories.has('Favorites') ? 'glass-active mb-1' : ''}
+                `}
+              >
+                <div className="flex items-center gap-2 relative z-10">
+                  <motion.div
+                    animate={{ rotate: !collapsedCategories.has('Favorites') ? 90 : 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </motion.div>
+                  <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                  <h3 className="text-sm font-medium">Favorites</h3>
+                  <span className="text-xs glass-badge px-2 py-0.5 rounded-full">
+                    {favoriteEffects.length}
+                  </span>
+                </div>
+              </button>
+
+              <AnimatePresence mode="sync">
+                {!collapsedCategories.has('Favorites') && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{
+                      height: { duration: 0.2, ease: 'easeInOut' },
+                      opacity: { duration: 0.15, ease: 'easeInOut' },
+                    }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="px-2 pb-2 grid grid-cols-2 gap-1.5">
+                      {favoriteEffects.map(([effectId, effect]) => (
+                        <EffectButton
+                          key={effectId}
+                          effectId={effectId}
+                          label={effect.label}
+                          isActive={activeEffect === effectId}
+                          hasImage={hasImage}
+                          isCompact={true}
+                          isFavorite={true}
+                          onClick={handleEffectClick}
+                          onToggleFavorite={toggleFavorite}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {/* Recently Used Section */}
+          {hasImage && recentEffects.length > 0 && !searchTerm && (
+            <div key="Recently Used">
+              <button
+                onClick={() => toggleCategory('Recently Used')}
+                className={`
+                  w-full flex items-center justify-between px-3 py-2.5 text-left
+                  transition-all rounded-xl group relative overflow-hidden glass-effect-button
+                  ${!collapsedCategories.has('Recently Used') ? 'glass-active mb-1' : ''}
+                `}
+              >
+                <div className="flex items-center gap-2 relative z-10">
+                  <motion.div
+                    animate={{ rotate: !collapsedCategories.has('Recently Used') ? 90 : 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </motion.div>
+                  <Clock className="w-4 h-4 text-blue-400" />
+                  <h3 className="text-sm font-medium">Recently Used</h3>
+                  <span className="text-xs glass-badge px-2 py-0.5 rounded-full">
+                    {recentEffects.length}
+                  </span>
+                </div>
+              </button>
+
+              <AnimatePresence mode="sync">
+                {!collapsedCategories.has('Recently Used') && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{
+                      height: { duration: 0.2, ease: 'easeInOut' },
+                      opacity: { duration: 0.15, ease: 'easeInOut' },
+                    }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="px-2 pb-2 grid grid-cols-2 gap-1.5">
+                      {recentEffects.map(([effectId, effect]) => (
+                        <EffectButton
+                          key={effectId}
+                          effectId={effectId}
+                          label={effect.label}
+                          isActive={activeEffect === effectId}
+                          hasImage={hasImage}
+                          isCompact={true}
+                          isFavorite={isFavorite(effectId)}
+                          onClick={handleEffectClick}
+                          onToggleFavorite={toggleFavorite}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
           {/* Categories and Effects */}
           {hasImage &&
             Object.entries(filteredEffectsByCategory).map(([category, effects]) => {
@@ -261,7 +429,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                   <button
                     onClick={() => toggleCategory(category)}
                     className={`
-                      w-full flex items-center justify-between px-3 py-2.5 text-left 
+                      w-full flex items-center justify-between px-3 py-2.5 text-left
                       transition-all rounded-xl group relative overflow-hidden glass-effect-button
                       ${isExpanded ? 'glass-active mb-1' : ''}
                     `}
@@ -307,7 +475,9 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                               isActive={activeEffect === effectId}
                               hasImage={hasImage}
                               isCompact={effects.length > 8}
+                              isFavorite={isFavorite(effectId)}
                               onClick={handleEffectClick}
+                              onToggleFavorite={toggleFavorite}
                             />
                           ))}
                         </div>
