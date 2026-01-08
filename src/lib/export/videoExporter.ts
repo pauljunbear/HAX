@@ -38,10 +38,10 @@ export class VideoExporter {
 
     try {
       console.log('Initializing FFmpeg...');
-      
+
       // Use public CDN URLs for ffmpeg-wasm
       const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-      
+
       await this.ffmpeg.load({
         coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -51,24 +51,17 @@ export class VideoExporter {
       console.log('FFmpeg initialized successfully');
     } catch (error) {
       console.error('Failed to initialize FFmpeg:', error);
-      throw new Error('Failed to initialize video encoder. Please check your internet connection and try again.');
+      throw new Error(
+        'Failed to initialize video encoder. Please check your internet connection and try again.'
+      );
     } finally {
       this.isInitializing = false;
     }
   }
 
   async exportVideo(options: VideoExportOptions): Promise<Blob> {
-    const {
-      frames,
-      frameRate,
-      quality,
-      format,
-      width,
-      height,
-      onProgress,
-      onComplete,
-      onError
-    } = options;
+    const { frames, frameRate, quality, format, width, height, onProgress, onComplete, onError } =
+      options;
 
     try {
       // Ensure FFmpeg is initialized
@@ -78,17 +71,19 @@ export class VideoExporter {
         throw new Error('No frames provided for video export');
       }
 
-      console.log(`Starting video export: ${frames.length} frames, ${frameRate}fps, ${format.toUpperCase()}`);
+      console.log(
+        `Starting video export: ${frames.length} frames, ${frameRate}fps, ${format.toUpperCase()}`
+      );
 
       // Convert canvases to image files
       const frameFiles: string[] = [];
       for (let i = 0; i < frames.length; i++) {
         const frameFileName = `frame_${i.toString().padStart(4, '0')}.png`;
         const canvas = frames[i];
-        
+
         // Convert canvas to blob
         const blob = await new Promise<Blob>((resolve, reject) => {
-          canvas.toBlob((blob) => {
+          canvas.toBlob(blob => {
             if (blob) resolve(blob);
             else reject(new Error('Failed to convert canvas to blob'));
           }, 'image/png');
@@ -100,7 +95,7 @@ export class VideoExporter {
 
         // Report progress for frame preparation
         if (onProgress) {
-          onProgress((i + 1) / frames.length * 0.3); // 30% for frame preparation
+          onProgress(((i + 1) / frames.length) * 0.3); // 30% for frame preparation
         }
       }
 
@@ -112,7 +107,7 @@ export class VideoExporter {
         format,
         width,
         height,
-        outputFileName
+        outputFileName,
       });
 
       console.log('FFmpeg command:', ffmpegArgs.join(' '));
@@ -120,7 +115,7 @@ export class VideoExporter {
       // Set up progress tracking
       let lastProgress = 0.3;
       this.ffmpeg.on('progress', ({ progress }) => {
-        const currentProgress = 0.3 + (progress * 0.7); // 70% for encoding
+        const currentProgress = 0.3 + progress * 0.7; // 70% for encoding
         if (currentProgress > lastProgress) {
           lastProgress = currentProgress;
           if (onProgress) {
@@ -134,7 +129,7 @@ export class VideoExporter {
 
       // Read the output file
       const data = await this.ffmpeg.readFile(outputFileName);
-      
+
       // Create blob from the video data
       const mimeType = format === 'webm' ? 'video/webm' : 'video/mp4';
       const videoBlob = new Blob([data], { type: mimeType });
@@ -153,16 +148,16 @@ export class VideoExporter {
       }
 
       return videoBlob;
-
     } catch (error) {
       console.error('Video export failed:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred during video export';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error occurred during video export';
       const exportError = new Error(`Video export failed: ${errorMessage}`);
-      
+
       if (onError) {
         onError(exportError);
       }
-      
+
       throw exportError;
     }
   }
@@ -179,34 +174,47 @@ export class VideoExporter {
 
     const baseArgs = [
       '-y', // Overwrite output file
-      '-framerate', frameRate.toString(),
-      '-i', 'frame_%04d.png',
-      '-s', `${width}x${height}`,
+      '-framerate',
+      frameRate.toString(),
+      '-i',
+      'frame_%04d.png',
+      '-s',
+      `${width}x${height}`,
     ];
 
     if (format === 'webm') {
       // WebM with VP9 codec
-      const crf = Math.max(15, Math.min(63, 63 - (quality * 4.8))); // Convert quality 1-10 to CRF 63-15
+      const crf = Math.max(15, Math.min(63, 63 - quality * 4.8)); // Convert quality 1-10 to CRF 63-15
       return [
         ...baseArgs,
-        '-c:v', 'libvpx-vp9',
-        '-crf', crf.toString(),
-        '-b:v', '0', // Use CRF mode
-        '-pix_fmt', 'yuv420p',
-        '-f', 'webm',
-        outputFileName
+        '-c:v',
+        'libvpx-vp9',
+        '-crf',
+        crf.toString(),
+        '-b:v',
+        '0', // Use CRF mode
+        '-pix_fmt',
+        'yuv420p',
+        '-f',
+        'webm',
+        outputFileName,
       ];
     } else {
       // MP4 with H.264 codec
-      const crf = Math.max(15, Math.min(51, 51 - (quality * 3.6))); // Convert quality 1-10 to CRF 51-15
+      const crf = Math.max(15, Math.min(51, 51 - quality * 3.6)); // Convert quality 1-10 to CRF 51-15
       return [
         ...baseArgs,
-        '-c:v', 'libx264',
-        '-crf', crf.toString(),
-        '-preset', 'medium',
-        '-pix_fmt', 'yuv420p',
-        '-f', 'mp4',
-        outputFileName
+        '-c:v',
+        'libx264',
+        '-crf',
+        crf.toString(),
+        '-preset',
+        'medium',
+        '-pix_fmt',
+        'yuv420p',
+        '-f',
+        'mp4',
+        outputFileName,
       ];
     }
   }
@@ -216,7 +224,7 @@ export class VideoExporter {
       for (const file of files) {
         try {
           await this.ffmpeg.deleteFile(file);
-        } catch (error) {
+        } catch {
           // Ignore individual file deletion errors
           console.warn(`Failed to delete temporary file: ${file}`);
         }
@@ -234,11 +242,11 @@ export class VideoExporter {
     try {
       // Try to get FFmpeg version
       await this.ffmpeg.exec(['-version']);
-      return { 
+      return {
         isInitialized: true,
-        version: 'FFmpeg WASM'
+        version: 'FFmpeg WASM',
       };
-    } catch (error) {
+    } catch {
       return { isInitialized: this.isInitialized };
     }
   }
@@ -281,22 +289,22 @@ export function estimateVideoSize(
 ): { estimatedMB: number; estimatedSeconds: number } {
   const duration = frameCount / frameRate;
   const pixelCount = resolution.width * resolution.height;
-  
+
   // Rough bitrate estimation based on quality and format
   let bitrateMbps: number;
-  
+
   if (format === 'webm') {
     // VP9 is generally more efficient
     bitrateMbps = (pixelCount / 1000000) * (quality / 10) * 2.5;
   } else {
-    // H.264 
+    // H.264
     bitrateMbps = (pixelCount / 1000000) * (quality / 10) * 3;
   }
-  
+
   const estimatedMB = (bitrateMbps * duration) / 8; // Convert bits to bytes, then to MB
-  
+
   return {
     estimatedMB: Math.round(estimatedMB * 100) / 100,
-    estimatedSeconds: Math.round(duration * 100) / 100
+    estimatedSeconds: Math.round(duration * 100) / 100,
   };
-} 
+}

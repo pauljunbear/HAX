@@ -19,7 +19,7 @@ export function VirtualScroll<T>({
   renderItem,
   overscan = 2,
   className = '',
-  onScroll
+  onScroll,
 }: VirtualScrollProps<T>) {
   const [scrollTop, setScrollTop] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -35,11 +35,14 @@ export function VirtualScroll<T>({
   const totalHeight = items.length * itemHeight;
 
   // Handle scroll
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const newScrollTop = e.currentTarget.scrollTop;
-    setScrollTop(newScrollTop);
-    onScroll?.(newScrollTop);
-  }, [onScroll]);
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const newScrollTop = e.currentTarget.scrollTop;
+      setScrollTop(newScrollTop);
+      onScroll?.(newScrollTop);
+    },
+    [onScroll]
+  );
 
   // Get visible items
   const visibleItems = items.slice(visibleStart, visibleEnd);
@@ -67,10 +70,7 @@ export function VirtualScroll<T>({
           }}
         >
           {visibleItems.map((item, index) => (
-            <div
-              key={visibleStart + index}
-              style={{ height: itemHeight }}
-            >
+            <div key={visibleStart + index} style={{ height: itemHeight }}>
               {renderItem(item, visibleStart + index)}
             </div>
           ))}
@@ -103,7 +103,7 @@ export function GroupedVirtualScroll<T>({
   renderItem,
   renderGroupHeader,
   overscan = 2,
-  className = ''
+  className = '',
 }: GroupedVirtualScrollProps<T>) {
   const [scrollTop, setScrollTop] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -128,7 +128,7 @@ export function GroupedVirtualScroll<T>({
       data: group.label,
       height: groupHeaderHeight,
       position: currentPosition,
-      groupIndex
+      groupIndex,
     });
     currentPosition += groupHeaderHeight;
 
@@ -140,7 +140,7 @@ export function GroupedVirtualScroll<T>({
         height: itemHeight,
         position: currentPosition,
         groupIndex,
-        itemIndex
+        itemIndex,
       });
       currentPosition += itemHeight;
     });
@@ -180,7 +180,7 @@ export function GroupedVirtualScroll<T>({
       onScroll={handleScroll}
     >
       <div style={{ height: totalHeight, position: 'relative' }}>
-        {visibleItems.map((item, index) => (
+        {visibleItems.map(item => (
           <div
             key={`${item.groupIndex}-${item.type}-${item.itemIndex ?? 'header'}`}
             style={{
@@ -188,13 +188,12 @@ export function GroupedVirtualScroll<T>({
               top: item.position,
               left: 0,
               right: 0,
-              height: item.height
+              height: item.height,
             }}
           >
-            {item.type === 'header' 
+            {item.type === 'header'
               ? renderGroupHeader(item.data as string)
-              : renderItem(item.data as T, item.itemIndex!)
-            }
+              : renderItem(item.data as T, item.itemIndex!)}
           </div>
         ))}
       </div>
@@ -203,9 +202,16 @@ export function GroupedVirtualScroll<T>({
 }
 
 // Hook for measuring dynamic item heights
-export function useDynamicVirtualScroll<T>(items: T[], containerRef: React.RefObject<HTMLDivElement>) {
+// items and containerRef are reserved for future auto-measurement functionality
+export function useDynamicVirtualScroll<T>(
+  _items: T[],
+  _containerRef: React.RefObject<HTMLDivElement>
+) {
   const [itemHeights, setItemHeights] = useState<number[]>([]);
   const [averageHeight, setAverageHeight] = useState(100);
+  // Reserved params for future use
+  void _items;
+  void _containerRef;
 
   const measureItem = useCallback((index: number, element: HTMLElement) => {
     const height = element.getBoundingClientRect().height;
@@ -226,6 +232,6 @@ export function useDynamicVirtualScroll<T>(items: T[], containerRef: React.RefOb
   return {
     itemHeights,
     averageHeight,
-    measureItem
+    measureItem,
   };
-} 
+}

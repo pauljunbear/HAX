@@ -33,7 +33,6 @@ export interface GifQualityMetrics {
 }
 
 export class GifOptimizer {
-  
   /**
    * Analyze frames to determine optimal quality settings
    */
@@ -44,7 +43,7 @@ export class GifOptimizer {
         colorCount: 0,
         motionIntensity: 0,
         recommendedQuality: 5,
-        estimatedSizeKB: 0
+        estimatedSizeKB: 0,
       };
     }
 
@@ -104,9 +103,11 @@ export class GifOptimizer {
     // Calculate complexity score
     const colorComplexity = Math.min(colorSet.size / 256, 1); // Normalize to 0-1
     const edgeComplexity = Math.min(edgeRatio * 10, 1); // Normalize edge ratio
-    const brightnessVariation = Math.abs(averageBrightness - 128) / 128; // Distance from middle gray
+    // Brightness variation reserved for future complexity weighting
+    const _brightnessVariation = Math.abs(averageBrightness - 128) / 128;
+    void _brightnessVariation;
 
-    const complexity = (colorComplexity * 0.4 + edgeComplexity * 0.4 + motionIntensity * 0.2);
+    const complexity = colorComplexity * 0.4 + edgeComplexity * 0.4 + motionIntensity * 0.2;
 
     // Determine recommended quality based on complexity
     let recommendedQuality: number;
@@ -136,7 +137,7 @@ export class GifOptimizer {
       colorCount: colorSet.size,
       motionIntensity,
       recommendedQuality,
-      estimatedSizeKB: Math.round(estimatedSizeKB)
+      estimatedSizeKB: Math.round(estimatedSizeKB),
     };
   }
 
@@ -162,7 +163,8 @@ export class GifOptimizer {
       let difference = 0;
       let samples = 0;
 
-      for (let j = 0; j < imageData1.data.length; j += 40) { // Sample every 10th pixel (4 bytes per pixel)
+      for (let j = 0; j < imageData1.data.length; j += 40) {
+        // Sample every 10th pixel (4 bytes per pixel)
         const r1 = imageData1.data[j];
         const g1 = imageData1.data[j + 1];
         const b1 = imageData1.data[j + 2];
@@ -200,7 +202,7 @@ export class GifOptimizer {
     estimatedSizeKB: number;
   } {
     const metrics = this.analyzeFrames(frames);
-    
+
     let quality = options.quality || metrics.recommendedQuality;
     let workers = 2;
     let dithering = options.dithering !== 'none';
@@ -209,7 +211,7 @@ export class GifOptimizer {
     // Adjust quality based on target file size
     if (options.targetSizeKB && metrics.estimatedSizeKB > options.targetSizeKB) {
       const sizeRatio = options.targetSizeKB / metrics.estimatedSizeKB;
-      
+
       if (sizeRatio < 0.5) {
         // Very aggressive reduction needed
         quality = Math.max(1, Math.round(quality * 0.5));
@@ -235,7 +237,7 @@ export class GifOptimizer {
       // Photo-like content benefits from dithering
       dithering = true;
     }
-    
+
     // Additional adjustment for very aggressive presets
     if (options.targetSizeKB && options.targetSizeKB < 500) {
       quality = Math.max(1, quality - 1); // Extra reduction for small targets
@@ -262,7 +264,7 @@ export class GifOptimizer {
       workers,
       dithering,
       transparency,
-      estimatedSizeKB: optimizedSizeKB
+      estimatedSizeKB: optimizedSizeKB,
     };
   }
 
@@ -306,7 +308,7 @@ export class GifOptimizer {
   } {
     const analysis = this.analyzeFrames(frames);
     const optimizedSettings = this.optimizeSettings(frames, originalOptions);
-    
+
     const recommendations: string[] = [];
 
     // Generate recommendations
@@ -323,7 +325,9 @@ export class GifOptimizer {
     }
 
     if (optimizedSettings.estimatedSizeKB > 2000) {
-      recommendations.push('Large file size predicted - consider reducing dimensions or frame count');
+      recommendations.push(
+        'Large file size predicted - consider reducing dimensions or frame count'
+      );
     }
 
     if (frames.length > 50) {
@@ -333,7 +337,7 @@ export class GifOptimizer {
     return {
       analysis,
       optimizedSettings,
-      recommendations
+      recommendations,
     };
   }
 
@@ -344,7 +348,7 @@ export class GifOptimizer {
     return this.optimizeSettings(frames, {
       targetSizeKB: 500, // 500KB target for web
       quality: 8,
-      dithering: 'none'
+      dithering: 'none',
     });
   }
 
@@ -355,7 +359,7 @@ export class GifOptimizer {
     return this.optimizeSettings(frames, {
       targetSizeKB: 100, // 100KB target for minimal
       quality: 4,
-      dithering: 'none'
+      dithering: 'none',
     });
   }
 
@@ -366,7 +370,7 @@ export class GifOptimizer {
     return this.optimizeSettings(frames, {
       targetSizeKB: 2000, // 2MB target for quality
       quality: 15,
-      dithering: 'floyd-steinberg'
+      dithering: 'floyd-steinberg',
     });
   }
 }
@@ -378,31 +382,31 @@ export const GIF_QUALITY_PRESETS = {
     targetSizeKB: 1000,
     maxSizeKB: 2000,
     contentType: 'graphics' as const,
-    dithering: 'none' as const
+    dithering: 'none' as const,
   },
   social: {
     quality: 8,
     targetSizeKB: 3000,
     maxSizeKB: 5000,
     contentType: 'animation' as const,
-    dithering: 'floyd-steinberg' as const
+    dithering: 'floyd-steinberg' as const,
   },
   highQuality: {
     quality: 10,
     maxSizeKB: 10000,
     contentType: 'photo' as const,
-    dithering: 'floyd-steinberg' as const
+    dithering: 'floyd-steinberg' as const,
   },
   minimal: {
     quality: 3, // Lower than web
     targetSizeKB: 300, // Much smaller target
-    maxSizeKB: 500,   // Smaller max limit
+    maxSizeKB: 500, // Smaller max limit
     contentType: 'graphics' as const,
-    dithering: 'none' as const
-  }
+    dithering: 'none' as const,
+  },
 } as const;
 
-export type GifQualityPreset = keyof typeof GIF_QUALITY_PRESETS; 
+export type GifQualityPreset = keyof typeof GIF_QUALITY_PRESETS;
 
 // Provide explicit result type referenced by tests
 export type OptimizationResult = ReturnType<typeof GifOptimizer.optimizeSettings>;

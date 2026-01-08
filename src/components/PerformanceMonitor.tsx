@@ -16,18 +16,53 @@ export interface PerformanceMetrics {
   isThrottled: boolean;
 }
 
+// Interface for WorkerManager status
+interface WorkerManagerStatus {
+  busyWorkers: number;
+  queueSize: number;
+}
+
+// Interface for WorkerManager
+interface WorkerManager {
+  getStatus: () => WorkerManagerStatus;
+}
+
+// Extended Performance interface with Chrome memory info
+interface PerformanceWithMemory extends Performance {
+  memory?: {
+    usedJSHeapSize: number;
+    jsHeapSizeLimit: number;
+    totalJSHeapSize: number;
+  };
+}
+
+// Interface for global performance monitor
+interface PerformanceMonitorGlobal {
+  startRender: () => void;
+  endRender: () => void;
+  startOperation: () => void;
+  endOperation: () => void;
+}
+
+// Extend Window to include performance monitor
+declare global {
+  interface Window {
+    __performanceMonitor?: PerformanceMonitorGlobal;
+  }
+}
+
 interface PerformanceMonitorProps {
   isVisible?: boolean;
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   onPerformanceChange?: (metrics: PerformanceMetrics) => void;
-  workerManager?: any; // WorkerManager instance
+  workerManager?: WorkerManager;
 }
 
 export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   isVisible = false,
   position = 'top-right',
   onPerformanceChange,
-  workerManager
+  workerManager,
 }) => {
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
     fps: 0,
@@ -39,7 +74,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
     activeWorkers: 0,
     queueSize: 0,
     frameDrops: 0,
-    isThrottled: false
+    isThrottled: false,
   });
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -49,17 +84,16 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   const renderStartRef = useRef<number>(0);
   const operationStartRef = useRef<number>(0);
   const frameDropCountRef = useRef<number>(0);
-  const lastFrameTimeRef = useRef<number>(0);
 
   // Memory performance observer
   const memoryObserverRef = useRef<PerformanceObserver | null>(null);
 
   const getMemoryInfo = useCallback((): { usage: number; limit: number } => {
-    if ('memory' in performance) {
-      const memory = (performance as any).memory;
+    const perf = performance as PerformanceWithMemory;
+    if (perf.memory) {
       return {
-        usage: memory.usedJSHeapSize / 1024 / 1024, // MB
-        limit: memory.jsHeapSizeLimit / 1024 / 1024  // MB
+        usage: perf.memory.usedJSHeapSize / 1024 / 1024, // MB
+        limit: perf.memory.jsHeapSizeLimit / 1024 / 1024, // MB
       };
     }
     return { usage: 0, limit: 0 };
@@ -68,11 +102,12 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   const updateFPS = useCallback(() => {
     const now = performance.now();
     const deltaTime = now - lastTimeRef.current;
-    
-    if (deltaTime >= 1000) { // Update every second
+
+    if (deltaTime >= 1000) {
+      // Update every second
       const currentFPS = (frameRef.current * 1000) / deltaTime;
       const avgFrameTime = deltaTime / frameRef.current;
-      
+
       // Track frame drops (frames taking longer than 16.67ms for 60fps)
       if (avgFrameTime > 16.67) {
         frameDropCountRef.current++;
@@ -91,7 +126,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
         fps: Math.round(smoothedFPS),
         frameTime: Math.round(avgFrameTime * 100) / 100,
         frameDrops: frameDropCountRef.current,
-        isThrottled: smoothedFPS < 30
+        isThrottled: smoothedFPS < 30,
       }));
 
       frameRef.current = 0;
@@ -104,15 +139,15 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
 
   const updateMemoryAndWorkers = useCallback(() => {
     const memory = getMemoryInfo();
-    
+
     setMetrics(prev => ({
       ...prev,
       memoryUsage: Math.round(memory.usage * 100) / 100,
       memoryLimit: Math.round(memory.limit * 100) / 100,
       ...(workerManager && {
         activeWorkers: workerManager.getStatus().busyWorkers,
-        queueSize: workerManager.getStatus().queueSize
-      })
+        queueSize: workerManager.getStatus().queueSize,
+      }),
     }));
   }, [getMemoryInfo, workerManager]);
 
@@ -127,7 +162,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
       const renderTime = performance.now() - renderStartRef.current;
       setMetrics(prev => ({
         ...prev,
-        renderTime: Math.round(renderTime * 100) / 100
+        renderTime: Math.round(renderTime * 100) / 100,
       }));
       renderStartRef.current = 0;
     }
@@ -144,7 +179,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
       const operationTime = performance.now() - operationStartRef.current;
       setMetrics(prev => ({
         ...prev,
-        operationTime: Math.round(operationTime * 100) / 100
+        operationTime: Math.round(operationTime * 100) / 100,
       }));
       operationStartRef.current = 0;
     }
@@ -152,15 +187,15 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
 
   // Expose timing functions globally for easy access
   useEffect(() => {
-    (window as any).__performanceMonitor = {
+    window.__performanceMonitor = {
       startRender: startRenderTiming,
       endRender: endRenderTiming,
       startOperation: startOperationTiming,
-      endOperation: endOperationTiming
+      endOperation: endOperationTiming,
     };
 
     return () => {
-      delete (window as any).__performanceMonitor;
+      delete window.__performanceMonitor;
     };
   }, [startRenderTiming, endRenderTiming, startOperationTiming, endOperationTiming]);
 
@@ -175,9 +210,9 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
 
     // Setup performance observer for navigation timing
     if ('PerformanceObserver' in window) {
-      const observer = new PerformanceObserver((list) => {
+      const observer = new PerformanceObserver(list => {
         const entries = list.getEntries();
-        entries.forEach((entry) => {
+        entries.forEach(entry => {
           if (entry.entryType === 'measure' || entry.entryType === 'navigation') {
             console.log('Performance entry:', entry);
           }
@@ -187,7 +222,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
       try {
         observer.observe({ entryTypes: ['measure', 'navigation'] });
         memoryObserverRef.current = observer;
-      } catch (error) {
+      } catch {
         console.warn('PerformanceObserver not supported for some entry types');
       }
     }
@@ -214,7 +249,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
     'top-left': 'top-4 left-4',
     'top-right': 'top-4 right-4',
     'bottom-left': 'bottom-4 left-4',
-    'bottom-right': 'bottom-4 right-4'
+    'bottom-right': 'bottom-4 right-4',
   };
 
   const getPerformanceColor = (value: number, thresholds: [number, number]) => {
@@ -224,17 +259,20 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
   };
 
   const fpsColor = getPerformanceColor(60 - metrics.fps, [15, 30]); // Reverse scale for FPS
-  const memoryColor = getPerformanceColor((metrics.memoryUsage / metrics.memoryLimit) * 100, [70, 90]);
+  const memoryColor = getPerformanceColor(
+    (metrics.memoryUsage / metrics.memoryLimit) * 100,
+    [70, 90]
+  );
   const renderColor = getPerformanceColor(metrics.renderTime, [16, 33]);
 
   return (
-    <div 
+    <div
       className={`fixed ${positionClasses[position]} z-50 bg-black/80 backdrop-blur-sm border border-gray-700 rounded-lg p-3 font-mono text-xs transition-all duration-200 ${
         isExpanded ? 'w-80' : 'w-48'
       }`}
     >
       {/* Header */}
-      <div 
+      <div
         className="flex items-center justify-between cursor-pointer mb-2"
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -243,9 +281,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
           <span className="text-white font-medium">Performance</span>
         </div>
         <div className="flex items-center gap-1">
-          {metrics.isThrottled && (
-            <AlertTriangle className="w-3 h-3 text-red-400" />
-          )}
+          {metrics.isThrottled && <AlertTriangle className="w-3 h-3 text-red-400" />}
           <span className="text-gray-400">{isExpanded ? '−' : '+'}</span>
         </div>
       </div>
@@ -256,7 +292,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
           <span className="text-gray-300">FPS</span>
           <span className={fpsColor}>{metrics.fps}</span>
         </div>
-        
+
         <div className="flex justify-between items-center">
           <span className="text-gray-300">Frame</span>
           <span className={renderColor}>{metrics.frameTime}ms</span>
@@ -308,12 +344,17 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
                   </span>
                 </div>
                 <div className="w-full bg-gray-700 rounded-full h-1">
-                  <div 
+                  <div
                     className={`h-1 rounded-full transition-all duration-300 ${
-                      (metrics.memoryUsage / metrics.memoryLimit) > 0.9 ? 'bg-red-400' :
-                      (metrics.memoryUsage / metrics.memoryLimit) > 0.7 ? 'bg-yellow-400' : 'bg-green-400'
+                      metrics.memoryUsage / metrics.memoryLimit > 0.9
+                        ? 'bg-red-400'
+                        : metrics.memoryUsage / metrics.memoryLimit > 0.7
+                          ? 'bg-yellow-400'
+                          : 'bg-green-400'
                     }`}
-                    style={{ width: `${Math.min((metrics.memoryUsage / metrics.memoryLimit) * 100, 100)}%` }}
+                    style={{
+                      width: `${Math.min((metrics.memoryUsage / metrics.memoryLimit) * 100, 100)}%`,
+                    }}
                   ></div>
                 </div>
               </div>
@@ -361,7 +402,7 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
           </div>
 
           {/* Performance Tips */}
-          {(metrics.fps < 30 || (metrics.memoryUsage / metrics.memoryLimit) > 0.8) && (
+          {(metrics.fps < 30 || metrics.memoryUsage / metrics.memoryLimit > 0.8) && (
             <div className="mt-3 pt-2 border-t border-gray-700">
               <div className="flex items-center gap-1 mb-1">
                 <AlertTriangle className="w-3 h-3 text-yellow-400" />
@@ -369,7 +410,9 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
               </div>
               <div className="ml-4 text-xs text-gray-400">
                 {metrics.fps < 30 && <div>• Reduce effect complexity</div>}
-                {(metrics.memoryUsage / metrics.memoryLimit) > 0.8 && <div>• High memory usage detected</div>}
+                {metrics.memoryUsage / metrics.memoryLimit > 0.8 && (
+                  <div>• High memory usage detected</div>
+                )}
                 {metrics.queueSize > 5 && <div>• Worker queue is full</div>}
               </div>
             </div>
@@ -383,33 +426,25 @@ export const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
 // Hook for easy performance monitoring
 export const usePerformanceMonitor = () => {
   const startRender = useCallback(() => {
-    if ((window as any).__performanceMonitor) {
-      (window as any).__performanceMonitor.startRender();
-    }
+    window.__performanceMonitor?.startRender();
   }, []);
 
   const endRender = useCallback(() => {
-    if ((window as any).__performanceMonitor) {
-      (window as any).__performanceMonitor.endRender();
-    }
+    window.__performanceMonitor?.endRender();
   }, []);
 
   const startOperation = useCallback(() => {
-    if ((window as any).__performanceMonitor) {
-      (window as any).__performanceMonitor.startOperation();
-    }
+    window.__performanceMonitor?.startOperation();
   }, []);
 
   const endOperation = useCallback(() => {
-    if ((window as any).__performanceMonitor) {
-      (window as any).__performanceMonitor.endOperation();
-    }
+    window.__performanceMonitor?.endOperation();
   }, []);
 
   return {
     startRender,
     endRender,
     startOperation,
-    endOperation
+    endOperation,
   };
-}; 
+};

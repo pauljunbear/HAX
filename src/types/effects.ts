@@ -1,5 +1,6 @@
 // Use a loose type for Konva image nodes to avoid tight coupling to Konva typings
-type KonvaImage = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type KonvaImage = Record<string, unknown>;
 
 export interface EffectSetting {
   min: number;
@@ -45,4 +46,4 @@ export interface EffectPreviewState {
 export interface PreviewSize {
   width: number;
   height: number;
-} 
+}

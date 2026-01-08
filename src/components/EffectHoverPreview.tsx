@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffectPreview } from '@/hooks/useEffectPreview';
 import { effectsConfig } from '@/lib/effects';
+import type { EffectConfig } from '@/lib/effects/types';
 
 interface EffectHoverPreviewProps {
   effectId: string;
@@ -16,11 +17,11 @@ const PREVIEW_SIZE = 150;
 export const EffectHoverPreview: React.FC<EffectHoverPreviewProps> = ({
   effectId,
   imageUrl,
-  position
+  position,
 }) => {
-  const [previewSize, setPreviewSize] = useState({ width: PREVIEW_SIZE, height: PREVIEW_SIZE });
+  const previewSize = { width: PREVIEW_SIZE, height: PREVIEW_SIZE };
   const { canvas, isLoading, error } = useEffectPreview(effectId, imageUrl, previewSize);
-  const effect = effectsConfig[effectId] as any;
+  const effect = effectsConfig[effectId] as EffectConfig | undefined;
 
   if (!effect) return null;
 
@@ -34,7 +35,7 @@ export const EffectHoverPreview: React.FC<EffectHoverPreviewProps> = ({
         className="effect-preview"
         style={{
           left: position.x,
-          top: position.y
+          top: position.y,
         }}
       >
         <div className="w-40 h-40 relative">
@@ -69,4 +70,4 @@ export const EffectHoverPreview: React.FC<EffectHoverPreviewProps> = ({
       </motion.div>
     </AnimatePresence>
   );
-}; 
+};

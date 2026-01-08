@@ -1,12 +1,22 @@
 import * as PIXI from 'pixi.js';
 import { BlurFilter } from '@pixi/filter-blur';
 import { ColorMatrixFilter } from '@pixi/filter-color-matrix';
-import { DisplacementFilter } from '@pixi/filter-displacement';
+// DisplacementFilter reserved for future displacement effects
+// import { DisplacementFilter } from '@pixi/filter-displacement';
+
+// PIXI with settings access
+interface PIXIWithSettings {
+  settings?: {
+    PREFER_ENV?: number;
+    RENDER_OPTIONS?: { hello?: boolean };
+  };
+  ENV?: { WEBGL2?: number };
+}
 
 export interface WebGLEffect {
   name: string;
   filter: PIXI.Filter;
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 }
 
 export class WebGLRenderer {
@@ -18,18 +28,18 @@ export class WebGLRenderer {
 
   constructor() {
     // Initialize PIXI settings for better performance
-    const anyPIXI = PIXI as any;
-    if (anyPIXI.settings && anyPIXI.ENV) {
-      anyPIXI.settings.PREFER_ENV = anyPIXI.ENV.WEBGL2;
-      if (anyPIXI.settings.RENDER_OPTIONS) {
-        anyPIXI.settings.RENDER_OPTIONS.hello = false;
+    const pixiWithSettings = PIXI as unknown as PIXIWithSettings;
+    if (pixiWithSettings.settings && pixiWithSettings.ENV) {
+      pixiWithSettings.settings.PREFER_ENV = pixiWithSettings.ENV.WEBGL2;
+      if (pixiWithSettings.settings.RENDER_OPTIONS) {
+        pixiWithSettings.settings.RENDER_OPTIONS.hello = false;
       }
     }
   }
 
   async initialize(container: HTMLElement, width: number, height: number): Promise<void> {
     this.container = container;
-    
+
     // Clean up existing app if any
     if (this.app) {
       this.app.destroy(true);
@@ -90,8 +100,11 @@ export class WebGLRenderer {
       this.sprite.destroy();
     }
 
-    // Load texture
-    const texture = await (PIXI as any).Assets.load(imageUrl);
+    // Load texture (Assets API not in all PIXI type definitions)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const texture = await (
+      PIXI as unknown as { Assets: { load: (url: string) => Promise<PIXI.Texture> } }
+    ).Assets.load(imageUrl);
     this.sprite = new PIXI.Sprite(texture);
 
     // Scale sprite to fit canvas
@@ -109,7 +122,7 @@ export class WebGLRenderer {
     this.app.stage.addChild(this.sprite);
   }
 
-  applyEffect(effectName: string, params?: Record<string, any>): void {
+  applyEffect(effectName: string, params?: Record<string, unknown>): void {
     if (!this.sprite) return;
 
     const effect = this.effectsCache.get(effectName);
@@ -122,7 +135,7 @@ export class WebGLRenderer {
     if (params) {
       switch (effectName) {
         case 'blur':
-      (effect.filter as unknown as BlurFilter).blur = params.intensity || 5;
+          (effect.filter as unknown as BlurFilter).blur = params.intensity || 5;
           break;
         case 'brightness':
           (effect.filter as unknown as ColorMatrixFilter).brightness(params.value || 1, false);
@@ -174,10 +187,10 @@ export class WebGLRenderer {
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = canvas.width;
     exportCanvas.height = canvas.height;
-    
+
     const ctx = exportCanvas.getContext('2d');
     if (!ctx) throw new Error('Failed to get 2D context');
-    
+
     ctx.drawImage(canvas, 0, 0);
     return exportCanvas;
   }
@@ -193,7 +206,7 @@ export class WebGLRenderer {
 
   destroy(): void {
     this.clearEffects();
-    
+
     if (this.sprite) {
       this.sprite.destroy();
       this.sprite = null;
@@ -211,9 +224,20 @@ export class WebGLRenderer {
   // Check if an effect can be GPU accelerated
   static canAccelerate(effectName: string): boolean {
     const acceleratedEffects = [
-      'blur', 'brightness', 'contrast', 'saturation', 'hue',
-      'vintage', 'sepia', 'pixelate', 'rgbSplit', 'glitch',
-      'zoomBlur', 'radialBlur', 'motionBlur', 'tiltShift'
+      'blur',
+      'brightness',
+      'contrast',
+      'saturation',
+      'hue',
+      'vintage',
+      'sepia',
+      'pixelate',
+      'rgbSplit',
+      'glitch',
+      'zoomBlur',
+      'radialBlur',
+      'motionBlur',
+      'tiltShift',
     ];
     return acceleratedEffects.includes(effectName);
   }
@@ -234,4 +258,4 @@ export function destroyWebGLRenderer(): void {
     webGLRenderer.destroy();
     webGLRenderer = null;
   }
-} 
+}

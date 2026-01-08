@@ -1,9 +1,21 @@
 'use client';
 
-import React, { Suspense, useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import React, { Suspense, useRef, useState, useEffect } from 'react';
+import { Canvas, useFrame, useThree, RootState } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
+
+// Interface for texture-like objects (including fallback)
+interface TextureLike {
+  image?: { width: number; height: number };
+  needsUpdate?: boolean;
+}
+
+// Interface for mouse position from R3F
+interface MousePosition {
+  x: number;
+  y: number;
+}
 
 export interface ThreeDEffectsCanvasProps {
   /** Image data URL to use as texture */
@@ -39,58 +51,52 @@ const ImagePlane: React.FC<{
 }> = ({ imageUrl, effectType, depth, rotationSpeed, tiltIntensity }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  
+
   // Load texture with a safe fallback when mocked modules are absent
-  let texture: any;
+  let texture: TextureLike;
   try {
-    const textureLoader: any = (useTexture as unknown as ((url: string) => any)) ||
-      ((url: string) => ({ image: { width: 1, height: 1 }, needsUpdate: true }));
+    const textureLoader = useTexture as (url: string) => TextureLike;
     texture = textureLoader(imageUrl);
-  } catch (error) {
+  } catch {
     // Gracefully handle texture loading failures in tests/runtime
     texture = { image: { width: 1, height: 1 }, needsUpdate: true };
   }
-  
+
   // Get mouse position for parallax effects (safe in tests)
-  const mouseContext = typeof (useThree as unknown as any) === 'function'
-    ? (useThree as unknown as () => any)()
-    : { mouse: { x: 0, y: 0 } };
-  const { mouse } = mouseContext;
-  
+  let mouse: MousePosition = { x: 0, y: 0 };
+  try {
+    const threeState = useThree();
+    mouse = threeState.mouse as MousePosition;
+  } catch {
+    // Fallback for test environment
+  }
+
   // Performance throttling
   const lastFrameTimeRef = useRef(0);
   const frameThrottle = 1000 / 30; // Limit to 30fps for performance
 
-  // Animation loop with performance throttling (safe in test env)
-  const useFrameHook: any = typeof (useFrame as unknown as any) === 'function'
-    ? (useFrame as unknown as any)
-    : ((cb: any) => {
-        // In tests without R3F, simulate a single frame
-        useEffect(() => {
-          const state = { clock: { elapsedTime: 0 } } as any;
-          cb(state, 0.016);
-        }, []);
-      });
-  useFrameHook((state: any, delta: number) => {
+  // Animation loop with performance throttling
+  // useFrame is a React Three Fiber hook that runs on every frame
+  useFrame((state: RootState, delta: number) => {
     const now = state.clock.elapsedTime * 1000;
     if (now - lastFrameTimeRef.current < frameThrottle) return;
     lastFrameTimeRef.current = now;
-    
+
     if (!meshRef.current) return;
-    
+
     switch (effectType) {
       case '3dCube':
         // Continuous rotation
         meshRef.current.rotation.x += rotationSpeed * delta;
         meshRef.current.rotation.y += rotationSpeed * delta;
         break;
-        
+
       case '3dTilt':
         // Tilt based on mouse position (reduced sensitivity)
         meshRef.current.rotation.x = mouse.y * tiltIntensity * 0.5;
         meshRef.current.rotation.y = mouse.x * tiltIntensity * 0.5;
         break;
-        
+
       case '3dParallax':
         // Subtle parallax movement (reduced intensity)
         meshRef.current.position.x = mouse.x * tiltIntensity * 0.3;
@@ -98,18 +104,22 @@ const ImagePlane: React.FC<{
         meshRef.current.rotation.x = mouse.y * tiltIntensity * 0.2;
         meshRef.current.rotation.y = mouse.x * tiltIntensity * 0.2;
         break;
-        
+
       default:
         // 3dPlane - subtle hover effect
         if (hovered) {
-          meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, depth * 0.1, 0.05);
+          meshRef.current.position.z = THREE.MathUtils.lerp(
+            meshRef.current.position.z,
+            depth * 0.1,
+            0.05
+          );
         } else {
           meshRef.current.position.z = THREE.MathUtils.lerp(meshRef.current.position.z, 0, 0.05);
         }
         break;
     }
   });
-  
+
   // Calculate geometry based on effect type and texture aspect ratio
   const aspectRatio = texture.image ? texture.image.width / texture.image.height : 1;
   const geometry = React.useMemo(() => {
@@ -120,11 +130,11 @@ const ImagePlane: React.FC<{
         return new THREE.PlaneGeometry(4 * aspectRatio, 4);
     }
   }, [effectType, aspectRatio]);
-  
+
   // If R3F renderer is not active (tests), render a harmless placeholder div
-  const isR3F = typeof (Canvas as unknown as any) === 'function';
+  const isR3F = typeof Canvas === 'function';
   if (!isR3F) {
-    return <div data-testid="image-plane" /> as any;
+    return <div data-testid="image-plane" />;
   }
   return (
     <mesh
@@ -133,7 +143,7 @@ const ImagePlane: React.FC<{
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
-      {React.createElement('meshBasicMaterial' as any, { map: texture, transparent: true })}
+      <meshBasicMaterial map={texture as THREE.Texture} transparent={true} />
     </mesh>
   );
 };
@@ -158,11 +168,11 @@ const ThreeDEffectsCanvas: React.FC<ThreeDEffectsCanvasProps> = ({
   width = 800,
   height = 600,
   className = '',
-  zIndex = 10
+  zIndex = 10,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [webGLSupported, setWebGLSupported] = useState(true);
-  
+
   // Check WebGL support
   useEffect(() => {
     const canvas = document.createElement('canvas');
@@ -171,11 +181,11 @@ const ThreeDEffectsCanvas: React.FC<ThreeDEffectsCanvasProps> = ({
   }, []);
 
   // No delayed render in tests/runtime; render immediately when visible & has image
-  
+
   // Fallback for devices without WebGL support
   if (!webGLSupported) {
     return (
-      <div 
+      <div
         className={`flex items-center justify-center bg-gray-100 text-gray-600 ${className}`}
         style={{ width, height, zIndex }}
       >
@@ -186,87 +196,63 @@ const ThreeDEffectsCanvas: React.FC<ThreeDEffectsCanvasProps> = ({
       </div>
     );
   }
-  
+
   if (!visible || !imageUrl) {
     return (
-      <div 
+      <div
         className={`relative ${className}`}
         style={{ width, height, zIndex, background: 'transparent' }}
       />
     );
   }
-  
-  return (
-    <div 
-      className={`relative ${className}`}
-      style={{ width, height, zIndex }}
-    >
-      {(() => {
-        // Resolve safe fallbacks for R3F components in tests
-        const CanvasComponent: any = (Canvas as unknown as any) || (({ children, ...props }: any) => (
-          <div data-testid="r3f-canvas" data-props={JSON.stringify(props)}>{children}</div>
-        ));
-        const OrbitControlsComponent: any = (OrbitControls as unknown as any) || ((props: any) => (
-          <div data-testid="orbit-controls" data-props={JSON.stringify(props)} />
-        ));
-        const PerspectiveCameraComponent: any = (PerspectiveCamera as unknown as any) || ((props: any) => (
-          <div data-testid="perspective-camera" data-props={JSON.stringify(props)} />
-        ));
 
-        return (
-          <CanvasComponent
-            ref={canvasRef}
-            style={{ width: '100%', height: '100%' }}
-            camera={{ position: [0, 0, 5], fov: 75 }}
-            frameloop="demand"
-            gl={{ 
-              alpha: true, 
-              antialias: true,
-              powerPreference: 'high-performance',
-              stencil: false,
-              depth: true
-            }}
-            onCreated={({ gl }: any) => {
-              if (gl && typeof gl.setPixelRatio === 'function') {
-                gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-              }
-            }}
-          >
-            {/* Camera and controls */}
-            <PerspectiveCameraComponent makeDefault position={[0, 0, 5]} />
-            {controlsEnabled && (
-              <OrbitControlsComponent 
-                enableZoom={effectType === '3dCube'}
-                enablePan={false}
-                enableRotate={effectType === '3dCube'}
-                maxPolarAngle={Math.PI / 2}
-                minPolarAngle={Math.PI / 2}
-              />
-            )}
-            
-            {/* Lighting (only render when running with R3F) */}
-            {typeof (Canvas as unknown as any) === 'function' ? (
-              <>
-                {React.createElement('ambientLight' as any, { intensity: 0.8 })}
-                {React.createElement('directionalLight' as any, { position: [10, 10, 5], intensity: 0.5 })}
-              </>
-            ) : null}
-            
-            {/* 3D Image */}
-            <Suspense fallback={<LoadingPlaceholder />}>
-              <ImagePlane
-                imageUrl={imageUrl}
-                effectType={effectType}
-                depth={depth}
-                rotationSpeed={rotationSpeed}
-                tiltIntensity={tiltIntensity}
-              />
-            </Suspense>
-          </CanvasComponent>
-        );
-      })()}
+  return (
+    <div className={`relative ${className}`} style={{ width, height, zIndex }}>
+      <Canvas
+        ref={canvasRef}
+        style={{ width: '100%', height: '100%' }}
+        camera={{ position: [0, 0, 5], fov: 75 }}
+        frameloop="demand"
+        gl={{
+          alpha: true,
+          antialias: true,
+          powerPreference: 'high-performance',
+          stencil: false,
+          depth: true,
+        }}
+        onCreated={({ gl }) => {
+          gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        }}
+      >
+        {/* Camera and controls */}
+        <PerspectiveCamera makeDefault position={[0, 0, 5]} />
+        {controlsEnabled && (
+          <OrbitControls
+            enableZoom={effectType === '3dCube'}
+            enablePan={false}
+            enableRotate={effectType === '3dCube'}
+            maxPolarAngle={Math.PI / 2}
+            minPolarAngle={Math.PI / 2}
+          />
+        )}
+
+        {/* Lighting */}
+        <ambientLight intensity={0.8} />
+        <directionalLight position={[10, 10, 5]} intensity={0.5} />
+
+        {/* 3D Image */}
+        <Suspense fallback={<LoadingPlaceholder />}>
+          <ImagePlane
+            imageUrl={imageUrl}
+            effectType={effectType}
+            depth={depth}
+            rotationSpeed={rotationSpeed}
+            tiltIntensity={tiltIntensity}
+          />
+        </Suspense>
+      </Canvas>
     </div>
   );
 };
 
-export default ThreeDEffectsCanvas; 
+export default ThreeDEffectsCanvas;

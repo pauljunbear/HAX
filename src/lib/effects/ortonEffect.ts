@@ -8,7 +8,7 @@ import Konva from 'konva';
  * The result is a dreamy, glowing appearance popular in landscape photography
  */
 
-interface OrtonSettings {
+export interface OrtonSettings {
   intensity: number; // Overall effect intensity (0-1)
   blurRadius: number; // Blur amount for the glow layer (0-50)
   contrast: number; // Contrast boost for sharp layer (0-2)
