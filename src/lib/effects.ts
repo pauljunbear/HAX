@@ -1554,7 +1554,7 @@ const createUnifiedGlowEffect = (settings: Record<string, number>) => {
     const { data, width, height } = imageData;
     const preset = Math.floor(settings.preset ?? 0);
     const intensity = (settings.intensity ?? 50) / 100;
-    const radius = Math.max(1, Math.min(100, settings.radius ?? 20));
+    const radius = Math.max(1, Math.min(150, settings.radius ?? 20)); // Config allows up to 150
     const threshold = (settings.threshold ?? 50) / 100;
     const colorShift = (settings.colorShift ?? 0) / 100;
     const darkenBg = (settings.darkenBg ?? 0) / 100;
@@ -4152,6 +4152,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 100,
         defaultValue: 0,
         step: 0.5,
+        description: 'Adjusts overall lightness. Negative values darken, positive values brighten.',
       },
     ],
   },
@@ -4166,6 +4167,8 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 100,
         defaultValue: 0,
         step: 0.5,
+        description:
+          'Adjusts the difference between light and dark areas. Higher values increase punch.',
       },
     ],
   },
@@ -4180,6 +4183,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 100,
         defaultValue: 0,
         step: 0.5,
+        description: 'Controls color intensity. -100 removes all color, +100 maximizes vibrancy.',
       },
     ],
   },
@@ -4194,6 +4198,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 360,
         defaultValue: 0,
         step: 1,
+        description: 'Rotates all colors around the color wheel. 180° inverts warm/cool colors.',
       },
     ],
   },
@@ -4209,6 +4214,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.35,
         step: 0.05,
+        description: 'Removes atmospheric haze and fog for clearer, more vivid images.',
       },
     ],
   },
@@ -4223,6 +4229,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 360,
         defaultValue: 45,
         step: 1,
+        description: 'Direction of the simulated light source (0° = right, 90° = top).',
       },
       {
         id: 'strength',
@@ -4231,6 +4238,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.4,
         step: 0.05,
+        description: 'Intensity of the directional lighting effect.',
       },
       {
         id: 'ambient',
@@ -4239,6 +4247,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.2,
         step: 0.05,
+        description: 'Base light level in shadow areas.',
       },
     ],
   },
@@ -4426,6 +4435,8 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 10,
         defaultValue: 1,
         step: 0.5,
+        description:
+          'Strength of edge enhancement. Higher values increase detail but may add noise.',
       },
       {
         id: 'opacity',
@@ -4443,7 +4454,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
     label: 'Bokeh',
     category: 'Blur & Focus',
     settings: [
-      { id: 'radius', label: 'Blur Radius', min: 0, max: 30, defaultValue: 10, step: 1 },
+      {
+        id: 'radius',
+        label: 'Blur Radius',
+        min: 0,
+        max: 30,
+        defaultValue: 10,
+        step: 1,
+        description: 'Size of the out-of-focus blur area.',
+      },
       {
         id: 'threshold',
         label: 'Highlight Threshold',
@@ -4451,18 +4470,59 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 0.98,
         defaultValue: 0.78,
         step: 0.005,
+        description: 'Brightness level to create circular bokeh highlights.',
       },
-      { id: 'strength', label: 'Blur Mix', min: 0, max: 1, defaultValue: 0.65, step: 0.05 },
-      { id: 'highlights', label: 'Highlight Boost', min: 0, max: 2, defaultValue: 0.9, step: 0.05 },
+      {
+        id: 'strength',
+        label: 'Blur Mix',
+        min: 0,
+        max: 1,
+        defaultValue: 0.65,
+        step: 0.05,
+        description: 'How much of the bokeh blur to blend in.',
+      },
+      {
+        id: 'highlights',
+        label: 'Highlight Boost',
+        min: 0,
+        max: 2,
+        defaultValue: 0.9,
+        step: 0.05,
+        description: 'Intensity of the bright bokeh circles.',
+      },
     ],
   },
   depthBlur: {
     label: 'Depth Blur',
     category: 'Blur & Focus',
     settings: [
-      { id: 'focusY', label: 'Focus Y', min: 0, max: 1, defaultValue: 0.5, step: 0.01 },
-      { id: 'range', label: 'Focus Range', min: 0, max: 0.5, defaultValue: 0.18, step: 0.01 },
-      { id: 'radius', label: 'Max Blur', min: 0, max: 30, defaultValue: 14, step: 1 },
+      {
+        id: 'focusY',
+        label: 'Focus Y',
+        min: 0,
+        max: 1,
+        defaultValue: 0.5,
+        step: 0.01,
+        description: 'Vertical position of the in-focus plane (0=top, 1=bottom).',
+      },
+      {
+        id: 'range',
+        label: 'Focus Range',
+        min: 0,
+        max: 0.5,
+        defaultValue: 0.18,
+        step: 0.01,
+        description: 'Size of the sharp focus area.',
+      },
+      {
+        id: 'radius',
+        label: 'Max Blur',
+        min: 0,
+        max: 30,
+        defaultValue: 14,
+        step: 1,
+        description: 'Maximum blur strength at the edges of the image.',
+      },
     ],
   },
 
@@ -4478,6 +4538,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 128,
         defaultValue: 8,
         step: 1,
+        description: 'Size of each mosaic block in pixels. Larger = more abstract.',
       },
       {
         id: 'opacity',
@@ -4501,6 +4562,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 2,
         defaultValue: 0.2,
         step: 0.01,
+        description: 'Intensity of random grain. Use for film-like texture or gritty effects.',
       },
       {
         id: 'opacity',
@@ -4526,6 +4588,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.01,
+        description: 'Cutoff point for pure black/white. Creates high-contrast graphic look.',
       },
       {
         id: 'opacity',
@@ -4549,6 +4612,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 32,
         defaultValue: 4,
         step: 1,
+        description: 'Number of color levels. Fewer levels = more graphic, poster-like look.',
       },
       { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
@@ -7601,7 +7665,7 @@ const createChromaticGrainEffect = (settings: Record<string, number>) => {
 const createHalationGlowEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const radius = Math.max(1, Math.min(100, settings.radius ?? 8));
+    const radius = Math.max(1, Math.min(150, settings.radius ?? 8)); // Match unifiedGlow limit
     const strength = settings.strength ?? 0.6;
     const bias = settings.bias ?? 0.8;
 
