@@ -127,6 +127,23 @@ const lerp = (a: number, b: number, t: number): number => {
   return a + (b - a) * t;
 };
 
+// Helper to blend effect result with original based on opacity
+const applyOpacityBlend = (
+  data: Uint8ClampedArray,
+  original: Uint8ClampedArray,
+  opacity: number
+): void => {
+  if (opacity >= 1) return; // No blending needed
+  const blend = opacity;
+  const invBlend = 1 - blend;
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = Math.round(original[i] * invBlend + data[i] * blend);
+    data[i + 1] = Math.round(original[i + 1] * invBlend + data[i + 1] * blend);
+    data[i + 2] = Math.round(original[i + 2] * invBlend + data[i + 2] * blend);
+    // Alpha stays unchanged
+  }
+};
+
 /**
  * Get buffer from pool or create new one
  * Always use this instead of `new Uint8ClampedArray(size)`
@@ -151,16 +168,33 @@ const acquireBufferCopy = (source: Uint8ClampedArray): Uint8ClampedArray => {
   return buffer;
 };
 
-const createPosterizeFallback = (levels: number): KonvaFilterFunction => {
-  const normalizedLevels = clamp(Math.floor(levels), 2, 16);
+const createPosterizeFallback = (levels: number, opacity: number = 1): KonvaFilterFunction => {
+  const normalizedLevels = clamp(Math.floor(levels), 2, 32);
   const step = 255 / (normalizedLevels - 1);
 
   return imageData => {
     const { data } = imageData;
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = Math.round(Math.round(data[i] / step) * step);
-      data[i + 1] = Math.round(Math.round(data[i + 1] / step) * step);
-      data[i + 2] = Math.round(Math.round(data[i + 2] / step) * step);
+    const pool = getBufferPool();
+    const original = opacity < 1 ? pool.acquire(data.length) : null;
+
+    try {
+      if (original) {
+        original.set(data);
+      }
+
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.round(Math.round(data[i] / step) * step);
+        data[i + 1] = Math.round(Math.round(data[i + 1] / step) * step);
+        data[i + 2] = Math.round(Math.round(data[i + 2] / step) * step);
+      }
+
+      if (original) {
+        applyOpacityBlend(data, original, opacity);
+      }
+    } finally {
+      if (original) {
+        pool.release(original);
+      }
     }
   };
 };
@@ -382,7 +416,8 @@ export const applyEffect = async (
 
       case 'posterize': {
         const levels = settings.levels ?? 4;
-        return [createPosterizeFallback(levels), null];
+        const opacity = settings.opacity ?? 1;
+        return [createPosterizeFallback(levels, opacity), null];
       }
 
       case 'grayscale':
@@ -1009,12 +1044,15 @@ const createUnifiedSketchEffect = (settings: Record<string, number>) => {
     const density = (settings.density ?? 60) / 100;
     const contrast = (settings.contrast ?? 120) / 100;
     const invert = (settings.invert ?? 0) === 1;
+    const opacity = settings.opacity ?? 1;
 
     const pool = getBufferPool();
     const original = pool.acquire(data.length);
+    const originalForBlend = opacity < 1 ? pool.acquire(data.length) : null;
 
     try {
       original.set(data);
+      if (originalForBlend) originalForBlend.set(data);
 
       // Convert to grayscale first
       for (let i = 0; i < data.length; i += 4) {
@@ -1090,8 +1128,14 @@ const createUnifiedSketchEffect = (settings: Record<string, number>) => {
           data[idx] = data[idx + 1] = data[idx + 2] = value;
         }
       }
+
+      // Apply opacity blending with original
+      if (originalForBlend) {
+        applyOpacityBlend(data, originalForBlend, opacity);
+      }
     } finally {
       pool.release(original);
+      if (originalForBlend) pool.release(originalForBlend);
     }
   };
 };
@@ -1106,6 +1150,7 @@ const createHalftoneEffect = (settings: Record<string, number>) => {
     // Map 1-10 to more dramatic ranges: dotSize 2-20, spacing 4-30
     const dotSizeInput = settings.dotSize || 4;
     const spacingInput = settings.spacing || 5;
+    const opacity = settings.opacity ?? 1;
 
     const dotSize = Math.floor(2 + ((dotSizeInput - 1) / 9) * 18); // 2 to 20
     const spacing = Math.floor(4 + ((spacingInput - 1) / 14) * 26); // 4 to 30
@@ -1123,9 +1168,10 @@ const createHalftoneEffect = (settings: Record<string, number>) => {
     const cosAngle = Math.cos(angle);
     const sinAngle = Math.sin(angle);
 
-    // Store original data for color sampling and alpha preservation
+    // Store original data for color sampling, alpha preservation, and opacity blending
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
+    const originalForBlend = opacity < 1 ? new Uint8ClampedArray(data) : null;
 
     // Create an alpha mask canvas to track which pixels should be visible
     const alphaCanvas = document.createElement('canvas');
@@ -1219,6 +1265,11 @@ const createHalftoneEffect = (settings: Record<string, number>) => {
       }
       // Transparent pixels (originalAlpha === 0) are left unchanged
     }
+
+    // Apply opacity blending with original
+    if (originalForBlend) {
+      applyOpacityBlend(data, originalForBlend, opacity);
+    }
   };
 };
 
@@ -1234,6 +1285,7 @@ const createUnifiedPatternEffect = (settings: Record<string, number>) => {
     const density = (settings.density ?? 50) / 100;
     const angle = ((settings.angle ?? 45) * Math.PI) / 180;
     const colorMode = Math.floor(settings.colorMode ?? 0);
+    const opacity = settings.opacity ?? 1;
 
     const pool = getBufferPool();
     const original = pool.acquire(data.length);
@@ -1318,6 +1370,11 @@ const createUnifiedPatternEffect = (settings: Record<string, number>) => {
           }
           data[idx + 3] = alpha;
         }
+      }
+
+      // Apply opacity blending with original
+      if (opacity < 1) {
+        applyOpacityBlend(data, original, opacity);
       }
     } finally {
       pool.release(original);
@@ -1499,13 +1556,16 @@ const createUnifiedGlowEffect = (settings: Record<string, number>) => {
     const threshold = (settings.threshold ?? 50) / 100;
     const colorShift = (settings.colorShift ?? 0) / 100;
     const darkenBg = (settings.darkenBg ?? 0) / 100;
+    const opacity = settings.opacity ?? 1;
 
     const pool = getBufferPool();
     const original = pool.acquire(data.length);
     const glowLayer = pool.acquire(data.length);
+    const originalForBlend = opacity < 1 ? pool.acquire(data.length) : null;
 
     try {
       original.set(data);
+      if (originalForBlend) originalForBlend.set(data);
 
       // Threshold extraction varies by preset
       const thresholdValue = threshold * 255;
@@ -1588,9 +1648,15 @@ const createUnifiedGlowEffect = (settings: Record<string, number>) => {
         );
         data[i + 3] = original[i + 3];
       }
+
+      // Apply opacity blending with original
+      if (originalForBlend) {
+        applyOpacityBlend(data, originalForBlend, opacity);
+      }
     } finally {
       pool.release(original);
       pool.release(glowLayer);
+      if (originalForBlend) pool.release(originalForBlend);
     }
   };
 };
@@ -1599,6 +1665,7 @@ const createUnifiedGlowEffect = (settings: Record<string, number>) => {
 // Adapted from https://github.com/ogus/kuwahara
 const createKuwaharaEffect = (settings: Record<string, number>) => {
   const radius = Math.round(settings.radius || 5); // Radius for the filter kernel
+  const opacity = settings.opacity ?? 1;
 
   // Helper function to calculate mean and variance for a region
   const calculateMeanVariance = (
@@ -1709,6 +1776,11 @@ const createKuwaharaEffect = (settings: Record<string, number>) => {
         data[index + 1] = Math.round(bestMean.g);
         data[index + 2] = Math.round(bestMean.b);
       }
+    }
+
+    // Apply opacity blending with original (tempData contains original)
+    if (opacity < 1) {
+      applyOpacityBlend(data, tempData, opacity);
     }
   };
 };
@@ -2879,9 +2951,13 @@ const createUnifiedGlitchEffect = (settings: Record<string, number>) => {
     const direction = Math.floor(settings.direction ?? 0); // 0=horizontal, 1=vertical, 2=both
     const blockSize = Math.floor(settings.blockSize ?? 8);
     const randomness = settings.randomness ?? 0.5;
+    const opacity = settings.opacity ?? 1;
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
+
+    // Store original for opacity blending
+    const originalForBlend = opacity < 1 ? new Uint8ClampedArray(data) : null;
 
     switch (preset) {
       case 0: // RGB Shift
@@ -2905,6 +2981,11 @@ const createUnifiedGlitchEffect = (settings: Record<string, number>) => {
       case 6: // Pixel Sort
         applyPixelSort(data, width, height, intensity, direction);
         break;
+    }
+
+    // Apply opacity blending with original
+    if (originalForBlend) {
+      applyOpacityBlend(data, originalForBlend, opacity);
     }
   };
 };
@@ -3219,40 +3300,59 @@ const createUnifiedVintageEffect = (settings: Record<string, number>) => {
     const scratches = settings.scratches ?? 0;
     const fade = settings.fade ?? 0;
     const warmth = (settings.warmth ?? 0.5) - 0.5; // -0.5 to 0.5
+    const opacity = settings.opacity ?? 1;
 
-    // Apply base color transformation based on preset
-    switch (preset) {
-      case 0: // Sepia
-        applySepiaTone(data, intensity);
-        break;
-      case 1: // Old Photo
-        applyOldPhotoTone(data, intensity, fade);
-        break;
-      case 2: // Faded Film
-        applyFadedFilm(data, intensity, fade);
-        break;
-      case 3: // Cross Process
-        applyCrossProcess(data, intensity);
-        break;
-      case 4: // Scratched Film
-        applyScratchedFilm(data, width, height, intensity, scratches);
-        break;
-      case 5: // Instant/Polaroid
-        applyPolaroid(data, intensity, warmth);
-        break;
-    }
+    const pool = getBufferPool();
+    const original = opacity < 1 ? pool.acquire(data.length) : null;
 
-    // Apply common vintage effects
-    if (warmth !== 0) {
-      applyWarmth(data, warmth);
-    }
+    try {
+      if (original) {
+        original.set(data);
+      }
 
-    if (grain > 0) {
-      applyFilmGrain(data, grain);
-    }
+      // Apply base color transformation based on preset
+      switch (preset) {
+        case 0: // Sepia
+          applySepiaTone(data, intensity);
+          break;
+        case 1: // Old Photo
+          applyOldPhotoTone(data, intensity, fade);
+          break;
+        case 2: // Faded Film
+          applyFadedFilm(data, intensity, fade);
+          break;
+        case 3: // Cross Process
+          applyCrossProcess(data, intensity);
+          break;
+        case 4: // Scratched Film
+          applyScratchedFilm(data, width, height, intensity, scratches);
+          break;
+        case 5: // Instant/Polaroid
+          applyPolaroid(data, intensity, warmth);
+          break;
+      }
 
-    if (vignette > 0) {
-      applyVintageVignette(data, width, height, vignette);
+      // Apply common vintage effects
+      if (warmth !== 0) {
+        applyWarmth(data, warmth);
+      }
+
+      if (grain > 0) {
+        applyFilmGrain(data, grain);
+      }
+
+      if (vignette > 0) {
+        applyVintageVignette(data, width, height, vignette);
+      }
+
+      // Apply opacity blending with original
+      if (original) {
+        applyOpacityBlend(data, original, opacity);
+      }
+    } finally {
+      if (original) {
+        pool.release(original);
+      }
     }
   };
 };
@@ -3455,6 +3555,7 @@ const createUnifiedWarpEffect = (settings: Record<string, number>) => {
     const centerY = (settings.centerY ?? 0.5) * height;
     const segments = Math.floor(settings.segments ?? 6);
     const radius = (settings.radius ?? 0.5) * Math.min(width, height);
+    const opacity = settings.opacity ?? 1;
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
@@ -3493,6 +3594,11 @@ const createUnifiedWarpEffect = (settings: Record<string, number>) => {
       case 7: // Shatter
         applyShatterWarp(data, tempData, width, height, amount);
         break;
+    }
+
+    // Apply opacity blending with original (tempData contains original)
+    if (opacity < 1) {
+      applyOpacityBlend(data, tempData, opacity);
     }
   };
 };
@@ -3812,6 +3918,7 @@ const createUnifiedBlurEffect = (settings: Record<string, number>) => {
     const focusY = (settings.focusY ?? 0.5) * height;
     const focusSize = (settings.focusSize ?? 0.3) * Math.min(width, height);
     const angle = (settings.angle ?? 0) * (Math.PI / 180);
+    const opacity = settings.opacity ?? 1;
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
@@ -3832,6 +3939,11 @@ const createUnifiedBlurEffect = (settings: Record<string, number>) => {
       case 4: // Radial/Zoom
         applyRadialBlur(data, tempData, width, height, radius, focusX, focusY);
         break;
+    }
+
+    // Apply opacity blending with original (tempData contains original)
+    if (opacity < 1) {
+      applyOpacityBlend(data, tempData, opacity);
     }
   };
 };
@@ -4365,6 +4477,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 4,
         step: 1,
       },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
   pencilSketch: {
@@ -4394,6 +4507,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'density', label: 'Line Density (%)', min: 10, max: 100, defaultValue: 60, step: 5 },
       { id: 'contrast', label: 'Contrast (%)', min: 50, max: 200, defaultValue: 120, step: 10 },
       { id: 'invert', label: 'Invert (0=No, 1=Yes)', min: 0, max: 1, defaultValue: 0, step: 1 },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
   halftone: {
@@ -4403,6 +4517,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'dotSize', label: 'Dot Size', min: 1, max: 100, defaultValue: 5, step: 1 },
       { id: 'spacing', label: 'Spacing', min: 2, max: 100, defaultValue: 8, step: 1 },
       { id: 'angle', label: 'Angle', min: 0, max: 180, defaultValue: 45, step: 5 },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
   // UNIFIED PATTERN - Combines halftone, dotScreen, dithering, stippling
@@ -4429,6 +4544,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 0,
         step: 1,
       },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
   bloom: {
@@ -4465,6 +4581,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 0,
         step: 5,
       },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
 
@@ -4505,6 +4622,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
       },
       { id: 'blockSize', label: 'Block Size', min: 2, max: 32, defaultValue: 8, step: 1 },
       { id: 'randomness', label: 'Randomness', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
   unifiedVintage: {
@@ -4526,6 +4644,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'scratches', label: 'Scratches', min: 0, max: 1, defaultValue: 0, step: 0.05 },
       { id: 'fade', label: 'Fade', min: 0, max: 1, defaultValue: 0, step: 0.05 },
       { id: 'warmth', label: 'Warmth', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
   unifiedWarp: {
@@ -4563,6 +4682,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
       },
       { id: 'radius', label: 'Radius', min: 0.1, max: 1, defaultValue: 0.5, step: 0.05 },
       { id: 'frequency', label: 'Frequency (Wave)', min: 5, max: 50, defaultValue: 10, step: 1 },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
   unifiedBlur: {
@@ -4583,6 +4703,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'focusY', label: 'Focus Y', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
       { id: 'focusSize', label: 'Focus Size', min: 0.1, max: 1, defaultValue: 0.3, step: 0.05 },
       { id: 'angle', label: 'Angle (Motion)', min: 0, max: 360, defaultValue: 0, step: 15 },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
 
@@ -4592,6 +4713,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     settings: [
       { id: 'radius', label: 'Brush Size', min: 1, max: 10, defaultValue: 4, step: 1 },
       { id: 'intensity', label: 'Intensity', min: 0.1, max: 2.0, defaultValue: 1.0, step: 0.1 },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
   watercolor: {
@@ -4601,6 +4723,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
       { id: 'intensity', label: 'Wash', min: 0, max: 1, defaultValue: 0.7, step: 0.05 },
       { id: 'edges', label: 'Edge Ink', min: 0, max: 1, defaultValue: 0.35, step: 0.05 },
       { id: 'texture', label: 'Paper Texture', min: 0, max: 1, defaultValue: 0.25, step: 0.05 },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
   toon: {
@@ -4625,6 +4748,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 0.85,
         step: 0.05,
       },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
     ],
   },
   posterEdges: {
@@ -7431,9 +7555,10 @@ const createToonEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
     const smoothness = Math.max(0, Math.min(20, Math.round(settings.smoothness ?? 8)));
-    const levels = Math.max(2, Math.min(12, Math.floor(settings.levels ?? 6)));
+    const levels = Math.max(2, Math.min(64, Math.floor(settings.levels ?? 6)));
     const edgeThreshold = clamp(settings.edgeThreshold ?? 0.25, 0, 1);
     const edgeStrength = clamp(settings.edgeStrength ?? 0.85, 0, 1);
+    const opacity = settings.opacity ?? 1;
     const step = 255 / (levels - 1);
 
     const pool = getBufferPool();
@@ -7481,6 +7606,11 @@ const createToonEffect = (settings: Record<string, number>) => {
           data[i + 3] = a;
         }
       }
+
+      // Apply opacity blending with original
+      if (opacity < 1) {
+        applyOpacityBlend(data, original, opacity);
+      }
     } finally {
       pool.release(original);
       pool.release(blurred);
@@ -7494,6 +7624,7 @@ const createWatercolorEffect = (settings: Record<string, number>) => {
     const intensity = clamp(settings.intensity ?? 0.7, 0, 1);
     const edges = clamp(settings.edges ?? 0.35, 0, 1);
     const texture = clamp(settings.texture ?? 0.25, 0, 1);
+    const opacity = settings.opacity ?? 1;
 
     const radius = Math.round(2 + intensity * 8);
 
@@ -7542,6 +7673,11 @@ const createWatercolorEffect = (settings: Record<string, number>) => {
           data[i + 2] = clampByte(b);
           data[i + 3] = a;
         }
+      }
+
+      // Apply opacity blending with original
+      if (opacity < 1) {
+        applyOpacityBlend(data, original, opacity);
       }
     } finally {
       pool.release(original);
