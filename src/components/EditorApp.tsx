@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
 import { useAppStore } from '@/lib/store';
 import ImageEditor from '@/components/ImageEditor';
@@ -51,53 +51,56 @@ export default function EditorApp() {
     setIsReady(true);
   }, []);
 
-  const handleImageUpload = (file: File) => {
-    // Reset error state
-    setImageError(null);
-    setImageLoading(true);
+  const handleImageUpload = useCallback(
+    (file: File) => {
+      // Reset error state
+      setImageError(null);
+      setImageLoading(true);
 
-    // Reset active effect and clear history when a new image is uploaded
-    clearHistory({ activeEffect: null, effectSettings: {} });
-    clearEffectLayers();
+      // Reset active effect and clear history when a new image is uploaded
+      clearHistory({ activeEffect: null, effectSettings: {} });
+      clearEffectLayers();
 
-    const reader = new FileReader();
-    reader.onload = e => {
-      const imageDataUrl = e.target?.result as string;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const imageDataUrl = e.target?.result as string;
 
-      // Validate the image data
-      if (!imageDataUrl.startsWith('data:image/')) {
-        console.error('Invalid image data format:', imageDataUrl.substring(0, 50));
-        setImageError('Invalid image data format');
-        setImageLoading(false);
-        return;
-      }
+        // Validate the image data
+        if (!imageDataUrl.startsWith('data:image/')) {
+          console.error('Invalid image data format:', imageDataUrl.substring(0, 50));
+          setImageError('Invalid image data format');
+          setImageLoading(false);
+          return;
+        }
 
-      // Test load the image first
-      const testImage = new Image();
-      testImage.onload = () => {
-        setSelectedImage(imageDataUrl);
+        // Test load the image first
+        const testImage = new Image();
+        testImage.onload = () => {
+          setSelectedImage(imageDataUrl);
+          setImageLoading(false);
+        };
+
+        testImage.onerror = error => {
+          console.error('Failed to load test image in Home component:', error);
+          setImageError('Failed to load image. Please try another file.');
+          setImageLoading(false);
+        };
+
+        // Set the source to trigger loading
+        testImage.src = imageDataUrl;
+      };
+
+      reader.onerror = () => {
+        setImageError('Failed to read file. Please try another file.');
         setImageLoading(false);
       };
 
-      testImage.onerror = error => {
-        console.error('Failed to load test image in Home component:', error);
-        setImageError('Failed to load image. Please try another file.');
-        setImageLoading(false);
-      };
+      reader.readAsDataURL(file);
+    },
+    [clearHistory, clearEffectLayers, setSelectedImage]
+  );
 
-      // Set the source to trigger loading
-      testImage.src = imageDataUrl;
-    };
-
-    reader.onerror = () => {
-      setImageError('Failed to read file. Please try another file.');
-      setImageLoading(false);
-    };
-
-    reader.readAsDataURL(file);
-  };
-
-  const handleImageSelect = () => {
+  const handleImageSelect = useCallback(() => {
     // This will be called by the AppleStyleLayout
     const input = document.createElement('input');
     input.type = 'file';
@@ -109,25 +112,31 @@ export default function EditorApp() {
       }
     };
     input.click();
-  };
+  }, [handleImageUpload]);
 
-  const handleEffectChange = (effectName: string | null) => {
-    if (effectName) {
-      // Add as a new effect layer
-      addEffectLayer(effectName);
-    } else if (activeEffectLayerId) {
-      // Remove the active layer
-      removeEffectLayer(activeEffectLayerId);
-    }
-  };
+  const handleEffectChange = useCallback(
+    (effectName: string | null) => {
+      if (effectName) {
+        // Add as a new effect layer
+        addEffectLayer(effectName);
+      } else if (activeEffectLayerId) {
+        // Remove the active layer
+        removeEffectLayer(activeEffectLayerId);
+      }
+    },
+    [addEffectLayer, removeEffectLayer, activeEffectLayerId]
+  );
 
-  const handleSettingChange = (settingName: string, value: number) => {
-    if (activeEffectLayerId) {
-      updateLayerSettings(activeEffectLayerId, settingName, value);
-    }
-  };
+  const handleSettingChange = useCallback(
+    (settingName: string, value: number) => {
+      if (activeEffectLayerId) {
+        updateLayerSettings(activeEffectLayerId, settingName, value);
+      }
+    },
+    [activeEffectLayerId, updateLayerSettings]
+  );
 
-  const handleResetSettings = () => {
+  const handleResetSettings = useCallback(() => {
     if (!activeEffectLayerId || !activeEffectLayer) {
       return;
     }
@@ -144,24 +153,42 @@ export default function EditorApp() {
     Object.entries(defaultSettings).forEach(([key, value]) => {
       updateLayerSettings(activeEffectLayerId, key, value as number);
     });
-  };
+  }, [activeEffectLayerId, activeEffectLayer, effectLayers, updateLayerSettings]);
 
-  const handleClearAllEffects = () => {
+  const handleClearAllEffects = useCallback(() => {
     clearEffectLayers();
-  };
+  }, [clearEffectLayers]);
 
-  const handleRemoveEffect = (layerId: string) => {
-    removeEffectLayer(layerId);
-  };
+  const handleRemoveEffect = useCallback(
+    (layerId: string) => {
+      removeEffectLayer(layerId);
+    },
+    [removeEffectLayer]
+  );
 
-  const handleToggleLayerVisibility = (layerId: string) => {
-    // This assumes your useEffectLayers hook has a function like toggleLayerVisibility
-    // If not, you'll need to implement it. For now, let's add it to the hook.
-    const layer = effectLayers.find(l => l.id === layerId);
-    if (layer) {
-      updateLayer(layerId, { ...layer, visible: !layer.visible });
+  const handleToggleLayerVisibility = useCallback(
+    (layerId: string) => {
+      // This assumes your useEffectLayers hook has a function like toggleLayerVisibility
+      // If not, you'll need to implement it. For now, let's add it to the hook.
+      const layer = effectLayers.find(l => l.id === layerId);
+      if (layer) {
+        updateLayer(layerId, { ...layer, visible: !layer.visible });
+      }
+    },
+    [effectLayers, updateLayer]
+  );
+
+  const handleExport = useCallback((format: string) => {
+    if (!imageEditorRef.current) {
+      return;
     }
-  };
+
+    try {
+      imageEditorRef.current.exportImage(format);
+    } catch (error) {
+      console.error('exportImage failed', error);
+    }
+  }, []);
 
   if (!isReady) {
     return null; // Or a very minimal loader
@@ -198,17 +225,7 @@ export default function EditorApp() {
             onSetActiveLayer={setActiveEffectLayer}
             onToggleLayerVisibility={handleToggleLayerVisibility}
             onReorderLayers={reorderLayers}
-            onExport={format => {
-              if (!imageEditorRef.current) {
-                return;
-              }
-
-              try {
-                imageEditorRef.current.exportImage(format);
-              } catch (error) {
-                console.error('exportImage failed', error);
-              }
-            }}
+            onExport={handleExport}
           >
             <div id="main-content" className="w-full h-full">
               {imageLoading ? (
