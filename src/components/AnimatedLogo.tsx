@@ -2,9 +2,28 @@
 
 import React, { useEffect, useRef } from 'react';
 
+// Interface for Unicorn Studio scene
+interface UnicornScene {
+  destroy: () => void;
+}
+
+// Interface for Unicorn Studio SDK
+interface UnicornStudioSDK {
+  addScene: (options: {
+    elementId: string;
+    fps: number;
+    scale: number;
+    dpi: number;
+    filePath: string;
+    lazyLoad: boolean;
+    altText: string;
+    ariaLabel: string;
+  }) => Promise<UnicornScene>;
+}
+
 declare global {
   interface Window {
-    UnicornStudio: any;
+    UnicornStudio?: UnicornStudioSDK;
   }
 }
 
@@ -14,7 +33,7 @@ interface AnimatedLogoProps {
 
 const AnimatedLogo: React.FC<AnimatedLogoProps> = ({ className = '' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<any>(null);
+  const sceneRef = useRef<UnicornScene | null>(null);
 
   useEffect(() => {
     // Load Unicorn Studio SDK
@@ -36,10 +55,10 @@ const AnimatedLogo: React.FC<AnimatedLogoProps> = ({ className = '' }) => {
           altText: 'HAX animated background',
           ariaLabel: 'Animated background for HAX',
         })
-          .then((scene: any) => {
+          .then((scene: UnicornScene) => {
             sceneRef.current = scene;
           })
-          .catch((err: any) => {
+          .catch((err: unknown) => {
             console.error('Failed to load Unicorn Studio scene:', err);
           });
       }

@@ -20,6 +20,7 @@ export interface EffectSetting {
 export interface EffectConfig {
   label: string;
   category: string;
+  description?: string;
   settings?: EffectSetting[];
 }
 

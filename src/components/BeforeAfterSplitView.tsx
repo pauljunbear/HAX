@@ -24,7 +24,7 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
   width = 800,
   height = 600,
   isActive = true,
-  onClose
+  onClose,
 }) => {
   const [dividerPosition, setDividerPosition] = useState(initialPosition); // Percentage
   const [isDragging, setIsDragging] = useState(false);
@@ -35,13 +35,13 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
   // Draw the before image on canvas (supports src string or HTMLImageElement)
   useEffect(() => {
     if (!beforeImage || !beforeCanvasRef.current) return;
-    
+
     const ctx = beforeCanvasRef.current.getContext('2d');
     if (!ctx) return;
-    
+
     beforeCanvasRef.current.width = width;
     beforeCanvasRef.current.height = height;
-    
+
     ctx.clearRect(0, 0, width, height);
     if (typeof beforeImage === 'string') {
       const img = new Image();
@@ -59,13 +59,13 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
   // Copy the after image/canvas content
   useEffect(() => {
     if (!afterImage || !afterCanvasRef.current) return;
-    
+
     const ctx = afterCanvasRef.current.getContext('2d');
     if (!ctx) return;
-    
+
     afterCanvasRef.current.width = width;
     afterCanvasRef.current.height = height;
-    
+
     ctx.clearRect(0, 0, width, height);
     if (typeof afterImage === 'string') {
       const img = new Image();
@@ -84,28 +84,36 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
     setIsDragging(true);
   }, []);
 
-  const handleMouseMove = useCallback((e: MouseEvent | TouchEvent) => {
-    if (!isDragging || !containerRef.current) return;
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    let clientX: number;
-    
-    if ('touches' in e) {
-      clientX = e.touches[0].clientX;
-    } else {
-      clientX = e.clientX;
-    }
-    
-    const x = clientX - rect.left;
-    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
-    setDividerPosition(percentage);
-    onPositionChange?.(percentage);
-  }, [isDragging]);
+  const handleMouseMove = useCallback(
+    (e: MouseEvent | TouchEvent) => {
+      if (!isDragging || !containerRef.current) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      let clientX: number;
+
+      if ('touches' in e) {
+        clientX = e.touches[0].clientX;
+      } else {
+        clientX = e.clientX;
+      }
+
+      const x = clientX - rect.left;
+      const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+      setDividerPosition(percentage);
+      onPositionChange?.(percentage);
+    },
+    [isDragging]
+  );
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-    if (navigator && 'vibrate' in navigator) {
-      try { (navigator as any).vibrate(10); } catch {}
+    // Haptic feedback on touch devices
+    if ('vibrate' in navigator) {
+      try {
+        navigator.vibrate(10);
+      } catch {
+        // Vibration not supported
+      }
     }
   }, []);
 
@@ -115,7 +123,7 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
       document.addEventListener('mouseup', handleMouseUp);
       document.addEventListener('touchmove', handleMouseMove);
       document.addEventListener('touchend', handleMouseUp);
-      
+
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
@@ -128,7 +136,7 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
   // Keyboard controls
   useEffect(() => {
     if (!isActive) return;
-    
+
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
         setDividerPosition(prev => {
@@ -146,7 +154,7 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
         onClose();
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [isActive, onClose]);
@@ -159,7 +167,7 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="absolute inset-0 bg-black/80 z-40 flex items-center justify-center"
-      onClick={(e) => {
+      onClick={e => {
         if (e.target === e.currentTarget && onClose) {
           onClose();
         }
@@ -174,17 +182,22 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
             aria-label="Close split view"
           >
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         )}
-        
+
         {/* Labels */}
         <div className="absolute top-0 left-0 right-0 flex justify-between px-4 -mt-8 text-white text-sm font-medium">
           <span className="bg-black/50 px-3 py-1 rounded">Original</span>
           <span className="bg-black/50 px-3 py-1 rounded">Edited</span>
         </div>
-        
+
         {/* Container */}
         <div
           ref={containerRef}
@@ -205,12 +218,12 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
             className="absolute inset-0"
             style={{ width: '100%', height: '100%' }}
           />
-          
+
           {/* After image with clip */}
           <div
             className="absolute inset-0"
             style={{
-              clipPath: `polygon(${dividerPosition}% 0, 100% 0, 100% 100%, ${dividerPosition}% 100%)`
+              clipPath: `polygon(${dividerPosition}% 0, 100% 0, 100% 100%, ${dividerPosition}% 100%)`,
             }}
           >
             <img
@@ -226,7 +239,7 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
               style={{ width: '100%', height: '100%' }}
             />
           </div>
-          
+
           {/* Divider line */}
           <div
             className="absolute top-0 bottom-0 w-1 bg-white shadow-lg cursor-ew-resize"
@@ -238,21 +251,29 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
             {/* Handle */}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
               <div className="bg-white rounded-full p-2 shadow-lg">
-                <svg className="w-4 h-4 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                <svg
+                  className="w-4 h-4 text-gray-800"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 9l4-4 4 4m0 6l-4 4-4-4"
+                  />
                 </svg>
               </div>
             </div>
           </div>
         </div>
-        
+
         {/* Instructions */}
         <div className="absolute bottom-0 left-0 right-0 text-center text-white text-xs -mb-8">
-          <span className="bg-black/50 px-3 py-1 rounded">
-            Drag the divider or use arrow keys
-          </span>
+          <span className="bg-black/50 px-3 py-1 rounded">Drag the divider or use arrow keys</span>
         </div>
       </div>
     </motion.div>
   );
-}; 
+};

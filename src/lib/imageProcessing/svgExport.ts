@@ -78,10 +78,8 @@ export function exportAsEmbeddedSVG(
   }
 
   const dataURL = imageDataToDataURL(processedImage);
-  
-  const dimensionAttrs = includeDimensions 
-    ? `width="${width}" height="${height}"` 
-    : '';
+
+  const dimensionAttrs = includeDimensions ? `width="${width}" height="${height}"` : '';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
@@ -118,9 +116,10 @@ export function exportAsTracedSVG(
   const { width, height, data } = processedImage;
 
   // Determine colors to trace
-  const colors = colorMode === 'color' 
-    ? extractDominantColors(processedImage, 8)
-    : [colorMode === 'white' ? '#FFFFFF' : '#000000'];
+  const colors =
+    colorMode === 'color'
+      ? extractDominantColors(processedImage, 8)
+      : [colorMode === 'white' ? '#FFFFFF' : '#000000'];
 
   // Convert to grayscale for tracing
   const grayscale = new Uint8Array(width * height);
@@ -130,7 +129,7 @@ export function exportAsTracedSVG(
     const g = data[idx + 1];
     const b = data[idx + 2];
     const a = data[idx + 3];
-    
+
     // Skip fully transparent pixels
     if (a < 128) {
       grayscale[i] = 255; // Treat as background
@@ -143,7 +142,7 @@ export function exportAsTracedSVG(
   const paths = traceContours(grayscale, width, height, threshold);
 
   // Simplify paths if requested
-  const simplifiedPaths = optimize 
+  const simplifiedPaths = optimize
     ? paths.map(path => simplifyPath(path, simplifyTolerance * 2))
     : paths;
 
@@ -157,9 +156,7 @@ export function exportAsTracedSVG(
     })
     .join('\n');
 
-  const dimensionAttrs = includeDimensions 
-    ? `width="${width}" height="${height}"` 
-    : '';
+  const dimensionAttrs = includeDimensions ? `width="${width}" height="${height}"` : '';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" ${dimensionAttrs}>
@@ -189,15 +186,19 @@ function traceContours(
   for (let y = 0; y < height - 1; y++) {
     for (let x = 0; x < width - 1; x++) {
       const idx = y * width + x;
-      
+
       // Look for edge transitions
       if (binary[idx] === 1 && !visited[idx]) {
         // Check if this is a border pixel
-        const hasBackground = 
-          (x === 0 || binary[idx - 1] === 0) ||
-          (x === width - 1 || binary[idx + 1] === 0) ||
-          (y === 0 || binary[idx - width] === 0) ||
-          (y === height - 1 || binary[idx + width] === 0);
+        const hasBackground =
+          x === 0 ||
+          binary[idx - 1] === 0 ||
+          x === width - 1 ||
+          binary[idx + 1] === 0 ||
+          y === 0 ||
+          binary[idx - width] === 0 ||
+          y === height - 1 ||
+          binary[idx + width] === 0;
 
         if (hasBackground) {
           const contour = traceContour(binary, width, height, x, y, visited);
@@ -225,8 +226,14 @@ function traceContour(
 ): number[] {
   const contour: number[] = [];
   const directions = [
-    [1, 0], [1, 1], [0, 1], [-1, 1],
-    [-1, 0], [-1, -1], [0, -1], [1, -1]
+    [1, 0],
+    [1, 1],
+    [0, 1],
+    [-1, 1],
+    [-1, 0],
+    [-1, -1],
+    [0, -1],
+    [1, -1],
   ];
 
   let x = startX;
@@ -251,11 +258,15 @@ function traceContour(
         const nidx = ny * width + nx;
         if (binary[nidx] === 1) {
           // Check if it's still a border pixel
-          const hasBackground = 
-            (nx === 0 || binary[nidx - 1] === 0) ||
-            (nx === width - 1 || binary[nidx + 1] === 0) ||
-            (ny === 0 || binary[nidx - width] === 0) ||
-            (ny === height - 1 || binary[nidx + width] === 0);
+          const hasBackground =
+            nx === 0 ||
+            binary[nidx - 1] === 0 ||
+            nx === width - 1 ||
+            binary[nidx + 1] === 0 ||
+            ny === 0 ||
+            binary[nidx - width] === 0 ||
+            ny === height - 1 ||
+            binary[nidx + width] === 0;
 
           if (hasBackground) {
             x = nx;
@@ -287,18 +298,25 @@ function simplifyPath(points: number[], tolerance: number): number[] {
   if (points.length <= 4) return points;
 
   const sqTolerance = tolerance * tolerance;
-  
+
   function getSqDist(p1x: number, p1y: number, p2x: number, p2y: number): number {
     const dx = p1x - p2x;
     const dy = p1y - p2y;
     return dx * dx + dy * dy;
   }
 
-  function getSqSegDist(px: number, py: number, p1x: number, p1y: number, p2x: number, p2y: number): number {
+  function getSqSegDist(
+    px: number,
+    py: number,
+    p1x: number,
+    p1y: number,
+    p2x: number,
+    p2y: number
+  ): number {
     let x = p1x;
     let y = p1y;
-    let dx = p2x - p1x;
-    let dy = p2y - p1y;
+    const dx = p2x - p1x;
+    const dy = p2y - p1y;
 
     if (dx !== 0 || dy !== 0) {
       const t = ((px - p1x) * dx + (py - p1y) * dy) / (dx * dx + dy * dy);
@@ -327,9 +345,12 @@ function simplifyPath(points: number[], tolerance: number): number[] {
 
     for (let i = first + 2; i < last; i += 2) {
       const sqDist = getSqSegDist(
-        points[i], points[i + 1],
-        points[first], points[first + 1],
-        points[last], points[last + 1]
+        points[i],
+        points[i + 1],
+        points[first],
+        points[first + 1],
+        points[last],
+        points[last + 1]
       );
 
       if (sqDist > maxSqDist) {
@@ -360,11 +381,11 @@ function pathToSVGPath(points: number[]): string {
   if (points.length < 2) return '';
 
   let d = `M${points[0]},${points[1]}`;
-  
+
   for (let i = 2; i < points.length; i += 2) {
     d += `L${points[i]},${points[i + 1]}`;
   }
-  
+
   d += 'Z';
   return d;
 }
@@ -378,7 +399,7 @@ function extractDominantColors(imageData: ImageData, maxColors: number): string[
 
   // Sample pixels (skip some for performance)
   const step = Math.max(1, Math.floor(data.length / 4 / 10000));
-  
+
   for (let i = 0; i < data.length; i += step * 4) {
     const r = data[i];
     const g = data[i + 1];
@@ -413,14 +434,14 @@ function extractDominantColors(imageData: ImageData, maxColors: number): string[
 export function downloadSVG(svgContent: string, filename: string = 'export.svg'): void {
   const blob = new Blob([svgContent], { type: 'image/svg+xml' });
   const url = URL.createObjectURL(blob);
-  
+
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  
+
   URL.revokeObjectURL(url);
 }
 
@@ -433,7 +454,7 @@ export async function copySVGToClipboard(svgContent: string): Promise<boolean> {
     return true;
   } catch (err) {
     console.error('Failed to copy SVG to clipboard:', err);
-    
+
     // Fallback for older browsers
     try {
       const textarea = document.createElement('textarea');
@@ -479,9 +500,10 @@ export function exportToSVG(
     }
   }
 
-  const svg = type === 'traced'
-    ? exportAsTracedSVG(imageData, mask, options)
-    : exportAsEmbeddedSVG(imageData, mask, options);
+  const svg =
+    type === 'traced'
+      ? exportAsTracedSVG(imageData, mask, options)
+      : exportAsEmbeddedSVG(imageData, mask, options);
 
   return { svg, width, height, type };
 }

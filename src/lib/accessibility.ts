@@ -8,29 +8,29 @@ export const ARIA_LABELS = {
   mainNav: 'Main navigation',
   skipToContent: 'Skip to main content',
   mobileMenuToggle: 'Toggle mobile menu',
-  
+
   // Image Editor
   uploadImage: 'Upload an image to edit',
   imageCanvas: 'Image editing canvas',
   dropZone: 'Drop zone for image upload',
   exportImage: 'Export edited image',
-  
+
   // Controls
   effectsPanel: 'Effects control panel',
   effectCategory: (category: string) => `${category} effects category`,
   effectButton: (effectName: string) => `Apply ${effectName} effect`,
   slider: (paramName: string) => `Adjust ${paramName}`,
-  
+
   // Layer controls
   layersList: 'Effect layers list',
   toggleLayer: (layerName: string) => `Toggle ${layerName} layer visibility`,
   deleteLayer: (layerName: string) => `Delete ${layerName} layer`,
   reorderLayer: 'Reorder layer, use arrow keys to move',
-  
+
   // Dialogs
   exportDialog: 'Export options dialog',
   closeDialog: 'Close dialog',
-  
+
   // Status
   loading: 'Loading',
   processing: 'Processing image',
@@ -44,7 +44,7 @@ export const KEYBOARD_SHORTCUTS = {
   escape: 'Escape',
   enter: 'Enter',
   space: ' ',
-  
+
   // Navigation
   tab: 'Tab',
   shiftTab: 'Shift+Tab',
@@ -52,7 +52,7 @@ export const KEYBOARD_SHORTCUTS = {
   arrowDown: 'ArrowDown',
   arrowLeft: 'ArrowLeft',
   arrowRight: 'ArrowRight',
-  
+
   // Actions
   ctrlZ: 'Control+z',
   ctrlY: 'Control+y',
@@ -100,27 +100,35 @@ export const announce = (message: string, priority: 'polite' | 'assertive' = 'po
   announcement.setAttribute('aria-live', priority);
   announcement.classList.add('sr-only');
   announcement.textContent = message;
-  
+
   document.body.appendChild(announcement);
-  
+
   setTimeout(() => {
     document.body.removeChild(announcement);
   }, 1000);
 };
 
 // Focus visible utility class
-export const focusRingClass = 'focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 focus:ring-offset-dark-bg';
+export const focusRingClass =
+  'focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 focus:ring-offset-dark-bg';
 
-// Color contrast checker
-export const meetsContrastRatio = (foreground: string, background: string, ratio: number = 4.5): boolean => {
+// Color contrast checker (placeholder - parameters reserved for future implementation)
+export const meetsContrastRatio = (
+  _foreground: string,
+  _background: string,
+  _ratio = 4.5
+): boolean => {
   // Simple implementation - in production, use a proper library
   // This is a placeholder that always returns true
+  void _foreground;
+  void _background;
+  void _ratio;
   return true;
 };
 
 // Keyboard navigation hook
-export const useKeyboardNavigation = (
-  items: any[],
+export const useKeyboardNavigation = <T>(
+  items: T[],
   onSelect: (index: number) => void,
   orientation: 'horizontal' | 'vertical' = 'vertical'
 ) => {
@@ -174,4 +182,4 @@ export const useKeyboardNavigation = (
   };
 
   return { handleKeyDown };
-}; 
+};

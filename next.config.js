@@ -29,8 +29,7 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   eslint: {
-    // TODO: Enable after fixing ~200 `any` types in Phase 5
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   distDir: '.next',
   // Headers required for ffmpeg-wasm (SharedArrayBuffer support)

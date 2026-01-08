@@ -2,6 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { applyEffect, getEffectSettings } from '@/lib/effects';
 import Konva from 'konva';
 
+// Extended Konva.Image type to support dynamic filter parameter methods
+interface KonvaImageWithDynamicMethods extends Konva.Image {
+  [key: string]: unknown;
+}
+
 interface PreviewState {
   isLoading: boolean;
   error: string | null;
@@ -79,9 +84,10 @@ export const useEffectPreview = (
 
               // Apply filter parameters if any
               if (filterParams) {
+                const konvaImage = konvaImageRef.current as KonvaImageWithDynamicMethods;
                 for (const [key, value] of Object.entries(filterParams)) {
-                  if (typeof (konvaImageRef.current as any)[key] === 'function') {
-                    (konvaImageRef.current as any)[key](value);
+                  if (typeof konvaImage[key] === 'function') {
+                    (konvaImage[key] as (value: unknown) => void)(value);
                   }
                 }
               }
