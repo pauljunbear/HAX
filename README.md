@@ -1,107 +1,46 @@
 # imHAX
 
-A modern web-based image editing playground built with Next.js, React, and Tailwind CSS. imHAX lets you apply fun, real-time artistic effects and filters to your images.
+A powerful browser-based image editor with 100+ real-time effects. Built with Next.js, Konva.js, and Tailwind CSS. All processing happens client-side - your images never leave your browser.
 
 ## Features
 
-- **Modern UI**: Clean, intuitive interface with a left sidebar for controls and main canvas area
-- **Image Upload**: Easily upload images to edit
-- **Real-time Effects**: Apply various effects to your images including:
-  - Brightness, contrast, and saturation adjustments
-  - Duotone effects
-  - Dithering and halftone processing
-  - Blur, sharpen, and pixelate filters
-  - Noise and texture generators
-- **Export**: Download your edited images
+**Effect Studios** - Preset-based effects with multiple variations:
 
-## Getting Started
+- Blur (Gaussian, Bokeh, Tilt-Shift, Motion, Radial)
+- Glow (Bloom, Dreamy, Neon, Bioluminescence, Halation)
+- Sketch (Pencil, Crosshatch, Etched, Ink Wash, Bold Outline)
+- Glitch (RGB Shift, Chromatic, Scanlines, VHS, Databend, Pixel Sort)
+- Vintage (Sepia, Old Photo, Faded, Cross Process, Polaroid)
+- Warp (Pixelate, Swirl, Kaleidoscope, Fisheye, Spherize, Wave)
+- Print (Risograph, Newsprint, Linocut, Screen Print, Letterpress)
+- Film (Portra 400, Cinestill 800T, Kodak Gold, Fuji Pro 400H, Ilford HP5, Kodachrome)
+- Dithering (Floyd-Steinberg, Atkinson, Ordered, Retro Palettes)
 
-### Prerequisites
+**Special FX** - Y2K Chrome, Broken Glass, Frosted Glass, Double Exposure, Liquid Metal, Anaglyph 3D, ASCII Art, and more
 
-- Node.js 16.x or higher
-- npm or yarn
+**Adjustments** - Brightness, Contrast, Saturation, Hue, Color Temperature, Dehaze, Relight
 
-### Installation
+**Color** - Tone Curves, Gradient Maps, Cinematic LUTs, Selective Color, Heatmap, Thermal
 
-1. Clone the repository:
+**Texture** - Noise, Fractal, Grain, Paper Relief, Weave, Topographic, Cellular, Voronoi
 
-```
-git clone https://github.com/yourusername/imhax.git
-cd imhax
-```
+## Quick Start
 
-2. Install dependencies:
-
-```
+```bash
 npm install
-# or
-yarn install
-```
-
-3. Start the development server:
-
-```
 npm run dev
-# or
-yarn dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+Open [http://localhost:3000](http://localhost:3000)
 
-## Troubleshooting
+## Tech Stack
 
-### Images Not Displaying
-
-If uploaded images aren't displaying in the editor:
-
-1. Check your browser console for any errors
-2. Try resizing your browser window which can trigger a redraw
-3. Ensure the image is a valid format (JPG, PNG) and under 10MB
-
-### Build Errors
-
-If you encounter build errors:
-
-1. Make sure you have the correct Node.js version installed
-2. Clear Next.js cache with `npm run clean` or `rm -rf .next`
-3. Reinstall dependencies with `npm install`
-
-### Directory Structure Issues
-
-If you see errors about missing directories or routing problems:
-
-1. Ensure that both `/app` and `/src/app` directories exist
-2. Check that all routes are properly set up
-3. Make sure `next.config.js` has the experimental `appDir` option enabled
-
-## Project Structure
-
-```
-imhax/
-├── app/               # Next.js App Router core (root routes)
-├── src/
-│   ├── app/           # Main application code
-│   ├── components/    # React components
-│   ├── hooks/         # Custom React hooks
-│   ├── lib/           # Utilities and helper functions
-│   └── styles/        # CSS styles
-├── public/            # Static assets
-└── ...                # Config files
-```
-
-## Technologies Used
-
-- **Next.js**: React framework for production
-- **React**: UI library
-- **Konva.js**: Canvas manipulation
-- **Tailwind CSS**: Utility-first CSS framework
+- **Next.js 14** - React framework
+- **Konva.js** - Canvas rendering
+- **Tailwind CSS** - Styling
+- **Zustand** - State management
+- **Framer Motion** - Animations
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Built with [Next.js](https://nextjs.org/)
-- UI styled with [Tailwind CSS](https://tailwindcss.com/)
-- Canvas powered by [Konva.js](https://konvajs.org/)
+MIT
