@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig, getEffectCategory } from '@/lib/effects';
-import { Layers, FileImage, Film, Monitor, X, Plus } from 'lucide-react';
+import { Layers, FileImage, Film, Monitor, X, Plus, ChevronDown } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -18,6 +18,263 @@ const PRESET_GRADIENTS = [
   { from: 'from-lime-500', to: 'to-green-500' },
   { from: 'from-fuchsia-500', to: 'to-purple-500' },
 ];
+
+// Group labels and icons for parameter grouping
+const GROUP_CONFIG: Record<string, { label: string; defaultOpen: boolean }> = {
+  style: { label: 'Style', defaultOpen: true },
+  intensity: { label: 'Intensity', defaultOpen: true },
+  position: { label: 'Position', defaultOpen: false },
+  focus: { label: 'Focus', defaultOpen: false },
+  pattern: { label: 'Pattern', defaultOpen: false },
+  color: { label: 'Color', defaultOpen: true },
+  texture: { label: 'Texture', defaultOpen: false },
+  appearance: { label: 'Appearance', defaultOpen: false },
+};
+
+// Setting type for grouped rendering
+interface SettingWithValue {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  defaultValue: number;
+  step: number;
+  currentValue: number;
+  description?: string;
+  group?: string;
+}
+
+// Effect config type
+interface EffectConfigType {
+  label: string;
+  category: string;
+  presetNames?: string[];
+  settings?: Array<{
+    id: string;
+    label: string;
+    min: number;
+    max: number;
+    defaultValue: number;
+    step: number;
+    description?: string;
+    group?: string;
+  }>;
+}
+
+// Grouped Settings Panel Component
+const GroupedSettingsPanel: React.FC<{
+  settings: SettingWithValue[];
+  activeEffectConfig: EffectConfigType | null;
+  onSettingChange?: (settingName: string, value: number) => void;
+}> = ({ settings, activeEffectConfig, onSettingChange }) => {
+  // Track which groups are expanded
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    Object.entries(GROUP_CONFIG).forEach(([key, config]) => {
+      initial[key] = config.defaultOpen;
+    });
+    return initial;
+  });
+
+  // Check if settings have groups
+  const hasGroups = settings.some(s => s.group);
+
+  // Group settings by their group property
+  const groupedSettings = useMemo(() => {
+    if (!hasGroups) return null;
+
+    const groups: Record<string, SettingWithValue[]> = {};
+    const ungrouped: SettingWithValue[] = [];
+
+    settings.forEach(setting => {
+      if (setting.group) {
+        if (!groups[setting.group]) {
+          groups[setting.group] = [];
+        }
+        groups[setting.group].push(setting);
+      } else {
+        ungrouped.push(setting);
+      }
+    });
+
+    return { groups, ungrouped };
+  }, [settings, hasGroups]);
+
+  const toggleGroup = (groupName: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupName]: !prev[groupName],
+    }));
+  };
+
+  // Render a single setting control
+  const renderSetting = (setting: SettingWithValue) => {
+    // Check if this is a color setting (hex color)
+    const isColorSetting =
+      setting.label.toLowerCase().includes('color') && setting.label.toLowerCase().includes('hex');
+
+    if (isColorSetting) {
+      return (
+        <div key={setting.id} className="py-2">
+          <HexColorInput
+            label={setting.label}
+            value={setting.currentValue}
+            onChange={value => onSettingChange?.(setting.id, value)}
+          />
+        </div>
+      );
+    }
+
+    // Check if this is a preset/style setting with named presets
+    const isPresetSetting =
+      (setting.id === 'preset' || setting.id === 'style') &&
+      activeEffectConfig?.presetNames &&
+      activeEffectConfig.presetNames.length > 0;
+
+    if (isPresetSetting) {
+      const presetNames = activeEffectConfig!.presetNames!;
+      return (
+        <div key={setting.id} className="py-2" title={setting.description}>
+          <div className="grid grid-cols-2 gap-2">
+            {presetNames.map((name, index) => {
+              const isActive = Math.round(setting.currentValue) === index;
+              const gradient = PRESET_GRADIENTS[index % PRESET_GRADIENTS.length];
+              return (
+                <motion.button
+                  key={name}
+                  onClick={() => onSettingChange?.(setting.id, index)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`relative px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 overflow-hidden ${
+                    isActive
+                      ? `bg-gradient-to-r ${gradient.from} ${gradient.to} text-white shadow-lg`
+                      : 'bg-muted/50 hover:bg-muted text-foreground border border-border/50'
+                  }`}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="activePreset"
+                      className="absolute inset-0 bg-white/10"
+                      initial={false}
+                      transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
+                    />
+                  )}
+                  <span className="relative z-10">{name}</span>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // Regular slider
+    return (
+      <div key={setting.id} className="py-2" title={setting.description}>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs font-medium text-muted-foreground">{setting.label}</label>
+          <span className="text-xs font-mono bg-muted/50 px-1.5 py-0.5 rounded">
+            {setting.currentValue.toFixed(setting.step < 1 ? 2 : 0)}
+          </span>
+        </div>
+        <Slider
+          min={setting.min}
+          max={setting.max}
+          step={setting.step}
+          value={[setting.currentValue]}
+          onValueChange={values => onSettingChange?.(setting.id, values[0])}
+          className="w-full"
+        />
+      </div>
+    );
+  };
+
+  // If no groups, render flat list
+  if (!hasGroups || !groupedSettings) {
+    return (
+      <div className="space-y-4">
+        {settings.map(setting => (
+          <div key={setting.id} className="glass-card p-4">
+            {renderSetting(setting)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Define group order
+  const groupOrder = [
+    'style',
+    'intensity',
+    'color',
+    'focus',
+    'position',
+    'pattern',
+    'texture',
+    'appearance',
+  ];
+
+  return (
+    <div className="space-y-3">
+      {/* Render groups in order */}
+      {groupOrder.map(groupName => {
+        const groupSettings = groupedSettings.groups[groupName];
+        if (!groupSettings || groupSettings.length === 0) return null;
+
+        const config = GROUP_CONFIG[groupName] || { label: groupName, defaultOpen: true };
+        const isExpanded = expandedGroups[groupName] ?? config.defaultOpen;
+        const isStyleGroup = groupName === 'style';
+
+        return (
+          <div key={groupName} className="glass-card overflow-hidden">
+            {/* Group Header */}
+            <button
+              onClick={() => !isStyleGroup && toggleGroup(groupName)}
+              className={`w-full flex items-center justify-between p-3 text-left ${
+                !isStyleGroup ? 'hover:bg-muted/50 transition-colors' : ''
+              }`}
+              disabled={isStyleGroup}
+            >
+              <span className="text-sm font-medium control-panel-label">{config.label}</span>
+              {!isStyleGroup && (
+                <motion.div
+                  animate={{ rotate: isExpanded ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                </motion.div>
+              )}
+            </button>
+
+            {/* Group Content */}
+            <AnimatePresence initial={false}>
+              {(isExpanded || isStyleGroup) && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-3 pb-3 space-y-1">
+                    {groupSettings.map(setting => renderSetting(setting))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+
+      {/* Render ungrouped settings */}
+      {groupedSettings.ungrouped.length > 0 && (
+        <div className="glass-card p-4 space-y-2">
+          {groupedSettings.ungrouped.map(setting => renderSetting(setting))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface EffectLayer {
   id: string;
@@ -296,125 +553,12 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Settings Controls with shadcn Slider */}
-                  <div className="space-y-6">
-                    {currentEffectSettings.map(setting => {
-                      // Check if this is a color setting (hex color)
-                      const isColorSetting =
-                        setting.label.toLowerCase().includes('color') &&
-                        setting.label.toLowerCase().includes('hex');
-
-                      if (isColorSetting) {
-                        return (
-                          <div key={setting.id} className="glass-card p-4">
-                            <HexColorInput
-                              label={setting.label}
-                              value={setting.currentValue}
-                              onChange={value => onSettingChange?.(setting.id, value)}
-                            />
-                          </div>
-                        );
-                      }
-
-                      // Check if this is a preset/style setting with named presets
-                      const isPresetSetting =
-                        (setting.id === 'preset' || setting.id === 'style') &&
-                        activeEffectConfig?.presetNames &&
-                        activeEffectConfig.presetNames.length > 0;
-
-                      if (isPresetSetting) {
-                        const presetNames = activeEffectConfig!.presetNames!;
-                        return (
-                          <div
-                            key={setting.id}
-                            className="glass-card p-4"
-                            title={setting.description}
-                          >
-                            <label className="text-sm font-medium control-panel-label block mb-2">
-                              Style
-                            </label>
-                            {/* Description tooltip text */}
-                            {setting.description && (
-                              <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
-                                {setting.description}
-                              </p>
-                            )}
-                            <div className="grid grid-cols-2 gap-2">
-                              {presetNames.map((name, index) => {
-                                const isActive = Math.round(setting.currentValue) === index;
-                                const gradient = PRESET_GRADIENTS[index % PRESET_GRADIENTS.length];
-                                return (
-                                  <motion.button
-                                    key={name}
-                                    onClick={() => onSettingChange?.(setting.id, index)}
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    className={`relative px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 overflow-hidden ${
-                                      isActive
-                                        ? `bg-gradient-to-r ${gradient.from} ${gradient.to} text-white shadow-lg`
-                                        : 'bg-muted/50 hover:bg-muted text-foreground border border-border/50'
-                                    }`}
-                                  >
-                                    {isActive && (
-                                      <motion.div
-                                        layoutId="activePreset"
-                                        className="absolute inset-0 bg-white/10"
-                                        initial={false}
-                                        transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
-                                      />
-                                    )}
-                                    <span className="relative z-10">{name}</span>
-                                  </motion.button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      // Regular slider for non-color settings
-                      return (
-                        <div
-                          key={setting.id}
-                          className="glass-card p-4"
-                          title={setting.description}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="text-sm font-medium control-panel-label">
-                              {setting.label}
-                            </label>
-                            <span className="text-xs font-mono bg-muted px-2 py-1 slider-value">
-                              {setting.currentValue.toFixed(2)}
-                            </span>
-                          </div>
-
-                          {/* Description tooltip text */}
-                          {setting.description && (
-                            <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
-                              {setting.description}
-                            </p>
-                          )}
-
-                          <div className="space-y-3">
-                            <Slider
-                              min={setting.min}
-                              max={setting.max}
-                              step={setting.step}
-                              value={[setting.currentValue]}
-                              onValueChange={values => onSettingChange?.(setting.id, values[0])}
-                              className="w-full"
-                            />
-
-                            {/* Range markers */}
-                            <div className="flex justify-between text-xs text-muted-foreground">
-                              <span>{setting.min}</span>
-                              <span>{setting.max}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {/* Settings Controls with Grouped Layout */}
+                  <GroupedSettingsPanel
+                    settings={currentEffectSettings}
+                    activeEffectConfig={activeEffectConfig}
+                    onSettingChange={onSettingChange}
+                  />
                 </div>
               )}
             </motion.div>
