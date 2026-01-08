@@ -225,7 +225,6 @@ export async function exportAsGif(
         `Creating optimized GIF with quality ${optimizedSettings.quality}, estimated size: ${optimizedSettings.estimatedSizeKB}KB`
       );
 
-      // @ts-expect-error - gif.js types are not perfect
       const gif = new GIF({
         quality: optimizedSettings.quality,
         workers: Math.min(optimizedSettings.workers, 4), // Cap workers for browser compatibility
@@ -476,7 +475,7 @@ export async function renderMultiLayerAnimationFrames(
 
       // Apply all effect layers in sequence
       const filters: ((imageData: ImageData) => void)[] = [];
-      const combinedFilterParams: Record<string, unknown> = {};
+      const combinedFilterParams: Record<string, number> = {};
 
       for (const effectLayer of effectLayers) {
         const { effectId, settings, animationConfig } = effectLayer;
@@ -505,6 +504,7 @@ export async function renderMultiLayerAnimationFrames(
           // Merge filter parameters
           if (filterParams) {
             for (const [key, value] of Object.entries(filterParams)) {
+              const numValue = typeof value === 'number' ? value : 0;
               // For additive parameters, sum them up
               if (
                 key === 'brightness' ||
@@ -513,10 +513,10 @@ export async function renderMultiLayerAnimationFrames(
                 key === 'saturation' ||
                 key === 'hue'
               ) {
-                combinedFilterParams[key] = (combinedFilterParams[key] || 0) + value;
+                combinedFilterParams[key] = (combinedFilterParams[key] || 0) + numValue;
               } else {
                 // For other parameters, use the last value
-                combinedFilterParams[key] = value;
+                combinedFilterParams[key] = numValue;
               }
             }
           }

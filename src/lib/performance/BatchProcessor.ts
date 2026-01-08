@@ -65,7 +65,7 @@ export class BatchProcessor {
       const totalBlur = blurOps.reduce((sum, op) => sum + (op.settings.intensity || 0), 0);
       const combinedBlur: BatchOperation = {
         ...blurOps[0],
-        settings: { intensity: totalBlur }
+        settings: { intensity: totalBlur },
       };
 
       return operations.filter(op => op.effectId !== 'blur').concat([combinedBlur]);
@@ -73,10 +73,10 @@ export class BatchProcessor {
 
     // Combine color adjustments
     this.optimizationRules.set('color', (operations: BatchOperation[]) => {
-      const colorOps = operations.filter(op => 
+      const colorOps = operations.filter(op =>
         ['brightness', 'contrast', 'saturation', 'hue'].includes(op.effectId)
       );
-      
+
       if (colorOps.length <= 1) return operations;
 
       // Combine all color adjustments into a single operation
@@ -90,33 +90,35 @@ export class BatchProcessor {
         type: 'EFFECT',
         effectId: 'colorAdjustment',
         settings: combinedSettings,
-        priority: Math.max(...colorOps.map(op => op.priority))
+        priority: Math.max(...colorOps.map(op => op.priority)),
       };
 
-      return operations.filter(op => 
-        !['brightness', 'contrast', 'saturation', 'hue'].includes(op.effectId)
-      ).concat([combinedColorOp]);
+      return operations
+        .filter(op => !['brightness', 'contrast', 'saturation', 'hue'].includes(op.effectId))
+        .concat([combinedColorOp]);
     });
 
     // Optimize convolution operations
     this.optimizationRules.set('convolution', (operations: BatchOperation[]) => {
-      const convOps = operations.filter(op => 
+      const convOps = operations.filter(op =>
         ['sharpen', 'emboss', 'edgeDetection'].includes(op.effectId)
       );
-      
+
       if (convOps.length <= 1) return operations;
 
       // These operations can often be combined by merging their kernels
       // For now, we'll just reorder them by computational cost
       const reordered = convOps.sort((a, b) => {
         const costs = { sharpen: 1, emboss: 2, edgeDetection: 3 };
-        return (costs[a.effectId as keyof typeof costs] || 0) - 
-               (costs[b.effectId as keyof typeof costs] || 0);
+        return (
+          (costs[a.effectId as keyof typeof costs] || 0) -
+          (costs[b.effectId as keyof typeof costs] || 0)
+        );
       });
 
-      return operations.filter(op => 
-        !['sharpen', 'emboss', 'edgeDetection'].includes(op.effectId)
-      ).concat(reordered);
+      return operations
+        .filter(op => !['sharpen', 'emboss', 'edgeDetection'].includes(op.effectId))
+        .concat(reordered);
     });
   }
 
@@ -128,11 +130,11 @@ export class BatchProcessor {
       const jobWithResolvers: BatchJobWithResolvers = {
         ...job,
         resolve,
-        reject
+        reject,
       };
-      
+
       this.processingQueue.push(jobWithResolvers);
-      
+
       if (!this.isProcessing) {
         this.processQueue();
       }
@@ -176,7 +178,7 @@ export class BatchProcessor {
         try {
           const optimizedOps = this.optimizeOperations(layer.operations);
           const layerResult = await this.processLayer(layer, optimizedOps);
-          
+
           results.push(layerResult);
           completedLayers++;
 
@@ -189,7 +191,6 @@ export class BatchProcessor {
           if (job.onLayerComplete) {
             job.onLayerComplete(layer.id, layerResult);
           }
-
         } catch (layerError) {
           console.error(`Error processing layer ${layer.id}:`, layerError);
           // Add original image data as fallback
@@ -199,7 +200,6 @@ export class BatchProcessor {
       }
 
       job.resolve(results);
-
     } catch (error) {
       job.reject(error);
     }
@@ -234,8 +234,8 @@ export class BatchProcessor {
     const resolvedIds = new Set<string>();
 
     while (remaining.length > 0) {
-      const canResolve = remaining.filter(op => 
-        !op.dependencies || op.dependencies.every(dep => resolvedIds.has(dep))
+      const canResolve = remaining.filter(
+        op => !op.dependencies || op.dependencies.every(dep => resolvedIds.has(dep))
       );
 
       if (canResolve.length === 0) {
@@ -280,7 +280,11 @@ export class BatchProcessor {
         currentImageData = await this.applySingleOperation(currentImageData, op, workerManager);
       } else {
         // Multiple compatible operations
-        currentImageData = await this.applyMultipleOperations(currentImageData, group, workerManager);
+        currentImageData = await this.applyMultipleOperations(
+          currentImageData,
+          group,
+          workerManager
+        );
       }
     }
 
@@ -295,7 +299,7 @@ export class BatchProcessor {
     // Clean cache if it gets too large
     if (this.operationCache.size > 50) {
       const firstKey = this.operationCache.keys().next().value;
-      this.operationCache.delete(firstKey);
+      if (firstKey) this.operationCache.delete(firstKey);
     }
 
     return currentImageData;
@@ -317,7 +321,7 @@ export class BatchProcessor {
       // Find other operations that can be combined with this one
       for (const otherOp of operations) {
         if (processed.has(otherOp.id)) continue;
-        
+
         if (this.areOperationsCompatible(operation, otherOp)) {
           compatibleGroup.push(otherOp);
           processed.add(otherOp.id);
@@ -374,11 +378,7 @@ export class BatchProcessor {
     try {
       // Use worker for heavy operations
       if (this.isHeavyOperation(operation)) {
-        result = await workerManager.applyEffect(
-          operation.effectId,
-          operation.settings,
-          imageData
-        );
+        result = await workerManager.applyEffect(operation.effectId, operation.settings, imageData);
       } else {
         // Process lightweight operations on main thread
         result = await this.applyLightweightOperation(imageData, operation);
@@ -403,7 +403,7 @@ export class BatchProcessor {
     // For now, apply operations sequentially
     // In a more advanced implementation, we could combine them into a single shader/filter
     let result = imageData;
-    
+
     for (const operation of operations) {
       result = await this.applySingleOperation(result, operation, workerManager);
     }
@@ -415,7 +415,7 @@ export class BatchProcessor {
    * Apply lightweight operations on the main thread
    */
   private async applyLightweightOperation(
-    imageData: ImageData, 
+    imageData: ImageData,
     operation: BatchOperation
   ): Promise<ImageData> {
     const { data, width, height } = imageData;
@@ -436,8 +436,14 @@ export class BatchProcessor {
         const contrast = operation.settings.intensity || 1;
         for (let i = 0; i < resultData.length; i += 4) {
           resultData[i] = Math.max(0, Math.min(255, (resultData[i] - 128) * contrast + 128));
-          resultData[i + 1] = Math.max(0, Math.min(255, (resultData[i + 1] - 128) * contrast + 128));
-          resultData[i + 2] = Math.max(0, Math.min(255, (resultData[i + 2] - 128) * contrast + 128));
+          resultData[i + 1] = Math.max(
+            0,
+            Math.min(255, (resultData[i + 1] - 128) * contrast + 128)
+          );
+          resultData[i + 2] = Math.max(
+            0,
+            Math.min(255, (resultData[i + 2] - 128) * contrast + 128)
+          );
         }
         break;
 
@@ -461,8 +467,8 @@ export class BatchProcessor {
    */
   private applyLayerProperties(imageData: ImageData, layer: BatchLayer): ImageData {
     const result = new ImageData(
-      new Uint8ClampedArray(imageData.data), 
-      imageData.width, 
+      new Uint8ClampedArray(imageData.data),
+      imageData.width,
       imageData.height
     );
 
@@ -516,11 +522,11 @@ export class BatchProcessor {
     // Sample a few pixels for performance
     const samples = [];
     const step = Math.max(1, Math.floor(data.length / 1000));
-    
+
     for (let i = 0; i < data.length; i += step) {
       samples.push(data[i]);
     }
-    
+
     return `${width}x${height}:${samples.join(',')}`;
   }
 
@@ -537,19 +543,21 @@ export class BatchProcessor {
       type: 'EFFECT',
       effectId: effect.effectId,
       settings: effect.settings,
-      priority: effects.length - index // Later effects have lower priority
+      priority: effects.length - index, // Later effects have lower priority
     }));
 
     return {
       id: `job-${Date.now()}`,
-      layers: [{
-        id: 'main',
-        imageData,
-        operations
-      }],
+      layers: [
+        {
+          id: 'main',
+          imageData,
+          operations,
+        },
+      ],
       outputWidth: imageData.width,
       outputHeight: imageData.height,
-      onProgress
+      onProgress,
     };
   }
 
@@ -566,14 +574,14 @@ export class BatchProcessor {
   getCacheStats(): { size: number; memoryUsage: number } {
     const size = this.operationCache.size;
     let memoryUsage = 0;
-    
+
     for (const imageData of this.operationCache.values()) {
       memoryUsage += imageData.data.length * 4; // 4 bytes per pixel
     }
-    
+
     return {
       size,
-      memoryUsage: memoryUsage / 1024 / 1024 // MB
+      memoryUsage: memoryUsage / 1024 / 1024, // MB
     };
   }
-} 
+}

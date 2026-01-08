@@ -69,10 +69,17 @@ imager2/
 │   │   └── useImage.ts          # Image loading
 │   │
 │   ├── lib/                 # Utilities & core logic
-│   │   ├── effects.ts       # Effects engine (8000+ lines)
+│   │   ├── effects.ts       # Main effects engine (9500+ lines)
 │   │   ├── store.ts         # Zustand global store
 │   │   ├── themes.ts        # Theme system
-│   │   ├── effects/         # Custom Konva filters
+│   │   ├── effects/         # Modular effects system
+│   │   │   ├── index.ts     # Entry point & re-exports
+│   │   │   ├── types.ts     # TypeScript interfaces
+│   │   │   ├── utils.ts     # Utility functions
+│   │   │   ├── categories.ts # Effect categories
+│   │   │   ├── legacy.ts    # Legacy effect mappings
+│   │   │   ├── konvaLoader.ts # Dynamic Konva loading
+│   │   │   └── filters/     # Custom Konva filters
 │   │   ├── performance/     # Optimization utilities
 │   │   │   ├── BufferPool.ts
 │   │   │   ├── WorkerManager.ts

@@ -301,7 +301,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
 
                 if (effectCacheRef.current.size > MAX_CACHE_ENTRIES) {
                   const firstKey = effectCacheRef.current.keys().next().value;
-                  effectCacheRef.current.delete(firstKey);
+                  if (firstKey) effectCacheRef.current.delete(firstKey);
                 }
               }
 
@@ -495,7 +495,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
 
     useEffect(() => {
       if (!image) return;
-      const imageNode = stageRef.current?.findOne('Image');
+      const imageNode = stageRef.current?.findOne('Image') as Konva.Image | undefined;
       if (!imageNode) return;
 
       const myVersion = ++versionRef.current;
@@ -513,7 +513,20 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         if (myVersion !== versionRef.current) return; // superseded
         await applyEffectsToNode(imageNode, window.devicePixelRatio || 1);
       }, 180) as unknown as number;
+
+      // Cleanup timers on dependency change or unmount
+      return () => {
+        if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
+        if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
+      };
     }, [effectLayers, image]);
+
+    // Cleanup effect cache on unmount
+    useEffect(() => {
+      return () => {
+        effectCacheRef.current.clear();
+      };
+    }, []);
 
     // Handle file upload
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

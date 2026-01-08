@@ -44,10 +44,10 @@ export class WorkerManager {
   private warmWorkers = true;
 
   constructor(
-    maxWorkers =
-      typeof navigator !== 'undefined' && typeof navigator.hardwareConcurrency === 'number'
-        ? navigator.hardwareConcurrency
-        : 4,
+    maxWorkers = typeof navigator !== 'undefined' &&
+    typeof navigator.hardwareConcurrency === 'number'
+      ? navigator.hardwareConcurrency
+      : 4
   ) {
     this.maxWorkers = Math.min(maxWorkers, 8); // Cap at 8 workers
   }
@@ -57,20 +57,21 @@ export class WorkerManager {
    */
   async initialize(): Promise<void> {
     // Pre-warm the worker pool with minimum workers
-    const minWorkers = (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test')
-      ? Math.min(2, this.maxWorkers)
-      : Math.min(2, this.maxWorkers);
+    const minWorkers =
+      typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test'
+        ? Math.min(2, this.maxWorkers)
+        : Math.min(2, this.maxWorkers);
     const warmupPromises = [];
-    
+
     for (let i = 0; i < minWorkers; i++) {
       warmupPromises.push(this.createWorker());
     }
-    
+
     await Promise.all(warmupPromises);
-    
+
     // Start worker warmup interval
     this.startWarmupInterval();
-    
+
     console.log(`Worker pool initialized with ${minWorkers} pre-warmed workers`);
   }
 
@@ -81,10 +82,10 @@ export class WorkerManager {
     // Send heartbeat messages every 30 seconds to keep workers warm
     this.warmupInterval = setInterval(() => {
       if (!this.warmWorkers) return;
-      
+
       const now = Date.now();
       const idleTime = now - this.lastActivityTime;
-      
+
       // If idle for more than 60 seconds, reduce to minimum workers
       if (idleTime > 60000 && this.workers.length > 2) {
         const workersToRemove = this.workers.length - 2;
@@ -95,14 +96,14 @@ export class WorkerManager {
           }
         }
       }
-      
+
       // Send heartbeat to keep workers responsive
       this.workers.forEach(worker => {
         if (!worker.busy) {
           worker.worker.postMessage({
             id: `heartbeat-${Date.now()}`,
             type: 'HEARTBEAT',
-            payload: null
+            payload: null,
           });
         }
       });
@@ -130,29 +131,29 @@ export class WorkerManager {
     const warmupPromises = this.workers
       .filter(w => !w.busy)
       .map(worker => {
-        return new Promise<void>((resolve) => {
+        return new Promise<void>(resolve => {
           const warmupId = `warmup-${Date.now()}-${Math.random()}`;
           const timeout = setTimeout(() => resolve(), 1000);
-          
+
           worker.worker.postMessage({
             id: warmupId,
             type: 'WARMUP',
-            payload: { imageData: testImageData }
+            payload: { imageData: testImageData },
           });
-          
+
           const originalHandler = worker.worker.onmessage;
-          worker.worker.onmessage = (event) => {
+          worker.worker.onmessage = event => {
             if (event.data.id === warmupId) {
               clearTimeout(timeout);
               worker.worker.onmessage = originalHandler;
               resolve();
             } else if (originalHandler) {
-              originalHandler(event);
+              originalHandler.call(worker.worker, event);
             }
           };
         });
       });
-    
+
     await Promise.all(warmupPromises);
   }
 
@@ -161,19 +162,22 @@ export class WorkerManager {
    */
   private async createWorker(): Promise<WorkerInstance> {
     const workerId = `worker-${this.workerCreated++}`;
-    
+
     // Create worker from blob to avoid build issues
-    const workerBlob = new Blob([
-      `
+    const workerBlob = new Blob(
+      [
+        `
       // Import the worker script
       importScripts('${window.location.origin}/_next/static/worker/effectsWorker.js');
-      `
-    ], { type: 'application/javascript' });
-    
+      `,
+      ],
+      { type: 'application/javascript' }
+    );
+
     const workerUrl = URL.createObjectURL(workerBlob);
-    
+
     let worker: Worker;
-    
+
     try {
       if (typeof Worker === 'undefined') {
         throw new Error('Worker not available');
@@ -190,12 +194,14 @@ export class WorkerManager {
     const workerInstance: WorkerInstance = {
       worker,
       busy: false,
-      id: workerId
+      id: workerId,
     };
 
     // Set up message handling
     worker.onmessage = (
-      event: MessageEvent<WorkerResponse | { id: string; type: 'result'; result: ImageData; frameIndex?: number }>,
+      event: MessageEvent<
+        WorkerResponse | { id: string; type: 'result'; result: ImageData; frameIndex?: number }
+      >
     ) => {
       // Normalize different test mocks that may send { type: 'result', result }
       const data = event.data;
@@ -211,14 +217,14 @@ export class WorkerManager {
       this.handleWorkerMessage(workerId, event.data as WorkerResponse);
     };
 
-    worker.onerror = (error) => {
+    worker.onerror = error => {
       console.error(`Worker ${workerId} error:`, error);
       this.handleWorkerError(workerId, new Error(error.message || 'Worker error'));
     };
 
     this.workers.push(workerInstance);
     URL.revokeObjectURL(workerUrl);
-    
+
     return workerInstance;
   }
 
@@ -413,7 +419,9 @@ export class WorkerManager {
     }
   }
 
-  private static isProgressPayload(payload: WorkerResponsePayload): payload is { progress: number } {
+  private static isProgressPayload(
+    payload: WorkerResponsePayload
+  ): payload is { progress: number } {
     return Boolean(payload && typeof payload === 'object' && 'progress' in payload);
   }
 
@@ -438,7 +446,7 @@ export class WorkerManager {
     this.lastActivityTime = Date.now();
 
     let worker = this.getAvailableWorker();
-    
+
     // If no workers available, try to create a new one
     if (!worker && this.workers.length < this.maxWorkers) {
       try {
@@ -460,7 +468,7 @@ export class WorkerManager {
     const message: WorkerMessage = {
       id: task.id,
       type: task.type,
-      payload: task.payload
+      payload: task.payload,
     };
 
     worker.worker.postMessage(message);
@@ -495,9 +503,9 @@ export class WorkerManager {
           settings,
           imageData,
           width: imageData.width,
-          height: imageData.height
+          height: imageData.height,
         },
-        resolve: (result) => resolve(result.imageData),
+        resolve: result => resolve(result.imageData),
         reject,
         onProgress,
         effectId,
@@ -537,15 +545,15 @@ export class WorkerManager {
           frameIndex,
           totalFrames,
           width: imageData.width,
-          height: imageData.height
+          height: imageData.height,
         },
-        resolve: (result) => {
+        resolve: result => {
           resolve({
             imageData: result.imageData,
             frameIndex: result.frameIndex ?? frameIndex,
           });
         },
-        reject
+        reject,
       };
 
       this.taskQueue.push(task);
@@ -567,15 +575,14 @@ export class WorkerManager {
     let completed = 0;
 
     const promises = Array.from({ length: totalFrames }, (_, index) =>
-      this.generateFrame(imageData, effectId, settings, index, totalFrames)
-        .then((result) => {
-          frames[result.frameIndex] = result.imageData;
-          completed++;
-          if (onProgress) {
-            onProgress(completed / totalFrames);
-          }
-          return result;
-        })
+      this.generateFrame(imageData, effectId, settings, index, totalFrames).then(result => {
+        frames[result.frameIndex] = result.imageData;
+        completed++;
+        if (onProgress) {
+          onProgress(completed / totalFrames);
+        }
+        return result;
+      })
     );
 
     await Promise.all(promises);
@@ -600,11 +607,11 @@ export class WorkerManager {
           imageData,
           operations,
           width: imageData.width,
-          height: imageData.height
+          height: imageData.height,
         },
-        resolve: (result) => resolve(result.imageData),
+        resolve: result => resolve(result.imageData),
         reject,
-        onProgress
+        onProgress,
       };
 
       this.taskQueue.push(task);
@@ -626,7 +633,7 @@ export class WorkerManager {
   } {
     const busyWorkers = this.workers.filter(w => w.busy).length;
     const now = Date.now();
-    
+
     return {
       totalWorkers: this.workers.length,
       busyWorkers,
@@ -634,7 +641,7 @@ export class WorkerManager {
       activeTasks: this.activeTasks.size,
       idleTime: now - this.lastActivityTime,
       maxWorkers: this.maxWorkers,
-      isWarmedUp: this.workers.length >= Math.min(2, this.maxWorkers)
+      isWarmedUp: this.workers.length >= Math.min(2, this.maxWorkers),
     };
   }
 
@@ -647,7 +654,7 @@ export class WorkerManager {
       clearInterval(this.warmupInterval);
       this.warmupInterval = null;
     }
-    
+
     this.warmWorkers = false;
 
     // Cancel all pending tasks
@@ -667,9 +674,9 @@ export class WorkerManager {
       workerInstance.worker.postMessage({
         id: 'terminate',
         type: 'TERMINATE',
-        payload: null
+        payload: null,
       } as WorkerMessage);
-      
+
       workerInstance.worker.terminate();
     }
 
@@ -693,4 +700,4 @@ export const cleanupWorkerManager = async (): Promise<void> => {
     await workerManagerInstance.cleanup();
     workerManagerInstance = null;
   }
-}; 
+};

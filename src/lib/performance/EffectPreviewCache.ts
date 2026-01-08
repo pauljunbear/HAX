@@ -21,7 +21,11 @@ export class EffectPreviewCache {
     this.loadFromStorage();
   }
 
-  private getCacheKey(imageUrl: string, effectId: string, settings: Record<string, number>): string {
+  private getCacheKey(
+    imageUrl: string,
+    effectId: string,
+    settings: Record<string, number>
+  ): string {
     return `${imageUrl}-${effectId}-${JSON.stringify(settings)}`;
   }
 
@@ -48,7 +52,7 @@ export class EffectPreviewCache {
       effectId,
       settings: effectSettings,
       thumbnail,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     // Manage cache size
@@ -68,7 +72,7 @@ export class EffectPreviewCache {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      
+
       img.onload = async () => {
         try {
           // Create canvas for thumbnail
@@ -111,7 +115,8 @@ export class EffectPreviewCache {
             image.filters([filterFunc]);
             if (filterParams) {
               Object.entries(filterParams).forEach(([key, value]) => {
-                const maybeSetter = (image as Record<string, unknown>)[key];
+                const imageAny = image as unknown as Record<string, unknown>;
+                const maybeSetter = imageAny[key];
                 if (typeof maybeSetter === 'function') {
                   (maybeSetter as (input: unknown) => void)(value);
                 }
@@ -147,7 +152,8 @@ export class EffectPreviewCache {
 
     const settings: Record<string, number> = {};
     for (const [key, setting] of Object.entries(config.settings)) {
-      settings[key] = setting.default;
+      const s = setting as { default?: number };
+      settings[key] = s.default ?? 0;
     }
     return settings;
   }
@@ -174,7 +180,7 @@ export class EffectPreviewCache {
       const metadata = Array.from(this.cache.entries()).map(([key, entry]) => ({
         key,
         effectId: entry.effectId,
-        timestamp: entry.timestamp
+        timestamp: entry.timestamp,
       }));
       localStorage.setItem('effectPreviewCacheMetadata', JSON.stringify(metadata));
     } catch (error) {
@@ -198,12 +204,18 @@ export class EffectPreviewCache {
   // Pregenerate previews for common effects
   async pregenerateCommonPreviews(imageUrl: string): Promise<void> {
     const commonEffects = [
-      'brightness', 'contrast', 'saturation', 'blur', 
-      'vintage', 'sepia', 'blackWhite', 'sharpen'
+      'brightness',
+      'contrast',
+      'saturation',
+      'blur',
+      'vintage',
+      'sepia',
+      'blackWhite',
+      'sharpen',
     ];
 
-    const promises = commonEffects.map(effectId => 
-      this.generatePreview(imageUrl, effectId).catch(err => 
+    const promises = commonEffects.map(effectId =>
+      this.generatePreview(imageUrl, effectId).catch(err =>
         console.warn(`Failed to pregenerate preview for ${effectId}:`, err)
       )
     );
@@ -226,4 +238,4 @@ export function clearEffectPreviewCache(): void {
   if (previewCache) {
     previewCache.clearCache();
   }
-} 
+}

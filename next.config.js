@@ -26,11 +26,10 @@ const nextConfig = {
     return config;
   },
   typescript: {
-    // Temporarily ignore TypeScript errors during build
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   eslint: {
-    // Temporarily ignore ESLint errors during build
+    // TODO: Enable after fixing ~200 `any` types in Phase 5
     ignoreDuringBuilds: true,
   },
   distDir: '.next',

@@ -3,6 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import { effectsConfig } from '@/lib/effects';
 
+// Extended effect setting with runtime values
+interface ExtendedEffectSetting {
+  id: string;
+  currentValue: number;
+  min: number;
+  max: number;
+  defaultValue: number;
+  step: number;
+  label: string;
+  type?: string;
+}
+
 // Debounce helper function
 const useDebounce = <T,>(value: T, delay: number): T => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -59,16 +71,31 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }));
 
   // Get settings for the active effect
-  const currentEffectSettings =
+  const currentEffectSettings: ExtendedEffectSetting[] =
     activeEffect && effectsConfig[activeEffect]?.settings
-      ? Object.entries(effectsConfig[activeEffect].settings).map(([key, setting]) => ({
-          id: key,
-          ...(setting as Record<string, unknown>),
-          currentValue:
-            effectSettings && effectSettings[key] !== undefined
-              ? effectSettings[key]
-              : ((setting as { default?: number }).default ?? 0),
-        }))
+      ? Object.entries(effectsConfig[activeEffect].settings).map(([key, setting]) => {
+          const s = setting as {
+            min: number;
+            max: number;
+            defaultValue: number;
+            step: number;
+            label: string;
+            type?: string;
+          };
+          return {
+            id: key,
+            min: s.min,
+            max: s.max,
+            defaultValue: s.defaultValue,
+            step: s.step,
+            label: s.label,
+            type: s.type,
+            currentValue:
+              effectSettings && effectSettings[key] !== undefined
+                ? effectSettings[key]
+                : (s.defaultValue ?? 0),
+          };
+        })
       : [];
 
   // Process debounced blur effect changes
@@ -264,7 +291,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             const displayValue =
               (localSliderValues[setting.id] !== undefined
                 ? localSliderValues[setting.id]
-                : setting.currentValue) ?? setting.default;
+                : setting.currentValue) ?? setting.defaultValue;
 
             return (
               <div key={setting.id} className="mb-4">
@@ -283,7 +310,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   min={setting.min}
                   max={setting.max}
                   step={setting.step}
-                  value={typeof displayValue === 'number' ? displayValue : setting.default}
+                  value={typeof displayValue === 'number' ? displayValue : setting.defaultValue}
                   // Only call onSettingChange directly if the effect is NOT debounced
                   onChange={e => {
                     const newValue = parseFloat(e.target.value);
