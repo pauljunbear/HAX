@@ -19,7 +19,8 @@ interface AppleControlsPanelProps {
   effectLayers?: EffectLayer[];
   effectSettings?: Record<string, number>;
   onSettingChange?: (settingName: string, value: number) => void;
-  onExport?: (format: string) => void;
+  onExport?: (format: string, quality?: number) => void;
+  onEstimateFileSize?: (format: 'png' | 'jpeg', quality?: number) => Promise<number>;
   onResetSettings?: () => void;
   onClearAllEffects?: () => void;
   onRemoveEffect?: (layerId: string) => void;
@@ -100,12 +101,21 @@ const HexColorInput: React.FC<{
   );
 };
 
+// Helper to format file size
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+};
+
 const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   activeEffect,
   effectLayers = [],
   effectSettings = {},
   onSettingChange,
   onExport,
+  onEstimateFileSize,
   onResetSettings,
   onClearAllEffects,
   onRemoveEffect,
@@ -119,6 +129,41 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
   const [activeTab, setActiveTab] = useState<string>('settings');
   const dragFromIndexRef = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // JPEG quality state (1-100)
+  const [jpegQuality, setJpegQuality] = useState(95);
+  const [estimatedJpegSize, setEstimatedJpegSize] = useState<number | null>(null);
+  const [estimatedPngSize, setEstimatedPngSize] = useState<number | null>(null);
+  const [isEstimating, setIsEstimating] = useState(false);
+
+  // Estimate file sizes when export tab is active
+  useEffect(() => {
+    if (activeTab !== 'export' || !hasImage || !onEstimateFileSize) return;
+
+    let cancelled = false;
+    const estimate = async () => {
+      setIsEstimating(true);
+      try {
+        const [pngSize, jpegSize] = await Promise.all([
+          onEstimateFileSize('png'),
+          onEstimateFileSize('jpeg', jpegQuality),
+        ]);
+        if (!cancelled) {
+          setEstimatedPngSize(pngSize);
+          setEstimatedJpegSize(jpegSize);
+        }
+      } catch {
+        // Ignore errors
+      } finally {
+        if (!cancelled) setIsEstimating(false);
+      }
+    };
+
+    estimate();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, hasImage, onEstimateFileSize, jpegQuality]);
 
   // Get the active layer with null checking
   const activeLayer = effectLayers?.find(layer => layer.id === activeEffect);
@@ -466,32 +511,123 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
               transition={{ duration: 0.2 }}
               className="space-y-4"
             >
+              {/* PNG Export */}
+              <div className="glass-card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 flex items-center justify-center mr-3 liquid-material">
+                      <FileImage className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium">PNG EXPORT</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Lossless, best quality
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-[10px] font-medium px-2 py-0.5 glass-badge">PNG</div>
+                </div>
+                {estimatedPngSize !== null && (
+                  <div className="text-[10px] text-muted-foreground mb-2">
+                    Estimated size: {isEstimating ? '...' : formatFileSize(estimatedPngSize)}
+                  </div>
+                )}
+                <button
+                  onClick={() => onExport?.('PNG')}
+                  disabled={!hasImage}
+                  className="w-full py-2 text-xs font-medium glass-button disabled:opacity-50"
+                >
+                  Export PNG
+                </button>
+              </div>
+
+              {/* JPEG Export with Quality Slider */}
+              <div className="glass-card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 flex items-center justify-center mr-3 liquid-material">
+                      <FileImage className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium">JPEG EXPORT</div>
+                      <div className="text-[10px] text-muted-foreground">Adjustable quality</div>
+                    </div>
+                  </div>
+                  <div className="text-[10px] font-medium px-2 py-0.5 glass-badge">JPG</div>
+                </div>
+
+                {/* Quality Slider */}
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-[11px] text-muted-foreground">Quality</label>
+                    <span className="text-[11px] font-mono bg-muted px-2 py-0.5 rounded">
+                      {jpegQuality}%
+                    </span>
+                  </div>
+                  <Slider
+                    min={10}
+                    max={100}
+                    step={5}
+                    value={[jpegQuality]}
+                    onValueChange={values => setJpegQuality(values[0])}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-[9px] text-muted-foreground mt-1">
+                    <span>Smaller file</span>
+                    <span>Better quality</span>
+                  </div>
+                </div>
+
+                {estimatedJpegSize !== null && (
+                  <div className="text-[10px] text-muted-foreground mb-2">
+                    Estimated size: {isEstimating ? '...' : formatFileSize(estimatedJpegSize)}
+                    {estimatedPngSize !== null && estimatedPngSize > 0 && (
+                      <span className="ml-1 text-green-500">
+                        ({Math.round((1 - estimatedJpegSize / estimatedPngSize) * 100)}% smaller
+                        than PNG)
+                      </span>
+                    )}
+                  </div>
+                )}
+                <button
+                  onClick={() => onExport?.('JPG', jpegQuality)}
+                  disabled={!hasImage}
+                  className="w-full py-2 text-xs font-medium glass-button disabled:opacity-50"
+                >
+                  Export JPEG
+                </button>
+              </div>
+
+              {/* GIF & Video Exports */}
               <div className="space-y-2">
-                {exportOptions.map(option => {
-                  const Icon = option.icon;
-                  return (
-                    <button
-                      key={option.format}
-                      onClick={() => onExport?.(option.format)}
-                      className="w-full p-3 transition-all text-left group glass-effect-button"
-                    >
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 flex items-center justify-center mr-3 liquid-material">
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-xs font-medium">{option.type}</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {option.description}
+                {exportOptions
+                  .filter(opt => opt.format === 'GIF' || opt.format === 'WEBM')
+                  .map(option => {
+                    const Icon = option.icon;
+                    return (
+                      <button
+                        key={option.format}
+                        onClick={() => onExport?.(option.format)}
+                        disabled={!hasImage}
+                        className="w-full p-3 transition-all text-left group glass-effect-button disabled:opacity-50"
+                      >
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 flex items-center justify-center mr-3 liquid-material">
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-xs font-medium">{option.type}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {option.description}
+                            </div>
+                          </div>
+                          <div className="text-[10px] font-medium px-2 py-0.5 ml-3 glass-badge">
+                            {option.format}
                           </div>
                         </div>
-                        <div className="text-[10px] font-medium px-2 py-0.5 ml-3 glass-badge">
-                          {option.format}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  })}
               </div>
             </motion.div>
           )}

@@ -30,7 +30,8 @@ interface AppleStyleLayoutProps {
   onSetActiveLayer?: (layerId: string) => void;
   onToggleLayerVisibility?: (layerId: string) => void;
   onReorderLayers?: (fromIndex: number, toIndex: number) => void;
-  onExport?: (format: string) => void;
+  onExport?: (format: string, quality?: number) => void;
+  onEstimateFileSize?: (format: 'png' | 'jpeg', quality?: number) => Promise<number>;
 }
 
 const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
@@ -50,6 +51,7 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
   onToggleLayerVisibility,
   onReorderLayers,
   onExport,
+  onEstimateFileSize,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { theme, toggleTheme } = useTheme();
@@ -178,6 +180,7 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
             onToggleLayerVisibility={onToggleLayerVisibility}
             onReorderLayers={onReorderLayers}
             onExport={onExport}
+            onEstimateFileSize={onEstimateFileSize}
             onNewImage={handleImageSelect}
             hasImage={!!selectedImage}
           />
@@ -206,6 +209,7 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
                 onToggleLayerVisibility={onToggleLayerVisibility}
                 onReorderLayers={onReorderLayers}
                 onExport={onExport}
+                onEstimateFileSize={onEstimateFileSize}
                 onNewImage={handleImageSelect}
                 hasImage={!!selectedImage}
               />
