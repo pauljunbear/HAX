@@ -13,6 +13,7 @@ interface EffectSetting {
   max: number;
   defaultValue: number;
   step: number;
+  description?: string; // Tooltip text explaining the setting
 }
 
 // Define the structure for effect configuration
@@ -4568,11 +4569,12 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 4,
         defaultValue: 0,
         step: 1,
+        description: 'Glow style: Bloom for highlights, Dreamy for soft focus, Neon for vibrant edges, Bioluminescent for organic glow, Halation for film-like light bleeding',
       },
-      { id: 'intensity', label: 'Intensity (%)', min: 0, max: 100, defaultValue: 50, step: 5 },
-      { id: 'radius', label: 'Glow Radius', min: 1, max: 100, defaultValue: 20, step: 1 },
-      { id: 'threshold', label: 'Threshold (%)', min: 0, max: 100, defaultValue: 50, step: 5 },
-      { id: 'colorShift', label: 'Color Shift', min: 0, max: 100, defaultValue: 0, step: 5 },
+      { id: 'intensity', label: 'Intensity (%)', min: 0, max: 100, defaultValue: 50, step: 5, description: 'Controls the strength of the glow effect' },
+      { id: 'radius', label: 'Glow Radius', min: 1, max: 100, defaultValue: 20, step: 1, description: 'Size of the glow spread in pixels' },
+      { id: 'threshold', label: 'Threshold (%)', min: 0, max: 100, defaultValue: 50, step: 5, description: 'Brightness level above which glow is applied' },
+      { id: 'colorShift', label: 'Color Shift', min: 0, max: 100, defaultValue: 0, step: 5, description: 'Shifts glow colors for creative tinting' },
       {
         id: 'darkenBg',
         label: 'Darken Background (%)',
@@ -4580,8 +4582,9 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 100,
         defaultValue: 0,
         step: 5,
+        description: 'Darkens non-glowing areas to make the glow stand out',
       },
-      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05, description: 'Blend the effect with the original image' },
     ],
   },
 
@@ -4609,9 +4612,10 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 6,
         defaultValue: 0,
         step: 1,
+        description: 'Glitch style: RGB Split separates color channels, Chromatic adds fringing, Scanlines for CRT look, VHS for tape artifacts, Corrupt for data errors, Databend for file corruption, Pixel Sort for sorted pixels',
       },
-      { id: 'intensity', label: 'Intensity', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
-      { id: 'amount', label: 'Amount', min: 1, max: 50, defaultValue: 10, step: 1 },
+      { id: 'intensity', label: 'Intensity', min: 0, max: 1, defaultValue: 0.5, step: 0.05, description: 'Overall strength of the glitch effect' },
+      { id: 'amount', label: 'Amount', min: 1, max: 50, defaultValue: 10, step: 1, description: 'Pixel offset distance for color separation' },
       {
         id: 'direction',
         label: 'Direction (0=Horiz, 1=Vert, 2=Both)',
@@ -4619,10 +4623,11 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 2,
         defaultValue: 0,
         step: 1,
+        description: 'Direction of the glitch displacement',
       },
-      { id: 'blockSize', label: 'Block Size', min: 2, max: 32, defaultValue: 8, step: 1 },
-      { id: 'randomness', label: 'Randomness', min: 0, max: 1, defaultValue: 0.5, step: 0.05 },
-      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05 },
+      { id: 'blockSize', label: 'Block Size', min: 2, max: 32, defaultValue: 8, step: 1, description: 'Size of glitch blocks or bands' },
+      { id: 'randomness', label: 'Randomness', min: 0, max: 1, defaultValue: 0.5, step: 0.05, description: 'How unpredictable the glitch pattern is' },
+      { id: 'opacity', label: 'Effect Opacity', min: 0, max: 1, defaultValue: 1, step: 0.05, description: 'Blend the effect with the original image' },
     ],
   },
   unifiedVintage: {

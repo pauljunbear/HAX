@@ -14,6 +14,7 @@ export interface EffectSetting {
   defaultValue: number;
   step: number;
   type?: string;
+  description?: string; // Tooltip text explaining the setting
 }
 
 // Define the structure for effect configuration

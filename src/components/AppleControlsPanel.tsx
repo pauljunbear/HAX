@@ -313,10 +313,16 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                       if (isPresetSetting) {
                         const presetNames = activeEffectConfig!.presetNames!;
                         return (
-                          <div key={setting.id} className="glass-card p-4">
-                            <label className="text-sm font-medium control-panel-label block mb-3">
+                          <div key={setting.id} className="glass-card p-4" title={setting.description}>
+                            <label className="text-sm font-medium control-panel-label block mb-1">
                               {setting.label}
                             </label>
+                            {/* Description tooltip text */}
+                            {setting.description && (
+                              <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
+                                {setting.description}
+                              </p>
+                            )}
                             <div className="flex flex-wrap gap-2">
                               {presetNames.map((name, index) => (
                                 <button
@@ -338,8 +344,8 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
 
                       // Regular slider for non-color settings
                       return (
-                        <div key={setting.id} className="glass-card p-4">
-                          <div className="flex items-center justify-between mb-3">
+                        <div key={setting.id} className="glass-card p-4" title={setting.description}>
+                          <div className="flex items-center justify-between mb-1">
                             <label className="text-sm font-medium control-panel-label">
                               {setting.label}
                             </label>
@@ -347,6 +353,13 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                               {setting.currentValue.toFixed(2)}
                             </span>
                           </div>
+
+                          {/* Description tooltip text */}
+                          {setting.description && (
+                            <p className="text-[10px] text-muted-foreground mb-3 leading-relaxed">
+                              {setting.description}
+                            </p>
+                          )}
 
                           <div className="space-y-3">
                             <Slider

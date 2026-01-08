@@ -8,6 +8,7 @@ export interface EffectSetting {
   default: number;
   step: number;
   label: string;
+  description?: string;
 }
 
 export interface EffectConfig {
