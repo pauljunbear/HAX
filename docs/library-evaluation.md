@@ -10,64 +10,66 @@ Based on performance benchmarks, bundle size analysis, and integration requireme
 
 ### 1. Bundle Size Impact
 
-| Library | Bundle Size | Impact on Imager |
-|---------|-------------|------------------|
-| **p5.js** | 1MB minified (4.8MB unminified) | +100% app size increase |
-| **tsParticles** | ~50-100KB (modular) | +5-10% app size increase |
+| Library         | Bundle Size                     | Impact on Imager         |
+| --------------- | ------------------------------- | ------------------------ |
+| **p5.js**       | 1MB minified (4.8MB unminified) | +100% app size increase  |
+| **tsParticles** | ~50-100KB (modular)             | +5-10% app size increase |
 
 **Winner: tsParticles** - Significantly smaller footprint aligns with our PRD goal of fast loading times.
 
 ### 2. Performance
 
-| Metric | p5.js | tsParticles |
-|--------|-------|-------------|
-| Real-time rendering | Good, but heavy framework overhead | Optimized specifically for particles |
-| Canvas integration | Requires separate canvas management | Can overlay on existing canvas |
-| Memory usage | Higher due to full creative framework | Lower, focused on particles only |
-| GPU acceleration | Manual WebGL setup required | Built-in optimizations |
+| Metric              | p5.js                                 | tsParticles                          |
+| ------------------- | ------------------------------------- | ------------------------------------ |
+| Real-time rendering | Good, but heavy framework overhead    | Optimized specifically for particles |
+| Canvas integration  | Requires separate canvas management   | Can overlay on existing canvas       |
+| Memory usage        | Higher due to full creative framework | Lower, focused on particles only     |
+| GPU acceleration    | Manual WebGL setup required           | Built-in optimizations               |
 
 **Winner: tsParticles** - Purpose-built for particle effects with better performance characteristics.
 
 ### 3. Integration with Existing Konva Canvas
 
-| Aspect | p5.js | tsParticles |
-|--------|-------|-------------|
-| Canvas coexistence | Complex - requires dual canvas setup | Seamless overlay capability |
-| Event handling | Conflicts with Konva mouse events | Non-intrusive overlay approach |
-| Rendering pipeline | Separate render loop needed | Integrates with existing animation frame |
+| Aspect             | p5.js                                | tsParticles                              |
+| ------------------ | ------------------------------------ | ---------------------------------------- |
+| Canvas coexistence | Complex - requires dual canvas setup | Seamless overlay capability              |
+| Event handling     | Conflicts with Konva mouse events    | Non-intrusive overlay approach           |
+| Rendering pipeline | Separate render loop needed          | Integrates with existing animation frame |
 
 **Winner: tsParticles** - Much easier integration with our existing Konva-based architecture.
 
 ### 4. Effect Variety & Customization
 
-| Feature | p5.js | tsParticles |
-|---------|-------|-------------|
-| Built-in effects | Unlimited (full creative framework) | 20+ optimized particle effects |
-| Custom effects | Full programming flexibility | Configuration-based customization |
-| Animation types | Any conceivable animation | Particle-focused animations |
-| Learning curve | Steep (requires p5.js knowledge) | Gentle (configuration-driven) |
+| Feature          | p5.js                               | tsParticles                       |
+| ---------------- | ----------------------------------- | --------------------------------- |
+| Built-in effects | Unlimited (full creative framework) | 20+ optimized particle effects    |
+| Custom effects   | Full programming flexibility        | Configuration-based customization |
+| Animation types  | Any conceivable animation           | Particle-focused animations       |
+| Learning curve   | Steep (requires p5.js knowledge)    | Gentle (configuration-driven)     |
 
 **Winner: p5.js** - More flexibility, but tsParticles provides sufficient variety for overlay effects.
 
 ### 5. Mobile Performance
 
-| Aspect | p5.js | tsParticles |
-|--------|-------|-------------|
-| Touch performance | Framework overhead impacts performance | Optimized for mobile devices |
-| Battery usage | Higher due to full framework | Lower, focused rendering |
-| Responsive behavior | Manual responsive handling | Built-in responsive features |
+| Aspect              | p5.js                                  | tsParticles                  |
+| ------------------- | -------------------------------------- | ---------------------------- |
+| Touch performance   | Framework overhead impacts performance | Optimized for mobile devices |
+| Battery usage       | Higher due to full framework           | Lower, focused rendering     |
+| Responsive behavior | Manual responsive handling             | Built-in responsive features |
 
 **Winner: tsParticles** - Critical advantage for our mobile-first PRD requirements.
 
 ## Technical Implementation Analysis
 
 ### p5.js Integration Challenges
+
 - Would require separate canvas element overlaid on Konva canvas
 - Complex event handling to prevent conflicts
 - Significant bundle size impact (doubles app size)
 - Need to manage dual render loops
 
 ### tsParticles Integration Benefits
+
 - Direct overlay on existing canvas via CSS positioning
 - Non-intrusive - doesn't interfere with image editing
 - Modular imports - only load needed effects
@@ -76,6 +78,7 @@ Based on performance benchmarks, bundle size analysis, and integration requireme
 ## Code Complexity Comparison
 
 ### p5.js Implementation (Estimated 150+ lines)
+
 ```javascript
 // Requires separate canvas, complex event handling,
 // dual animation loops, and manual optimization
@@ -85,11 +88,16 @@ let p5Instance;
 ```
 
 ### tsParticles Implementation (Estimated 30-50 lines)
+
 ```javascript
 // Simple configuration-driven approach
 const particlesOptions = {
-  particles: { /* config */ },
-  interactivity: { /* config */ }
+  particles: {
+    /* config */
+  },
+  interactivity: {
+    /* config */
+  },
 };
 // ... minimal setup code
 ```
@@ -104,7 +112,7 @@ Based on [2024 JavaScript bundlers comparison](https://tonai.github.io/blog/post
 ## Recommendation Rationale
 
 1. **Aligns with PRD Goals**: tsParticles directly supports our <300ms effect preview requirement
-2. **Bundle Size**: Critical for mobile users and global accessibility 
+2. **Bundle Size**: Critical for mobile users and global accessibility
 3. **Integration Simplicity**: Minimal code changes to existing architecture
 4. **Maintenance**: Configuration-driven vs. code-heavy implementation
 5. **Mobile Performance**: Essential for our responsive design requirements
@@ -119,4 +127,4 @@ Based on [2024 JavaScript bundlers comparison](https://tonai.github.io/blog/post
 
 ## Next Steps
 
-Proceed with tsParticles implementation for Task 1.2 - creating the GenerativeOverlay component. 
+Proceed with tsParticles implementation for Task 1.2 - creating the GenerativeOverlay component.

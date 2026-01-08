@@ -1,9 +1,11 @@
 # Product Requirements Document (PRD)
 
 ## Product Overview
+
 The product is a React-based image editing app providing real-time artistic effects, filters, and generative art capabilities. It leverages prebuilt libraries (React Konva, Three.js, Fabric.js, glfx.js, CSS filters, etc.) to allow users to intuitively apply creative effects and export images seamlessly.
 
 ## Objectives
+
 - Simplify the image editing experience with intuitive UI.
 - Provide real-time visual feedback for applied effects.
 - Allow easy image export/download functionality.
@@ -12,6 +14,7 @@ The product is a React-based image editing app providing real-time artistic effe
 ## Features
 
 ### 1. Core Functionality
+
 - **Image Upload & Editing:** Load user-uploaded images directly into the editor.
 - **Real-time effects preview:** Instant visual feedback when effects are adjusted.
 - **Export functionality:** Allow image export in formats like PNG/JPEG.
@@ -19,40 +22,48 @@ The product is a React-based image editing app providing real-time artistic effe
 ## Core Features & Implementation
 
 ### Image Import & Canvas Initialization
+
 - **Implementation:** Use React Konva or Fabric.js for canvas rendering.
 - **Features:** Drag-and-drop or file picker to import images.
 
 ### Real-time Filters
+
 - **Libraries:** Konva.js, CamanJS, glfx.js, Tailwind CSS
 - **Effects:** Blur, pixelation, hue rotation, brightness, contrast, grayscale, sepia, invert.
 - **Implementation:** Apply filters via canvas manipulation (Konva or CamanJS) or CSS classes (Tailwind CSS).
 
 ### Glitch Effects
+
 - **Libraries:** PowerGlitch (CSS), glfx.js, VFX.js
 - **Implementation:** Real-time glitches triggered by user actions (toggle, sliders).
 - **Use Case:** Creative visual distortion for artistic effect.
 
 ### Generative Artistic Overlays
+
 - **Libraries:** p5.js, tsParticles
 - **Implementation:** Procedurally generated patterns or particles overlaid on images.
 - **Examples:** Particle effects (tsParticles), noise patterns or procedural effects (p5.js).
 
 ### Pixelation & Distortion Effects
+
 - **Libraries:** Konva.js filters, glfx.js (bulge, pinch, swirl)
 - **Implementation:** Sliders controlling intensity of distortion or pixelation.
 - **Use Case:** Artistic mosaic or abstract distortions.
 
 ### Advanced 3D Effects
+
 - **Libraries:** Three.js, React Three Fiber
 - **Features:** Apply image textures onto 3D objects, post-processing effects (bloom, glitch).
 - **Use Case:** 3D tilting, depth, or pseudo-3D relief.
 
 ## UI/UX Requirements
+
 - Simple, minimalist design built with Tailwind CSS.
 - Intuitive controls: sliders, toggles, buttons for effects.
 - Responsive and performant previews.
 
 ## Technical Stack
+
 - **Frontend:** React, Tailwind CSS
 - **Graphics Libraries:** React Konva, Fabric.js, glfx.js, Three.js (R3F), CamanJS
 - **Effects:** VFX.js, PowerGlitch, CSS blend modes
@@ -60,33 +71,38 @@ The product is a React-based image editing app providing real-time artistic effe
 - **Code Management:** Cursor
 
 ## Performance Considerations
+
 - Utilize Web Workers/OffscreenCanvas for heavy computations (pixel sorting).
 - Preview effects at lower resolutions initially, apply full resolution upon export.
 - Use WebGL effects where GPU acceleration is advantageous.
 
 ## Export & Download
+
 - Leverage `canvas.toDataURL()` or `toBlob()` for export.
 - Download button triggers export at original image resolution with applied effects.
 
 ## Milestones
+
 - **MVP:** Image import, basic filters (CSS & Konva.js), simple glitch.
 - **Phase 2:** Implement advanced effects (glfx.js, generative overlays).
 - **Phase 3:** Integrate Three.js/R3F for 3D effects.
 - **Final Product:** Polished UI, comprehensive effects palette, performant real-time editing.
 
 ## Risks & Mitigation
+
 - **Performance Risk:** High-res images with effects can lag.
   - **Mitigation:** Debounce slider inputs, preview at lower resolutions.
 - **Complexity Risk:** 3D effects and generative art can become intricate.
   - **Mitigation:** Start simple; progressively add complex features iteratively.
 
 ## Success Metrics
+
 - User satisfaction with intuitiveness and responsiveness.
 - Performance: Smooth real-time updates (target 60fps).
 - Export quality: High-fidelity downloads accurately reflect applied effects.
 
 ## Future Enhancements
+
 - User-saved custom presets.
 - Collaborative editing/sharing options.
 - Integration with social media for direct sharing.
-
