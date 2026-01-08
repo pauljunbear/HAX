@@ -19,6 +19,7 @@ interface EffectSetting {
 interface EffectConfig {
   label: string;
   category: string;
+  presetNames?: string[];
   settings?: EffectSetting[];
 }
 
@@ -4229,10 +4230,11 @@ export const effectsConfig: Record<string, EffectConfig> = {
   cinematicLut: {
     label: 'Cinematic LUT',
     category: 'Color Effects',
+    presetNames: ['Teal/Orange', 'Bleach', 'Film Fade', 'Pastel'],
     settings: [
       {
         id: 'preset',
-        label: 'Preset (0=Teal/Orange, 1=Bleach, 2=Film Fade, 3=Pastel)',
+        label: 'Style',
         min: 0,
         max: 3,
         defaultValue: 0,
@@ -4378,10 +4380,11 @@ export const effectsConfig: Record<string, EffectConfig> = {
   unifiedSketch: {
     label: 'Sketch',
     category: 'Artistic',
+    presetNames: ['Pencil', 'Crosshatch', 'Etched', 'Ink Wash', 'Bold Ink'],
     settings: [
       {
         id: 'style',
-        label: 'Style (0=Pencil, 1=Cross, 2=Etched, 3=Ink, 4=Bold)',
+        label: 'Style',
         min: 0,
         max: 4,
         defaultValue: 0,
@@ -4440,10 +4443,11 @@ export const effectsConfig: Record<string, EffectConfig> = {
   unifiedGlow: {
     label: 'Glow',
     category: 'Blur & Focus',
+    presetNames: ['Bloom', 'Dreamy', 'Neon', 'Bioluminescent', 'Halation'],
     settings: [
       {
         id: 'preset',
-        label: 'Style (0=Bloom, 1=Dreamy, 2=Neon, 3=Bio, 4=Halation)',
+        label: 'Style',
         min: 0,
         max: 4,
         defaultValue: 0,
@@ -4471,10 +4475,19 @@ export const effectsConfig: Record<string, EffectConfig> = {
   unifiedGlitch: {
     label: 'Glitch',
     category: 'Distort',
+    presetNames: [
+      'RGB Split',
+      'Chromatic',
+      'Scanlines',
+      'VHS',
+      'Corrupt',
+      'Databend',
+      'Pixel Sort',
+    ],
     settings: [
       {
         id: 'preset',
-        label: 'Style (0=RGB, 1=Chromatic, 2=Scanlines, 3=VHS, 4=Corrupt, 5=Databend, 6=PixelSort)',
+        label: 'Style',
         min: 0,
         max: 6,
         defaultValue: 0,
@@ -4497,10 +4510,11 @@ export const effectsConfig: Record<string, EffectConfig> = {
   unifiedVintage: {
     label: 'Vintage',
     category: 'Color',
+    presetNames: ['Sepia', 'Old Photo', 'Faded', 'Cross Process', 'Scratched', 'Polaroid'],
     settings: [
       {
         id: 'preset',
-        label: 'Style (0=Sepia, 1=OldPhoto, 2=Faded, 3=CrossProc, 4=Scratched, 5=Polaroid)',
+        label: 'Style',
         min: 0,
         max: 5,
         defaultValue: 0,
@@ -4517,11 +4531,20 @@ export const effectsConfig: Record<string, EffectConfig> = {
   unifiedWarp: {
     label: 'Warp',
     category: 'Distort',
+    presetNames: [
+      'Pixelate',
+      'Swirl',
+      'Kaleidoscope',
+      'Fisheye',
+      'Sphere',
+      'Pinch',
+      'Wave',
+      'Shatter',
+    ],
     settings: [
       {
         id: 'preset',
-        label:
-          'Style (0=Pixel, 1=Swirl, 2=Kaleid, 3=Fisheye, 4=Sphere, 5=Pinch, 6=Wave, 7=Shatter)',
+        label: 'Style',
         min: 0,
         max: 7,
         defaultValue: 1,
@@ -4545,10 +4568,11 @@ export const effectsConfig: Record<string, EffectConfig> = {
   unifiedBlur: {
     label: 'Blur',
     category: 'Blur & Focus',
+    presetNames: ['Gaussian', 'Bokeh', 'Tilt Shift', 'Motion', 'Radial'],
     settings: [
       {
         id: 'preset',
-        label: 'Style (0=Gaussian, 1=Bokeh, 2=TiltShift, 3=Motion, 4=Radial)',
+        label: 'Style',
         min: 0,
         max: 4,
         defaultValue: 0,
