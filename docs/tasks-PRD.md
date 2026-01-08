@@ -25,15 +25,17 @@
 ## Tasks
 
 - [x] 1.0 Add Generative Artistic Overlays ⚠️ **REMOVED DUE TO PERFORMANCE ISSUES**
+
   - [x] 1.1 Evaluate and select a library for overlays (p5.js vs. tsParticles) with performance benchmark
   - [x] 1.2 ~~Create `GenerativeOverlay.tsx`~~ **DISABLED** - Caused browser freezing and poor UX
   - [x] 1.3 ~~Extend `effectsConfig` and `effectCategories`~~ **REMOVED** - Generative Overlay category disabled
   - [x] 1.4 ~~Add parameter controls~~ **REMOVED** - No longer accessible in UI
   - [x] 1.5 ~~Support overlay visibility~~ **REMOVED** - Effects return null
-  - [x] 1.6 ~~Ensure overlays are rasterised~~ **REMOVED** - No overlay compositing  
+  - [x] 1.6 ~~Ensure overlays are rasterised~~ **REMOVED** - No overlay compositing
   - [x] 1.7 ~~Write unit tests~~ **OBSOLETE** - Component no longer used
 
 - [x] 2.0 Integrate 3D Effects with Three.js/R3F ⚠️ **REMOVED DUE TO POOR USER EXPERIENCE**
+
   - [x] 2.1 ~~Scaffold `ThreeDEffectsCanvas.tsx`~~ **REMOVED** - 3D effects deemed gimmicky and not useful
   - [x] 2.2 ~~Map uploaded image as texture onto 3D objects~~ **REMOVED** - Effects were weird and uninteresting
   - [x] 2.3 ~~Implement tilt/parallax 3D effect~~ **REMOVED** - No practical value for image editing
@@ -44,6 +46,7 @@
   - [x] 2.8 ~~Unit tests for 3D effects~~ **OBSOLETE** - Components no longer used
 
 - [x] 3.0 Enhance Export Pipeline (Video & High-quality Animation)
+
   - [x] 3.1 Add ffmpeg-wasm and create `videoExporter.ts` utility
   - [x] 3.2 Capture animation frames and pipe to ffmpeg for WebM/MP4 export
   - [x] 3.3 Extend export dialog UI to include video format options and quality slider
@@ -52,6 +55,7 @@
   - [x] 3.6 Unit tests for `videoExporter` and updated export dialog logic
 
 - [x] 4.0 Performance Optimisation (Web Workers, OffscreenCanvas, Code-Splitting)
+
   - [x] 4.1 Create `effectsWorker.ts` to run heavy pixel manipulations off the main thread
   - [x] 4.2 Refactor custom filter logic to execute inside the worker and postMessage results
   - [x] 4.3 Use `OffscreenCanvas` where supported for worker-side rendering
@@ -60,12 +64,14 @@
   - [x] 4.6 Write unit tests or benchmarks for worker vs. main-thread performance
 
 - [x] 5.0 Accessibility & Onboarding Improvements
+
   - [x] 5.1 Audit existing components for ARIA roles, labels, and keyboard navigation gaps
   - [x] 5.2 Ensure color contrast meets WCAG AA for both light and dark themes
   - [x] 5.4 Add focus-ring styling and skip-to-content link
   - [ ] 5.5 Create Cypress E2E tests for accessibility flows and onboarding tour
 
 - [x] 6.0 Testing & CI/CD Pipeline Setup
+
   - [x] 6.1 Expand Jest configuration to collect coverage for new directories (`src/lib`, `src/worker`)
   - [ ] 6.2 Add unit tests for all new components, hooks, and utilities
   - [x] 6.3 Configure GitHub Actions workflow: install, lint, test, build
@@ -73,6 +79,7 @@
   - [x] 6.5 Ensure Vercel Preview deploy passes all checks before merging to main
 
 - [x] 8.0 Performance Optimization with WebGL & Smart Caching
+
   - [x] 8.1 Implement WebGL renderer using PixiJS for GPU-accelerated effects
   - [x] 8.2 Add multi-layer caching: localStorage for effect results, memory cache for Konva nodes
   - [x] 8.3 Implement worker pool warming and reuse
@@ -82,6 +89,7 @@
   - [ ] 8.7 Add performance benchmarks and optimization recommendations
 
 - [x] 9.0 Mathematical & Fractal Effects
+
   - [x] 9.1 Implement Mandelbrot/Julia set fractal generators
   - [x] 9.2 Create reaction-diffusion pattern effect (Turing patterns)
   - [x] 9.3 Add Voronoi/Delaunay tessellation effects
@@ -91,6 +99,7 @@
   - [ ] 9.7 Unit tests for mathematical computations and rendering
 
 - [ ] 10.0 Phase 1: Quick UI/UX Wins
+
   - [x] 10.1 Implement effect hover previews
   - [x] 10.2 Add before/after split view with draggable divider
   - [ ] 10.3 Create Orton Effect (dreamy glow)
@@ -104,4 +113,4 @@
   - [ ] 11.3 Create HDR Tone Mapping effect
   - [ ] 11.4 Implement Advanced Color Grading
   - [ ] 11.5 Add export presets for social platforms
-  - [ ] 11.6 Create magnetic sliders with haptic feedback 
+  - [ ] 11.6 Create magnetic sliders with haptic feedback
