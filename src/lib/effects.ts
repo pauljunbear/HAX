@@ -655,6 +655,8 @@ export const applyEffect = async (
       // --- TRENDING EFFECTS ---
       case 'y2kChrome':
         return [createY2kChromeEffect(settings), {}];
+      case 'brokenGlass':
+        return [createBrokenGlassEffect(settings), {}];
 
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
@@ -5120,6 +5122,204 @@ const createY2kChromeEffect = (settings: Record<string, number>) => {
   };
 };
 
+// ============================================================================
+// BROKEN GLASS EFFECT - Shattered Glass Overlay
+// Creates cracked/shattered glass pattern with displacement and highlights
+// ============================================================================
+const createBrokenGlassEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const crackDensity = Math.max(3, Math.min(25, Math.floor(settings.density ?? 12)));
+    const displacement = Math.max(0, Math.min(30, settings.displacement ?? 8));
+    const glassThickness = (settings.thickness ?? 50) / 100;
+    const impactX = (settings.impactX ?? 50) / 100;
+    const impactY = (settings.impactY ?? 50) / 100;
+    const chromaticAmount = (settings.chromatic ?? 30) / 100;
+    const opacity = settings.opacity ?? 1;
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const originalForBlend = opacity < 1 ? pool.acquire(data.length) : null;
+
+    try {
+      original.set(data);
+      if (originalForBlend) originalForBlend.set(data);
+
+      // Generate Voronoi cell centers for glass shards
+      const impactCenterX = width * impactX;
+      const impactCenterY = height * impactY;
+
+      // Create shard centers radiating from impact point
+      const shardCenters: Array<{ x: number; y: number; id: number }> = [];
+      const numShards = crackDensity * crackDensity;
+
+      // Seed random for consistent results
+      const seededRandom = (seed: number) => {
+        const x = Math.sin(seed * 12.9898 + seed * 78.233) * 43758.5453;
+        return x - Math.floor(x);
+      };
+
+      for (let i = 0; i < numShards; i++) {
+        // Distribute shards with more density near impact
+        const angle = seededRandom(i * 2) * Math.PI * 2;
+        const distFactor = seededRandom(i * 3);
+        const maxDist = Math.sqrt(width * width + height * height) / 2;
+        const dist = distFactor * distFactor * maxDist; // More shards near center
+
+        const x = impactCenterX + Math.cos(angle) * dist + (seededRandom(i * 5) - 0.5) * 100;
+        const y = impactCenterY + Math.sin(angle) * dist + (seededRandom(i * 7) - 0.5) * 100;
+
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          shardCenters.push({ x, y, id: i });
+        }
+      }
+
+      // Add edge shards
+      for (let i = 0; i < crackDensity * 2; i++) {
+        shardCenters.push({ x: seededRandom(i + 100) * width, y: 0, id: numShards + i });
+        shardCenters.push({
+          x: seededRandom(i + 200) * width,
+          y: height - 1,
+          id: numShards + i + crackDensity * 2,
+        });
+        shardCenters.push({
+          x: 0,
+          y: seededRandom(i + 300) * height,
+          id: numShards + i + crackDensity * 4,
+        });
+        shardCenters.push({
+          x: width - 1,
+          y: seededRandom(i + 400) * height,
+          id: numShards + i + crackDensity * 6,
+        });
+      }
+
+      // Pre-compute shard assignments and crack detection
+      const shardMap = new Int32Array(width * height);
+      const crackMap = new Float32Array(width * height);
+
+      // Assign each pixel to nearest shard (Voronoi)
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          let minDist = Infinity;
+          let secondMinDist = Infinity;
+          let nearestShard = 0;
+
+          for (let s = 0; s < shardCenters.length; s++) {
+            const dx = x - shardCenters[s].x;
+            const dy = y - shardCenters[s].y;
+            const dist = dx * dx + dy * dy;
+
+            if (dist < minDist) {
+              secondMinDist = minDist;
+              minDist = dist;
+              nearestShard = shardCenters[s].id;
+            } else if (dist < secondMinDist) {
+              secondMinDist = dist;
+            }
+          }
+
+          const idx = y * width + x;
+          shardMap[idx] = nearestShard;
+
+          // Crack intensity based on distance to cell edge
+          const edgeDist = Math.sqrt(secondMinDist) - Math.sqrt(minDist);
+          crackMap[idx] = Math.max(0, 1 - edgeDist / 3);
+        }
+      }
+
+      // Apply effect
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+          const idx = y * width + x;
+          const crack = crackMap[idx];
+          const shardId = shardMap[idx];
+
+          // Calculate displacement based on shard
+          const shardAngle = seededRandom(shardId * 17) * Math.PI * 2;
+          const shardDisp = seededRandom(shardId * 23) * displacement;
+
+          // Distance from impact affects displacement
+          const distFromImpact = Math.sqrt((x - impactCenterX) ** 2 + (y - impactCenterY) ** 2);
+          const maxDist = Math.sqrt(width * width + height * height) / 2;
+          const dispFactor = Math.min(1, distFromImpact / maxDist);
+
+          const dispX = Math.cos(shardAngle) * shardDisp * dispFactor;
+          const dispY = Math.sin(shardAngle) * shardDisp * dispFactor;
+
+          // Sample with displacement
+          const srcX = clamp(Math.round(x + dispX), 0, width - 1);
+          const srcY = clamp(Math.round(y + dispY), 0, height - 1);
+          const srcI = (srcY * width + srcX) * 4;
+
+          // Chromatic aberration on edges
+          let finalR, finalG, finalB;
+
+          if (chromaticAmount > 0 && crack > 0.3) {
+            const caOffset = Math.round(chromaticAmount * crack * 5);
+            const srcIR = (srcY * width + clamp(srcX + caOffset, 0, width - 1)) * 4;
+            const srcIB = (srcY * width + clamp(srcX - caOffset, 0, width - 1)) * 4;
+
+            finalR = original[srcIR];
+            finalG = original[srcI + 1];
+            finalB = original[srcIB + 2];
+          } else {
+            finalR = original[srcI];
+            finalG = original[srcI + 1];
+            finalB = original[srcI + 2];
+          }
+
+          // Glass highlights on cracks
+          if (crack > 0.5) {
+            const highlight = (crack - 0.5) * 2 * glassThickness;
+
+            // Bright highlight on one side
+            const highlightAngle = seededRandom(shardId * 31);
+            if (highlightAngle > 0.5) {
+              finalR = clampByte(finalR + highlight * 200);
+              finalG = clampByte(finalG + highlight * 200);
+              finalB = clampByte(finalB + highlight * 200);
+            } else {
+              // Dark edge on other side
+              finalR = clampByte(finalR * (1 - highlight * 0.5));
+              finalG = clampByte(finalG * (1 - highlight * 0.5));
+              finalB = clampByte(finalB * (1 - highlight * 0.5));
+            }
+          }
+
+          // Draw crack lines
+          if (crack > 0.7) {
+            const crackIntensity = (crack - 0.7) / 0.3;
+            // Dark crack line
+            finalR = clampByte(lerp(finalR, 20, crackIntensity * 0.8));
+            finalG = clampByte(lerp(finalG, 20, crackIntensity * 0.8));
+            finalB = clampByte(lerp(finalB, 25, crackIntensity * 0.8));
+          }
+
+          // Subtle refraction tint per shard
+          const shardTint = seededRandom(shardId * 41) * 0.1;
+          finalR = clampByte(finalR * (1 + shardTint - 0.05));
+          finalG = clampByte(finalG * (1 + shardTint * 0.5 - 0.025));
+          finalB = clampByte(finalB * (1 - shardTint + 0.05));
+
+          data[i] = finalR;
+          data[i + 1] = finalG;
+          data[i + 2] = finalB;
+        }
+      }
+
+      // Apply opacity blend
+      if (originalForBlend && opacity < 1) {
+        applyOpacityBlend(data, originalForBlend, opacity);
+      }
+    } finally {
+      pool.release(original);
+      if (originalForBlend) pool.release(originalForBlend);
+    }
+  };
+};
+
 // Define all available effects with their settings
 export const effectsConfig: Record<string, EffectConfig> = {
   // Basic Adjustments - Standardized to intuitive percentage-based ranges
@@ -6434,6 +6634,84 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         group: 'appearance',
         description: 'Blend between original image and chrome result',
+      },
+    ],
+  },
+
+  // BROKEN GLASS - Shattered Glass Effect
+  brokenGlass: {
+    label: 'Broken Glass',
+    category: 'Special FX',
+    settings: [
+      {
+        id: 'density',
+        label: 'Crack Density',
+        min: 3,
+        max: 25,
+        defaultValue: 12,
+        step: 1,
+        group: 'style',
+        description: 'Number of glass shards - higher values create more cracks',
+      },
+      {
+        id: 'displacement',
+        label: 'Displacement (px)',
+        min: 0,
+        max: 30,
+        defaultValue: 8,
+        step: 1,
+        group: 'intensity',
+        description: 'How much each shard shifts from its original position',
+      },
+      {
+        id: 'thickness',
+        label: 'Glass Thickness (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 50,
+        step: 5,
+        group: 'appearance',
+        description: 'Affects highlight intensity on glass edges',
+      },
+      {
+        id: 'impactX',
+        label: 'Impact Point X (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 50,
+        step: 5,
+        group: 'position',
+        description: 'Horizontal position of the impact center',
+      },
+      {
+        id: 'impactY',
+        label: 'Impact Point Y (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 50,
+        step: 5,
+        group: 'position',
+        description: 'Vertical position of the impact center',
+      },
+      {
+        id: 'chromatic',
+        label: 'Chromatic Aberration (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 30,
+        step: 5,
+        group: 'appearance',
+        description: 'Color fringing along crack edges',
+      },
+      {
+        id: 'opacity',
+        label: 'Effect Opacity',
+        min: 0,
+        max: 1,
+        defaultValue: 1,
+        step: 0.05,
+        group: 'appearance',
+        description: 'Blend between original image and shattered result',
       },
     ],
   },
@@ -10533,6 +10811,7 @@ export const effectCategories = {
     description: 'Special effects and simulations',
     effects: [
       'y2kChrome', // Metallic chrome, holographic rainbow, Y2K aesthetic
+      'brokenGlass', // Shattered glass overlay with displacement
       'doubleExposure',
       'liquidMetal',
       'neuralDream',
