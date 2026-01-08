@@ -657,6 +657,8 @@ export const applyEffect = async (
         return [createY2kChromeEffect(settings), {}];
       case 'brokenGlass':
         return [createBrokenGlassEffect(settings), {}];
+      case 'frostedGlass':
+        return [createFrostedGlassEffect(settings), {}];
 
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
@@ -5320,6 +5322,252 @@ const createBrokenGlassEffect = (settings: Record<string, number>) => {
   };
 };
 
+// ============================================================================
+// FROSTED GLASS EFFECT - Textured Glass Simulation
+// Simulates looking through frosted/textured glass with blur and displacement
+// ============================================================================
+const createFrostedGlassEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const frostAmount = (settings.frost ?? 50) / 100;
+    const textureScale = Math.max(1, Math.min(50, settings.scale ?? 10));
+    const clarity = (settings.clarity ?? 0) / 100; // Center clarity
+    const claritySize = (settings.claritySize ?? 30) / 100;
+    const tint = (settings.tint ?? 0) / 100; // Blue-ish tint for glass
+    const opacity = settings.opacity ?? 1;
+
+    if (frostAmount === 0) return;
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const blurred = pool.acquire(data.length);
+    const originalForBlend = opacity < 1 ? pool.acquire(data.length) : null;
+
+    try {
+      original.set(data);
+      if (originalForBlend) originalForBlend.set(data);
+
+      // Generate Perlin-like noise for displacement
+      const seededRandom = (x: number, y: number) => {
+        const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        return n - Math.floor(n);
+      };
+
+      // Smooth noise function (interpolated)
+      const smoothNoise = (x: number, y: number) => {
+        const x0 = Math.floor(x);
+        const y0 = Math.floor(y);
+        const fx = x - x0;
+        const fy = y - y0;
+
+        // Smooth interpolation
+        const sx = fx * fx * (3 - 2 * fx);
+        const sy = fy * fy * (3 - 2 * fy);
+
+        const n00 = seededRandom(x0, y0);
+        const n10 = seededRandom(x0 + 1, y0);
+        const n01 = seededRandom(x0, y0 + 1);
+        const n11 = seededRandom(x0 + 1, y0 + 1);
+
+        const nx0 = n00 * (1 - sx) + n10 * sx;
+        const nx1 = n01 * (1 - sx) + n11 * sx;
+
+        return nx0 * (1 - sy) + nx1 * sy;
+      };
+
+      // Fractal Brownian Motion for more natural texture
+      const fbm = (x: number, y: number, octaves: number) => {
+        let value = 0;
+        let amplitude = 0.5;
+        let frequency = 1;
+        let maxValue = 0;
+
+        for (let i = 0; i < octaves; i++) {
+          value += smoothNoise(x * frequency, y * frequency) * amplitude;
+          maxValue += amplitude;
+          amplitude *= 0.5;
+          frequency *= 2;
+        }
+
+        return value / maxValue;
+      };
+
+      // First pass: Apply displacement based on noise
+      const maxDisplacement = frostAmount * 15; // Max pixel displacement
+      const displaced = pool.acquire(data.length);
+
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const maxRadius = Math.sqrt(centerX * centerX + centerY * centerY);
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+
+          // Calculate distance from center for clarity gradient
+          const dx = x - centerX;
+          const dy = y - centerY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const normalizedDist = dist / maxRadius;
+
+          // Clarity falloff - center is clearer
+          let localFrost = frostAmount;
+          if (clarity > 0) {
+            const clarityFalloff = Math.max(0, 1 - normalizedDist / claritySize);
+            localFrost = frostAmount * (1 - clarity * clarityFalloff * clarityFalloff);
+          }
+
+          // Get noise-based displacement
+          const noiseX = fbm(x / textureScale, y / textureScale, 3);
+          const noiseY = fbm(x / textureScale + 100, y / textureScale + 100, 3);
+
+          const dispX = (noiseX - 0.5) * 2 * maxDisplacement * localFrost;
+          const dispY = (noiseY - 0.5) * 2 * maxDisplacement * localFrost;
+
+          // Sample from displaced position
+          const srcX = Math.max(0, Math.min(width - 1, Math.round(x + dispX)));
+          const srcY = Math.max(0, Math.min(height - 1, Math.round(y + dispY)));
+          const srcI = (srcY * width + srcX) * 4;
+
+          displaced[i] = original[srcI];
+          displaced[i + 1] = original[srcI + 1];
+          displaced[i + 2] = original[srcI + 2];
+          displaced[i + 3] = original[srcI + 3];
+        }
+      }
+
+      // Second pass: Apply blur based on frost amount
+      const blurRadius = Math.floor(frostAmount * 8);
+      if (blurRadius > 0) {
+        // Box blur (separable for performance)
+        const temp = pool.acquire(data.length);
+
+        // Horizontal pass
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            let r = 0,
+              g = 0,
+              b = 0,
+              a = 0,
+              count = 0;
+
+            // Calculate local blur based on clarity
+            const dx = x - centerX;
+            const dy = y - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const normalizedDist = dist / maxRadius;
+
+            let localBlur = blurRadius;
+            if (clarity > 0) {
+              const clarityFalloff = Math.max(0, 1 - normalizedDist / claritySize);
+              localBlur = Math.floor(blurRadius * (1 - clarity * clarityFalloff * clarityFalloff));
+            }
+
+            for (let kx = -localBlur; kx <= localBlur; kx++) {
+              const sx = Math.max(0, Math.min(width - 1, x + kx));
+              const si = (y * width + sx) * 4;
+              r += displaced[si];
+              g += displaced[si + 1];
+              b += displaced[si + 2];
+              a += displaced[si + 3];
+              count++;
+            }
+
+            temp[i] = r / count;
+            temp[i + 1] = g / count;
+            temp[i + 2] = b / count;
+            temp[i + 3] = a / count;
+          }
+        }
+
+        // Vertical pass
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            let r = 0,
+              g = 0,
+              b = 0,
+              a = 0,
+              count = 0;
+
+            // Calculate local blur based on clarity
+            const dx = x - centerX;
+            const dy = y - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const normalizedDist = dist / maxRadius;
+
+            let localBlur = blurRadius;
+            if (clarity > 0) {
+              const clarityFalloff = Math.max(0, 1 - normalizedDist / claritySize);
+              localBlur = Math.floor(blurRadius * (1 - clarity * clarityFalloff * clarityFalloff));
+            }
+
+            for (let ky = -localBlur; ky <= localBlur; ky++) {
+              const sy = Math.max(0, Math.min(height - 1, y + ky));
+              const si = (sy * width + x) * 4;
+              r += temp[si];
+              g += temp[si + 1];
+              b += temp[si + 2];
+              a += temp[si + 3];
+              count++;
+            }
+
+            blurred[i] = r / count;
+            blurred[i + 1] = g / count;
+            blurred[i + 2] = b / count;
+            blurred[i + 3] = a / count;
+          }
+        }
+
+        pool.release(temp);
+      } else {
+        blurred.set(displaced);
+      }
+
+      pool.release(displaced);
+
+      // Apply result with optional glass tint
+      for (let i = 0; i < data.length; i += 4) {
+        let r = blurred[i];
+        let g = blurred[i + 1];
+        let b = blurred[i + 2];
+
+        // Subtle blue-ish glass tint
+        if (tint > 0) {
+          r = r * (1 - tint * 0.1);
+          g = g * (1 - tint * 0.05);
+          b = b * (1 + tint * 0.05);
+        }
+
+        // Add subtle specular highlight based on noise
+        const px = (i / 4) % width;
+        const py = Math.floor(i / 4 / width);
+        const highlight = smoothNoise((px / textureScale) * 2, (py / textureScale) * 2);
+        if (highlight > 0.7) {
+          const highlightStrength = ((highlight - 0.7) / 0.3) * frostAmount * 30;
+          r = Math.min(255, r + highlightStrength);
+          g = Math.min(255, g + highlightStrength);
+          b = Math.min(255, b + highlightStrength);
+        }
+
+        data[i] = clampByte(r);
+        data[i + 1] = clampByte(g);
+        data[i + 2] = clampByte(b);
+      }
+
+      // Apply opacity blend
+      if (originalForBlend && opacity < 1) {
+        applyOpacityBlend(data, originalForBlend, opacity);
+      }
+    } finally {
+      pool.release(original);
+      pool.release(blurred);
+      if (originalForBlend) pool.release(originalForBlend);
+    }
+  };
+};
+
 // Define all available effects with their settings
 export const effectsConfig: Record<string, EffectConfig> = {
   // Basic Adjustments - Standardized to intuitive percentage-based ranges
@@ -6712,6 +6960,73 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         group: 'appearance',
         description: 'Blend between original image and shattered result',
+      },
+    ],
+  },
+
+  frostedGlass: {
+    label: 'Frosted Glass',
+    category: 'Special FX',
+    settings: [
+      {
+        id: 'frost',
+        label: 'Frost Amount (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 50,
+        step: 5,
+        group: 'intensity',
+        description: 'Overall intensity of the frosted glass effect',
+      },
+      {
+        id: 'scale',
+        label: 'Texture Scale',
+        min: 1,
+        max: 50,
+        defaultValue: 10,
+        step: 1,
+        group: 'style',
+        description: 'Size of the frost texture pattern',
+      },
+      {
+        id: 'clarity',
+        label: 'Center Clarity (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 0,
+        step: 5,
+        group: 'style',
+        description: 'Create a clear center area that gradually frosts outward',
+      },
+      {
+        id: 'claritySize',
+        label: 'Clarity Radius (%)',
+        min: 10,
+        max: 100,
+        defaultValue: 30,
+        step: 5,
+        group: 'style',
+        description: 'Size of the clear center area when clarity is enabled',
+      },
+      {
+        id: 'tint',
+        label: 'Glass Tint (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 0,
+        step: 5,
+        group: 'appearance',
+        description: 'Add a subtle blue-ish glass tint',
+      },
+      {
+        id: 'opacity',
+        label: 'Effect Opacity',
+        min: 0,
+        max: 1,
+        defaultValue: 1,
+        step: 0.05,
+        group: 'appearance',
+        description: 'Blend between original image and frosted result',
       },
     ],
   },
@@ -10812,6 +11127,7 @@ export const effectCategories = {
     effects: [
       'y2kChrome', // Metallic chrome, holographic rainbow, Y2K aesthetic
       'brokenGlass', // Shattered glass overlay with displacement
+      'frostedGlass', // Textured frosted glass with blur and displacement
       'doubleExposure',
       'liquidMetal',
       'neuralDream',
