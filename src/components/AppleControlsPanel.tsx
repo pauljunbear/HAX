@@ -7,6 +7,18 @@ import { Layers, FileImage, Film, Monitor, X, Plus } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+// Gradient colors for preset buttons
+const PRESET_GRADIENTS = [
+  { from: 'from-blue-500', to: 'to-cyan-500' },
+  { from: 'from-purple-500', to: 'to-pink-500' },
+  { from: 'from-emerald-500', to: 'to-teal-500' },
+  { from: 'from-orange-500', to: 'to-amber-500' },
+  { from: 'from-rose-500', to: 'to-red-500' },
+  { from: 'from-indigo-500', to: 'to-violet-500' },
+  { from: 'from-lime-500', to: 'to-green-500' },
+  { from: 'from-fuchsia-500', to: 'to-purple-500' },
+];
+
 interface EffectLayer {
   id: string;
   effectId: string;
@@ -313,9 +325,13 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                       if (isPresetSetting) {
                         const presetNames = activeEffectConfig!.presetNames!;
                         return (
-                          <div key={setting.id} className="glass-card p-4" title={setting.description}>
-                            <label className="text-sm font-medium control-panel-label block mb-1">
-                              {setting.label}
+                          <div
+                            key={setting.id}
+                            className="glass-card p-4"
+                            title={setting.description}
+                          >
+                            <label className="text-sm font-medium control-panel-label block mb-2">
+                              Style
                             </label>
                             {/* Description tooltip text */}
                             {setting.description && (
@@ -323,20 +339,34 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                                 {setting.description}
                               </p>
                             )}
-                            <div className="flex flex-wrap gap-2">
-                              {presetNames.map((name, index) => (
-                                <button
-                                  key={name}
-                                  onClick={() => onSettingChange?.(setting.id, index)}
-                                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                                    Math.round(setting.currentValue) === index
-                                      ? 'bg-primary text-primary-foreground shadow-md'
-                                      : 'glass-button hover:bg-muted'
-                                  }`}
-                                >
-                                  {name}
-                                </button>
-                              ))}
+                            <div className="grid grid-cols-2 gap-2">
+                              {presetNames.map((name, index) => {
+                                const isActive = Math.round(setting.currentValue) === index;
+                                const gradient = PRESET_GRADIENTS[index % PRESET_GRADIENTS.length];
+                                return (
+                                  <motion.button
+                                    key={name}
+                                    onClick={() => onSettingChange?.(setting.id, index)}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    className={`relative px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 overflow-hidden ${
+                                      isActive
+                                        ? `bg-gradient-to-r ${gradient.from} ${gradient.to} text-white shadow-lg`
+                                        : 'bg-muted/50 hover:bg-muted text-foreground border border-border/50'
+                                    }`}
+                                  >
+                                    {isActive && (
+                                      <motion.div
+                                        layoutId="activePreset"
+                                        className="absolute inset-0 bg-white/10"
+                                        initial={false}
+                                        transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
+                                      />
+                                    )}
+                                    <span className="relative z-10">{name}</span>
+                                  </motion.button>
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -344,7 +374,11 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
 
                       // Regular slider for non-color settings
                       return (
-                        <div key={setting.id} className="glass-card p-4" title={setting.description}>
+                        <div
+                          key={setting.id}
+                          className="glass-card p-4"
+                          title={setting.description}
+                        >
                           <div className="flex items-center justify-between mb-1">
                             <label className="text-sm font-medium control-panel-label">
                               {setting.label}
