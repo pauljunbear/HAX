@@ -1,8 +1,22 @@
-import * as PIXI from 'pixi.js';
-import { BlurFilter } from '@pixi/filter-blur';
-import { ColorMatrixFilter } from '@pixi/filter-color-matrix';
-// DisplacementFilter reserved for future displacement effects
-// import { DisplacementFilter } from '@pixi/filter-displacement';
+// Lazy-loaded Pixi.js modules - saves ~450KB on initial bundle
+let PIXI: typeof import('pixi.js') | null = null;
+let BlurFilter: typeof import('@pixi/filter-blur').BlurFilter | null = null;
+let ColorMatrixFilter: typeof import('@pixi/filter-color-matrix').ColorMatrixFilter | null = null;
+
+// Load Pixi.js and filters on demand
+async function loadPixiModules(): Promise<void> {
+  if (PIXI) return; // Already loaded
+
+  const [pixiModule, blurModule, colorModule] = await Promise.all([
+    import('pixi.js'),
+    import('@pixi/filter-blur'),
+    import('@pixi/filter-color-matrix'),
+  ]);
+
+  PIXI = pixiModule;
+  BlurFilter = blurModule.BlurFilter;
+  ColorMatrixFilter = colorModule.ColorMatrixFilter;
+}
 
 // PIXI with settings access
 interface PIXIWithSettings {
@@ -13,21 +27,46 @@ interface PIXIWithSettings {
   ENV?: { WEBGL2?: number };
 }
 
+// Generic filter interface for type safety before PIXI is loaded
+interface GenericFilter {
+  blur?: number;
+  brightness?: (value: number, multiply: boolean) => void;
+  contrast?: (value: number, multiply: boolean) => void;
+  saturate?: (value: number, multiply: boolean) => void;
+  hue?: (value: number, multiply: boolean) => void;
+  vintage?: (multiply: boolean) => void;
+  sepia?: (multiply: boolean) => void;
+}
+
 export interface WebGLEffect {
   name: string;
-  filter: PIXI.Filter;
+  filter: GenericFilter;
   params?: Record<string, unknown>;
 }
 
 export class WebGLRenderer {
-  private app: PIXI.Application | null = null;
-  private sprite: PIXI.Sprite | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private app: any | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private sprite: any | null = null;
   private container: HTMLElement | null = null;
   private effectsCache = new Map<string, WebGLEffect>();
-  private currentFilters: PIXI.Filter[] = [];
+  private currentFilters: GenericFilter[] = [];
+  private initialized = false;
 
   constructor() {
-    // Initialize PIXI settings for better performance
+    // PIXI settings will be configured when modules are loaded
+  }
+
+  async initialize(container: HTMLElement, width: number, height: number): Promise<void> {
+    // Lazy-load Pixi.js modules
+    await loadPixiModules();
+
+    if (!PIXI) throw new Error('Failed to load Pixi.js');
+
+    this.container = container;
+
+    // Configure PIXI settings for better performance
     const pixiWithSettings = PIXI as unknown as PIXIWithSettings;
     if (pixiWithSettings.settings && pixiWithSettings.ENV) {
       pixiWithSettings.settings.PREFER_ENV = pixiWithSettings.ENV.WEBGL2;
@@ -35,10 +74,6 @@ export class WebGLRenderer {
         pixiWithSettings.settings.RENDER_OPTIONS.hello = false;
       }
     }
-  }
-
-  async initialize(container: HTMLElement, width: number, height: number): Promise<void> {
-    this.container = container;
 
     // Clean up existing app if any
     if (this.app) {
@@ -61,39 +96,42 @@ export class WebGLRenderer {
 
     // Preload common filters
     this.preloadFilters();
+    this.initialized = true;
   }
 
   private preloadFilters(): void {
+    if (!BlurFilter || !ColorMatrixFilter) return;
+
     // Blur filter
-    const blurFilter = new BlurFilter() as unknown as PIXI.Filter;
+    const blurFilter = new BlurFilter() as unknown as GenericFilter;
     this.effectsCache.set('blur', { name: 'blur', filter: blurFilter });
 
     // Color matrix filters
-    const brightnessFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
+    const brightnessFilter = new ColorMatrixFilter() as unknown as GenericFilter;
     this.effectsCache.set('brightness', { name: 'brightness', filter: brightnessFilter });
 
-    const contrastFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
+    const contrastFilter = new ColorMatrixFilter() as unknown as GenericFilter;
     this.effectsCache.set('contrast', { name: 'contrast', filter: contrastFilter });
 
-    const saturationFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
+    const saturationFilter = new ColorMatrixFilter() as unknown as GenericFilter;
     this.effectsCache.set('saturation', { name: 'saturation', filter: saturationFilter });
 
-    const hueFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
+    const hueFilter = new ColorMatrixFilter() as unknown as GenericFilter;
     this.effectsCache.set('hue', { name: 'hue', filter: hueFilter });
 
     // Vintage filter
-    const vintageFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
-    vintageFilter.vintage(true);
+    const vintageFilter = new ColorMatrixFilter() as unknown as GenericFilter;
+    vintageFilter.vintage?.(true);
     this.effectsCache.set('vintage', { name: 'vintage', filter: vintageFilter });
 
     // Sepia filter
-    const sepiaFilter = new ColorMatrixFilter() as unknown as PIXI.Filter;
-    sepiaFilter.sepia(true);
+    const sepiaFilter = new ColorMatrixFilter() as unknown as GenericFilter;
+    sepiaFilter.sepia?.(true);
     this.effectsCache.set('sepia', { name: 'sepia', filter: sepiaFilter });
   }
 
   async loadImage(imageUrl: string): Promise<void> {
-    if (!this.app) throw new Error('WebGL renderer not initialized');
+    if (!this.app || !PIXI) throw new Error('WebGL renderer not initialized');
 
     // Remove existing sprite
     if (this.sprite) {
@@ -101,11 +139,10 @@ export class WebGLRenderer {
     }
 
     // Load texture (Assets API not in all PIXI type definitions)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const texture = await (
-      PIXI as unknown as { Assets: { load: (url: string) => Promise<PIXI.Texture> } }
+      PIXI as unknown as { Assets: { load: (url: string) => Promise<unknown> } }
     ).Assets.load(imageUrl);
-    this.sprite = new PIXI.Sprite(texture);
+    this.sprite = new PIXI.Sprite(texture as PIXI.Texture);
 
     // Scale sprite to fit canvas
     const scale = Math.min(
@@ -135,19 +172,19 @@ export class WebGLRenderer {
     if (params) {
       switch (effectName) {
         case 'blur':
-          (effect.filter as unknown as BlurFilter).blur = params.intensity || 5;
+          effect.filter.blur = (params.intensity as number) || 5;
           break;
         case 'brightness':
-          (effect.filter as unknown as ColorMatrixFilter).brightness(params.value || 1, false);
+          effect.filter.brightness?.((params.value as number) || 1, false);
           break;
         case 'contrast':
-          (effect.filter as unknown as ColorMatrixFilter).contrast(params.value || 1, false);
+          effect.filter.contrast?.((params.value as number) || 1, false);
           break;
         case 'saturation':
-          (effect.filter as unknown as ColorMatrixFilter).saturate(params.value || 1, false);
+          effect.filter.saturate?.((params.value as number) || 1, false);
           break;
         case 'hue':
-          (effect.filter as unknown as ColorMatrixFilter).hue(params.value || 0, false);
+          effect.filter.hue?.((params.value as number) || 0, false);
           break;
       }
     }
@@ -219,6 +256,7 @@ export class WebGLRenderer {
 
     this.effectsCache.clear();
     this.currentFilters = [];
+    this.initialized = false;
   }
 
   // Check if an effect can be GPU accelerated
@@ -240,6 +278,16 @@ export class WebGLRenderer {
       'tiltShift',
     ];
     return acceleratedEffects.includes(effectName);
+  }
+
+  // Check if Pixi.js modules are loaded
+  static isLoaded(): boolean {
+    return PIXI !== null;
+  }
+
+  // Preload Pixi.js modules without initializing renderer
+  static async preload(): Promise<void> {
+    await loadPixiModules();
   }
 }
 

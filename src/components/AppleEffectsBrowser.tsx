@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig, effectCategories, hiddenLegacyEffects } from '@/lib/effects';
 import { ChevronRight, Plus, Search } from 'lucide-react';
@@ -13,6 +13,97 @@ interface AppleEffectsBrowserProps {
   onHidePanel?: () => void;
 }
 
+// Gradient colors for effect buttons - cached outside component
+const EFFECT_GRADIENTS = [
+  { from: 'from-blue-400', to: 'to-blue-600' },
+  { from: 'from-purple-400', to: 'to-purple-600' },
+  { from: 'from-pink-400', to: 'to-pink-600' },
+  { from: 'from-emerald-400', to: 'to-emerald-600' },
+  { from: 'from-orange-400', to: 'to-orange-600' },
+  { from: 'from-cyan-400', to: 'to-cyan-600' },
+  { from: 'from-indigo-400', to: 'to-indigo-600' },
+  { from: 'from-rose-400', to: 'to-rose-600' },
+  { from: 'from-violet-400', to: 'to-violet-600' },
+  { from: 'from-amber-400', to: 'to-amber-600' },
+  { from: 'from-teal-400', to: 'to-teal-600' },
+  { from: 'from-lime-400', to: 'to-lime-600' },
+];
+
+// Cache for gradient lookups
+const gradientCache = new Map<string, (typeof EFFECT_GRADIENTS)[0]>();
+
+const getEffectGradient = (effectId: string) => {
+  const cached = gradientCache.get(effectId);
+  if (cached) return cached;
+
+  const hash = effectId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const gradient = EFFECT_GRADIENTS[hash % EFFECT_GRADIENTS.length];
+  gradientCache.set(effectId, gradient);
+  return gradient;
+};
+
+// Memoized effect button component - each button manages its own hover state
+interface EffectButtonProps {
+  effectId: string;
+  label: string;
+  isActive: boolean;
+  hasImage: boolean;
+  isCompact: boolean;
+  onClick: (effectId: string) => void;
+}
+
+const EffectButton = memo(function EffectButton({
+  effectId,
+  label,
+  isActive,
+  hasImage,
+  isCompact,
+  onClick,
+}: EffectButtonProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const gradient = useMemo(() => getEffectGradient(effectId), [effectId]);
+
+  const handleClick = useCallback(() => {
+    onClick(effectId);
+  }, [onClick, effectId]);
+
+  return (
+    <motion.button
+      onClick={handleClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      disabled={!hasImage}
+      className={`
+        effect-button-modern glass-button
+        ${isActive ? 'glass-active' : ''}
+        ${!hasImage ? 'opacity-40 cursor-not-allowed' : ''}
+        ${isCompact ? 'px-2 py-2 text-xs' : 'px-3 py-2 text-sm'}
+      `}
+      whileHover={hasImage && !isActive ? { scale: 1.02, y: -1 } : {}}
+      whileTap={hasImage ? { scale: 0.98 } : {}}
+    >
+      {/* Gradient background on hover */}
+      <div
+        className={`
+          absolute inset-0 rounded-md opacity-0 transition-opacity duration-200
+          ${isHovered && !isActive ? 'opacity-100' : ''}
+          bg-gradient-to-r ${gradient.from} ${gradient.to}
+        `}
+      />
+
+      <span
+        className={`
+          block relative z-10 transition-colors duration-200
+          ${isCompact ? 'truncate' : ''}
+          ${isHovered && !isActive ? 'text-white' : ''}
+        `}
+      >
+        {label}
+      </span>
+    </motion.button>
+  );
+});
+
 const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   activeEffect,
   onEffectChange,
@@ -20,7 +111,6 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
   onNewImage,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [hoveredEffect, setHoveredEffect] = useState<string | null>(null);
 
   // Start with curated categories collapsed by default
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
@@ -94,55 +184,13 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
     setCollapsedCategories(newCollapsed);
   };
 
-  const handleEffectClick = (effectId: string) => {
-    if (!hasImage) return;
-    onEffectChange?.(effectId);
-  };
-
-  // Get beautiful gradient colors for each effect
-  const getEffectGradient = (effectId: string) => {
-    const gradients = [
-      { from: 'from-blue-400', to: 'to-blue-600', hover: 'hover:from-blue-500 hover:to-blue-700' },
-      {
-        from: 'from-purple-400',
-        to: 'to-purple-600',
-        hover: 'hover:from-purple-500 hover:to-purple-700',
-      },
-      { from: 'from-pink-400', to: 'to-pink-600', hover: 'hover:from-pink-500 hover:to-pink-700' },
-      {
-        from: 'from-emerald-400',
-        to: 'to-emerald-600',
-        hover: 'hover:from-emerald-500 hover:to-emerald-700',
-      },
-      {
-        from: 'from-orange-400',
-        to: 'to-orange-600',
-        hover: 'hover:from-orange-500 hover:to-orange-700',
-      },
-      { from: 'from-cyan-400', to: 'to-cyan-600', hover: 'hover:from-cyan-500 hover:to-cyan-700' },
-      {
-        from: 'from-indigo-400',
-        to: 'to-indigo-600',
-        hover: 'hover:from-indigo-500 hover:to-indigo-700',
-      },
-      { from: 'from-rose-400', to: 'to-rose-600', hover: 'hover:from-rose-500 hover:to-rose-700' },
-      {
-        from: 'from-violet-400',
-        to: 'to-violet-600',
-        hover: 'hover:from-violet-500 hover:to-violet-700',
-      },
-      {
-        from: 'from-amber-400',
-        to: 'to-amber-600',
-        hover: 'hover:from-amber-500 hover:to-amber-700',
-      },
-      { from: 'from-teal-400', to: 'to-teal-600', hover: 'hover:from-teal-500 hover:to-teal-700' },
-      { from: 'from-lime-400', to: 'to-lime-600', hover: 'hover:from-lime-500 hover:to-lime-700' },
-    ];
-
-    const hash = effectId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return gradients[hash % gradients.length];
-  };
+  const handleEffectClick = useCallback(
+    (effectId: string) => {
+      if (!hasImage) return;
+      onEffectChange?.(effectId);
+    },
+    [hasImage, onEffectChange]
+  );
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -251,47 +299,17 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                           ${effects.length > 8 ? 'grid grid-cols-2 gap-1.5' : 'space-y-0.5'}
                         `}
                         >
-                          {effects.map(([effectId, effect]) => {
-                            const gradient = getEffectGradient(effectId);
-                            const isActive = activeEffect === effectId;
-
-                            return (
-                              <motion.button
-                                key={effectId}
-                                onClick={() => handleEffectClick(effectId)}
-                                onMouseEnter={() => setHoveredEffect(effectId)}
-                                onMouseLeave={() => setHoveredEffect(null)}
-                                disabled={!hasImage}
-                                className={`
-                                  effect-button-modern glass-button
-                                  ${isActive ? 'glass-active' : ''}
-                                  ${!hasImage ? 'opacity-40 cursor-not-allowed' : ''}
-                                  ${effects.length > 8 ? 'px-2 py-2 text-xs' : 'px-3 py-2 text-sm'}
-                                `}
-                                whileHover={hasImage && !isActive ? { scale: 1.02, y: -1 } : {}}
-                                whileTap={hasImage ? { scale: 0.98 } : {}}
-                              >
-                                {/* Gradient background on hover */}
-                                <div
-                                  className={`
-                                    absolute inset-0 rounded-md opacity-0 transition-opacity duration-200
-                                    ${hoveredEffect === effectId && !isActive ? 'opacity-100' : ''}
-                                    bg-gradient-to-r ${gradient.from} ${gradient.to}
-                                  `}
-                                />
-
-                                <span
-                                  className={`
-                                  block relative z-10 transition-colors duration-200
-                                  ${effects.length > 8 ? 'truncate' : ''}
-                                  ${hoveredEffect === effectId && !isActive ? 'text-white' : ''}
-                                `}
-                                >
-                                  {effect.label}
-                                </span>
-                              </motion.button>
-                            );
-                          })}
+                          {effects.map(([effectId, effect]) => (
+                            <EffectButton
+                              key={effectId}
+                              effectId={effectId}
+                              label={effect.label}
+                              isActive={activeEffect === effectId}
+                              hasImage={hasImage}
+                              isCompact={effects.length > 8}
+                              onClick={handleEffectClick}
+                            />
+                          ))}
                         </div>
                       </motion.div>
                     )}
