@@ -210,7 +210,7 @@ const softLightBlend = (base: number, overlay: number) => {
 };
 
 const createOrtonFallback = (settings: Record<string, number>): KonvaFilterFunction => {
-  const blurRadius = clamp(settings.blur ?? 5, 1, 50);
+  const blurRadius = clamp(settings.blur ?? 5, 1, 100);
   const brightness = clamp(settings.brightness ?? 0.2, 0, 1);
   const glow = clamp(settings.glow ?? 0.5, 0, 1);
   const blendMode = Math.round(clamp(settings.blendMode ?? 0, 0, 2));
@@ -1229,7 +1229,7 @@ const createUnifiedPatternEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
     const pattern = Math.floor(settings.pattern ?? 0);
-    const size = Math.max(2, Math.min(50, settings.size ?? 8));
+    const size = Math.max(2, Math.min(100, settings.size ?? 8));
     const density = (settings.density ?? 50) / 100;
     const angle = ((settings.angle ?? 45) * Math.PI) / 180;
     const colorMode = Math.floor(settings.colorMode ?? 0);
@@ -4260,7 +4260,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         min: 0,
         max: 100,
         defaultValue: 5,
-        step: 1,
+        step: 0.5,
       },
     ],
   },
@@ -4290,7 +4290,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         min: 0.4,
         max: 0.98,
         defaultValue: 0.78,
-        step: 0.01,
+        step: 0.005,
       },
       { id: 'strength', label: 'Blur Mix', min: 0, max: 1, defaultValue: 0.65, step: 0.05 },
       { id: 'highlights', label: 'Highlight Boost', min: 0, max: 2, defaultValue: 0.9, step: 0.05 },
@@ -4315,7 +4315,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         id: 'pixelSize',
         label: 'Pixel Size',
         min: 1,
-        max: 32,
+        max: 128,
         defaultValue: 8,
         step: 1,
       },
@@ -4329,7 +4329,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         id: 'value',
         label: 'Amount',
         min: 0,
-        max: 1,
+        max: 2,
         defaultValue: 0.2,
         step: 0.01,
       },
@@ -4359,7 +4359,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         id: 'levels',
         label: 'Levels',
         min: 2,
-        max: 8,
+        max: 32,
         defaultValue: 4,
         step: 1,
       },
@@ -4397,8 +4397,8 @@ export const effectsConfig: Record<string, EffectConfig> = {
     label: 'Halftone',
     category: 'Artistic',
     settings: [
-      { id: 'dotSize', label: 'Dot Size', min: 1, max: 50, defaultValue: 5, step: 1 },
-      { id: 'spacing', label: 'Spacing', min: 2, max: 50, defaultValue: 8, step: 1 },
+      { id: 'dotSize', label: 'Dot Size', min: 1, max: 100, defaultValue: 5, step: 1 },
+      { id: 'spacing', label: 'Spacing', min: 2, max: 100, defaultValue: 8, step: 1 },
       { id: 'angle', label: 'Angle', min: 0, max: 180, defaultValue: 45, step: 5 },
     ],
   },
@@ -4415,7 +4415,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 0,
         step: 1,
       },
-      { id: 'size', label: 'Size', min: 2, max: 50, defaultValue: 8, step: 1 },
+      { id: 'size', label: 'Size', min: 2, max: 100, defaultValue: 8, step: 1 },
       { id: 'density', label: 'Density (%)', min: 10, max: 100, defaultValue: 50, step: 5 },
       { id: 'angle', label: 'Angle', min: 0, max: 180, defaultValue: 45, step: 5 },
       {
@@ -4584,7 +4584,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     category: 'Artistic',
     settings: [
       { id: 'smoothness', label: 'Smoothness', min: 0, max: 20, defaultValue: 8, step: 1 },
-      { id: 'levels', label: 'Color Levels', min: 2, max: 12, defaultValue: 6, step: 1 },
+      { id: 'levels', label: 'Color Levels', min: 2, max: 64, defaultValue: 6, step: 1 },
       {
         id: 'edgeThreshold',
         label: 'Edge Threshold',
@@ -4607,7 +4607,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     label: 'Poster Edges',
     category: 'Artistic',
     settings: [
-      { id: 'levels', label: 'Poster Levels', min: 2, max: 10, defaultValue: 5, step: 1 },
+      { id: 'levels', label: 'Poster Levels', min: 2, max: 32, defaultValue: 5, step: 1 },
       {
         id: 'edgeThreshold',
         label: 'Edge Threshold',
@@ -4623,7 +4623,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     label: 'Cutout',
     category: 'Artistic',
     settings: [
-      { id: 'levels', label: 'Levels', min: 2, max: 12, defaultValue: 6, step: 1 },
+      { id: 'levels', label: 'Levels', min: 2, max: 32, defaultValue: 6, step: 1 },
       { id: 'edgeStrength', label: 'Edge Strength', min: 0, max: 1, defaultValue: 0.6, step: 0.05 },
       { id: 'soften', label: 'Soften', min: 0, max: 1, defaultValue: 0.2, step: 0.05 },
     ],
@@ -5074,7 +5074,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         id: 'scratchDensity',
         label: 'Scratch Density',
         min: 0,
-        max: 0.1,
+        max: 0.5,
         defaultValue: 0.02,
         step: 0.005,
       },
@@ -6164,7 +6164,7 @@ const createChromaticGrainEffect = (settings: Record<string, number>) => {
 const createHalationGlowEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const radius = Math.max(1, Math.min(50, settings.radius ?? 8));
+    const radius = Math.max(1, Math.min(100, settings.radius ?? 8));
     const strength = settings.strength ?? 0.6;
     const bias = settings.bias ?? 0.8;
 
