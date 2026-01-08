@@ -4,6 +4,7 @@
 interface ParticleContainer {
   pause?: () => void;
   resume?: () => void;
+  play?: () => void;
   destroy?: () => void;
 }
 
