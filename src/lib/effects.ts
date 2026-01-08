@@ -646,6 +646,12 @@ export const applyEffect = async (
           Konva?.Filters?.Orton ? {} : null,
         ];
 
+      // --- ANALOG/PRINT EFFECTS ---
+      case 'unifiedPrint':
+        return [createUnifiedPrintEffect(settings), {}];
+      case 'unifiedFilm':
+        return [createUnifiedFilmEffect(settings), {}];
+
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
         return [null, null];
@@ -4138,6 +4144,839 @@ const applyRadialBlur = (
   }
 };
 
+// ============================================================================
+// UNIFIED PRINT EFFECT - Analog Print Simulations
+// Presets: Risograph, Newsprint, Linocut, Screen Print, Letterpress
+// ============================================================================
+const createUnifiedPrintEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const preset = Math.floor(settings.preset ?? 0);
+    const intensity = (settings.intensity ?? 70) / 100;
+    const colorCount = Math.max(2, Math.min(4, Math.floor(settings.colorCount ?? 2)));
+    const dotSize = Math.max(2, Math.min(20, settings.dotSize ?? 6));
+    const registration = settings.registration ?? 3;
+    const paperTexture = (settings.paperTexture ?? 50) / 100;
+    const inkBleed = (settings.inkBleed ?? 30) / 100;
+    const opacity = settings.opacity ?? 1;
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const result = pool.acquire(data.length);
+    const originalForBlend = opacity < 1 ? pool.acquire(data.length) : null;
+
+    try {
+      original.set(data);
+      if (originalForBlend) originalForBlend.set(data);
+      result.set(data);
+
+      // Risograph spot colors (warm palette)
+      const risoColors = [
+        { r: 255, g: 72, b: 95 }, // Fluorescent Pink
+        { r: 0, g: 120, b: 191 }, // Blue
+        { r: 255, g: 195, b: 0 }, // Yellow
+        { r: 0, g: 168, b: 142 }, // Teal
+      ];
+
+      // Newspaper CMYK simulation
+      const cmykColors = [
+        { r: 0, g: 174, b: 239 }, // Cyan
+        { r: 236, g: 0, b: 140 }, // Magenta
+        { r: 255, g: 242, b: 0 }, // Yellow
+        { r: 35, g: 31, b: 32 }, // Key (Black)
+      ];
+
+      switch (preset) {
+        case 0: // Risograph
+          applyRisographEffect(
+            result,
+            original,
+            width,
+            height,
+            risoColors,
+            colorCount,
+            dotSize,
+            registration,
+            inkBleed,
+            intensity
+          );
+          break;
+
+        case 1: // Newsprint
+          applyNewsprintEffect(
+            result,
+            original,
+            width,
+            height,
+            cmykColors,
+            dotSize,
+            paperTexture,
+            intensity
+          );
+          break;
+
+        case 2: // Linocut
+          applyLinocutEffect(result, original, width, height, intensity, dotSize);
+          break;
+
+        case 3: // Screen Print
+          applyScreenPrintEffect(
+            result,
+            original,
+            width,
+            height,
+            risoColors,
+            colorCount,
+            intensity
+          );
+          break;
+
+        case 4: // Letterpress
+          applyLetterpressEffect(result, original, width, height, intensity, inkBleed);
+          break;
+      }
+
+      // Apply paper texture for all presets
+      if (paperTexture > 0) {
+        applyPaperGrain(result, width, height, paperTexture * 0.5);
+      }
+
+      // Copy result back to data
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = result[i];
+        data[i + 1] = result[i + 1];
+        data[i + 2] = result[i + 2];
+        data[i + 3] = original[i + 3]; // Preserve alpha
+      }
+
+      // Apply opacity blend
+      if (originalForBlend && opacity < 1) {
+        applyOpacityBlend(data, originalForBlend, opacity);
+      }
+    } finally {
+      pool.release(original);
+      pool.release(result);
+      if (originalForBlend) pool.release(originalForBlend);
+    }
+  };
+};
+
+// Risograph effect: limited colors, halftone, registration errors
+const applyRisographEffect = (
+  result: Uint8ClampedArray,
+  original: Uint8ClampedArray,
+  width: number,
+  height: number,
+  colors: Array<{ r: number; g: number; b: number }>,
+  colorCount: number,
+  dotSize: number,
+  registration: number,
+  inkBleed: number,
+  intensity: number
+) => {
+  const halfDot = Math.floor(dotSize / 2);
+  const activeColors = colors.slice(0, colorCount);
+
+  // First pass: quantize to spot colors
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const r = original[i];
+      const g = original[i + 1];
+      const b = original[i + 2];
+
+      // Find closest spot color
+      let minDist = Infinity;
+      let closestColor = activeColors[0];
+
+      for (const color of activeColors) {
+        const dist = (r - color.r) ** 2 + (g - color.g) ** 2 + (b - color.b) ** 2;
+        if (dist < minDist) {
+          minDist = dist;
+          closestColor = color;
+        }
+      }
+
+      // Apply halftone pattern
+      const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+      const threshold = ((x % dotSize) / dotSize + (y % dotSize) / dotSize) / 2;
+
+      if (brightness > threshold) {
+        result[i] = closestColor.r;
+        result[i + 1] = closestColor.g;
+        result[i + 2] = closestColor.b;
+      } else {
+        // Paper white
+        result[i] = 245;
+        result[i + 1] = 242;
+        result[i + 2] = 235;
+      }
+    }
+  }
+
+  // Apply registration error (color misalignment)
+  if (registration > 0) {
+    const offsetX = Math.floor(registration * (Math.random() - 0.5) * 2);
+    const offsetY = Math.floor(registration * (Math.random() - 0.5) * 2);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const srcX = clamp(x + offsetX, 0, width - 1);
+        const srcY = clamp(y + offsetY, 0, height - 1);
+        const srcI = (srcY * width + srcX) * 4;
+
+        // Shift only one color channel for misregistration effect
+        result[i] = Math.round(lerp(result[i], result[srcI], intensity * 0.3));
+      }
+    }
+  }
+
+  // Apply ink bleed
+  if (inkBleed > 0) {
+    const bleedRadius = Math.ceil(inkBleed * 2);
+    for (let y = bleedRadius; y < height - bleedRadius; y++) {
+      for (let x = bleedRadius; x < width - bleedRadius; x++) {
+        const i = (y * width + x) * 4;
+        const brightness = result[i] + result[i + 1] + result[i + 2];
+
+        if (brightness < 600) {
+          // Dark areas bleed
+          const bleedAmount = inkBleed * 0.1;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const ni = ((y + dy) * width + (x + dx)) * 4;
+              result[ni] = Math.round(lerp(result[ni], result[i], bleedAmount));
+              result[ni + 1] = Math.round(lerp(result[ni + 1], result[i + 1], bleedAmount));
+              result[ni + 2] = Math.round(lerp(result[ni + 2], result[i + 2], bleedAmount));
+            }
+          }
+        }
+      }
+    }
+  }
+};
+
+// Newsprint effect: CMYK halftone with different angles
+const applyNewsprintEffect = (
+  result: Uint8ClampedArray,
+  original: Uint8ClampedArray,
+  width: number,
+  height: number,
+  colors: Array<{ r: number; g: number; b: number }>,
+  dotSize: number,
+  paperYellowing: number,
+  intensity: number
+) => {
+  // CMYK screen angles (traditional)
+  const angles = [15, 75, 0, 45]; // C, M, Y, K in degrees
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const r = original[i];
+      const g = original[i + 1];
+      const b = original[i + 2];
+
+      // Convert to CMYK
+      const c = 1 - r / 255;
+      const m = 1 - g / 255;
+      const yel = 1 - b / 255;
+      const k = Math.min(c, m, yel);
+
+      // Apply halftone per channel with different angles
+      const cmykValues = [c - k, m - k, yel - k, k];
+      let finalR = 255,
+        finalG = 255,
+        finalB = 255;
+
+      for (let ch = 0; ch < 4; ch++) {
+        const angle = (angles[ch] * Math.PI) / 180;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const rotX = x * cos + y * sin;
+        const rotY = -x * sin + y * cos;
+
+        const threshold =
+          (Math.sin((rotX / dotSize) * Math.PI) * 0.5 + 0.5) *
+          (Math.sin((rotY / dotSize) * Math.PI) * 0.5 + 0.5);
+
+        if (cmykValues[ch] > threshold) {
+          // Apply ink
+          const color = colors[ch];
+          finalR = Math.round(finalR * (1 - cmykValues[ch] * 0.3) + color.r * cmykValues[ch] * 0.3);
+          finalG = Math.round(finalG * (1 - cmykValues[ch] * 0.3) + color.g * cmykValues[ch] * 0.3);
+          finalB = Math.round(finalB * (1 - cmykValues[ch] * 0.3) + color.b * cmykValues[ch] * 0.3);
+        }
+      }
+
+      // Apply paper yellowing
+      const paperR = 255 - paperYellowing * 10;
+      const paperG = 252 - paperYellowing * 8;
+      const paperB = 240 - paperYellowing * 20;
+
+      result[i] = clampByte(lerp(original[i], Math.min(finalR, paperR), intensity));
+      result[i + 1] = clampByte(lerp(original[i + 1], Math.min(finalG, paperG), intensity));
+      result[i + 2] = clampByte(lerp(original[i + 2], Math.min(finalB, paperB), intensity));
+    }
+  }
+};
+
+// Linocut effect: High contrast with carved line aesthetic
+const applyLinocutEffect = (
+  result: Uint8ClampedArray,
+  original: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number,
+  lineThickness: number
+) => {
+  // Edge detection for carving lines
+  const edges = new Float32Array(width * height);
+
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = (y * width + x) * 4;
+      const lum = original[i] * 0.299 + original[i + 1] * 0.587 + original[i + 2] * 0.114;
+
+      // Sobel edge detection
+      const tl =
+        original[((y - 1) * width + (x - 1)) * 4] * 0.299 +
+        original[((y - 1) * width + (x - 1)) * 4 + 1] * 0.587 +
+        original[((y - 1) * width + (x - 1)) * 4 + 2] * 0.114;
+      const br =
+        original[((y + 1) * width + (x + 1)) * 4] * 0.299 +
+        original[((y + 1) * width + (x + 1)) * 4 + 1] * 0.587 +
+        original[((y + 1) * width + (x + 1)) * 4 + 2] * 0.114;
+
+      edges[y * width + x] = Math.abs(lum - tl) + Math.abs(lum - br);
+    }
+  }
+
+  // Apply linocut style
+  const threshold = 128;
+  const lineThresh = lineThickness * 10;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const lum = original[i] * 0.299 + original[i + 1] * 0.587 + original[i + 2] * 0.114;
+      const edge = edges[y * width + x] || 0;
+
+      // Create carved look: dark areas = ink, light areas = paper
+      let inkCoverage = 0;
+
+      if (lum < threshold) {
+        inkCoverage = 1;
+      } else if (edge > lineThresh) {
+        // Carving lines
+        inkCoverage = 0.8;
+      }
+
+      // Wood grain texture
+      const grain = Math.sin((x + y * 0.5) * 0.1) * 0.1 + 0.9;
+
+      const inkR = 25 * grain;
+      const inkG = 20 * grain;
+      const inkB = 15 * grain;
+
+      const paperR = 245;
+      const paperG = 240;
+      const paperB = 230;
+
+      result[i] = clampByte(lerp(original[i], lerp(paperR, inkR, inkCoverage), intensity));
+      result[i + 1] = clampByte(lerp(original[i + 1], lerp(paperG, inkG, inkCoverage), intensity));
+      result[i + 2] = clampByte(lerp(original[i + 2], lerp(paperB, inkB, inkCoverage), intensity));
+    }
+  }
+};
+
+// Screen Print effect: Flat colors with registration
+const applyScreenPrintEffect = (
+  result: Uint8ClampedArray,
+  original: Uint8ClampedArray,
+  width: number,
+  height: number,
+  colors: Array<{ r: number; g: number; b: number }>,
+  colorCount: number,
+  intensity: number
+) => {
+  const activeColors = colors.slice(0, colorCount);
+
+  // Add white/paper as base
+  const palette = [{ r: 250, g: 248, b: 245 }, ...activeColors];
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const r = original[i];
+      const g = original[i + 1];
+      const b = original[i + 2];
+
+      // Find closest color in palette
+      let minDist = Infinity;
+      let closest = palette[0];
+
+      for (const color of palette) {
+        const dist = (r - color.r) ** 2 + (g - color.g) ** 2 + (b - color.b) ** 2;
+        if (dist < minDist) {
+          minDist = dist;
+          closest = color;
+        }
+      }
+
+      result[i] = clampByte(lerp(original[i], closest.r, intensity));
+      result[i + 1] = clampByte(lerp(original[i + 1], closest.g, intensity));
+      result[i + 2] = clampByte(lerp(original[i + 2], closest.b, intensity));
+    }
+  }
+};
+
+// Letterpress effect: Debossed text appearance
+const applyLetterpressEffect = (
+  result: Uint8ClampedArray,
+  original: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number,
+  inkBleed: number
+) => {
+  const pool = getBufferPool();
+  const lum = pool.acquire(width * height);
+
+  try {
+    // Calculate luminance
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        lum[y * width + x] =
+          original[i] * 0.299 + original[i + 1] * 0.587 + original[i + 2] * 0.114;
+      }
+    }
+
+    // Apply debossed effect with ink impression
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const i = (y * width + x) * 4;
+        const l = lum[y * width + x];
+
+        // Emboss effect for depth
+        const topLeft = lum[(y - 1) * width + (x - 1)];
+        const bottomRight = lum[(y + 1) * width + (x + 1)];
+        const emboss = (bottomRight - topLeft) * 0.5 + 128;
+
+        // Dark ink color
+        const inkR = 20;
+        const inkG = 18;
+        const inkB = 25;
+
+        // Paper color
+        const paperR = 252;
+        const paperG = 250;
+        const paperB = 245;
+
+        // Ink coverage based on original brightness
+        const inkCoverage = 1 - l / 255;
+
+        // Add slight blur for ink spread
+        const spreadFactor = inkBleed * 0.3;
+
+        const baseR = lerp(paperR, inkR, inkCoverage);
+        const baseG = lerp(paperG, inkG, inkCoverage);
+        const baseB = lerp(paperB, inkB, inkCoverage);
+
+        // Apply emboss for debossed look
+        const embossFactor = 0.3;
+        const finalR = clampByte(baseR + (emboss - 128) * embossFactor);
+        const finalG = clampByte(baseG + (emboss - 128) * embossFactor);
+        const finalB = clampByte(baseB + (emboss - 128) * embossFactor);
+
+        result[i] = clampByte(lerp(original[i], finalR, intensity));
+        result[i + 1] = clampByte(lerp(original[i + 1], finalG, intensity));
+        result[i + 2] = clampByte(lerp(original[i + 2], finalB, intensity));
+      }
+    }
+  } finally {
+    pool.release(lum);
+  }
+};
+
+// Paper grain texture helper
+const applyPaperGrain = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number
+) => {
+  for (let i = 0; i < data.length; i += 4) {
+    const noise = (Math.random() - 0.5) * intensity * 30;
+    data[i] = clampByte(data[i] + noise);
+    data[i + 1] = clampByte(data[i + 1] + noise);
+    data[i + 2] = clampByte(data[i + 2] + noise);
+  }
+};
+
+// ============================================================================
+// UNIFIED FILM EFFECT - Film Stock Emulations
+// Presets: Portra 400, Cinestill 800T, Kodak Gold, Fuji Pro 400H, Ilford HP5, Kodachrome
+// ============================================================================
+const createUnifiedFilmEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const preset = Math.floor(settings.preset ?? 0);
+    const grainIntensity = (settings.grain ?? 30) / 100;
+    const halation = (settings.halation ?? 20) / 100;
+    const fade = (settings.fade ?? 0) / 100;
+    const exposure = settings.exposure ?? 0; // -2 to +2 stops
+    const opacity = settings.opacity ?? 1;
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const originalForBlend = opacity < 1 ? pool.acquire(data.length) : null;
+
+    try {
+      original.set(data);
+      if (originalForBlend) originalForBlend.set(data);
+
+      // Apply exposure shift first
+      if (exposure !== 0) {
+        const expFactor = Math.pow(2, exposure);
+        for (let i = 0; i < data.length; i += 4) {
+          data[i] = clampByte(data[i] * expFactor);
+          data[i + 1] = clampByte(data[i + 1] * expFactor);
+          data[i + 2] = clampByte(data[i + 2] * expFactor);
+        }
+      }
+
+      switch (preset) {
+        case 0: // Portra 400 - Warm skin tones, fine grain, soft contrast
+          applyPortra400(data, width, height);
+          break;
+
+        case 1: // Cinestill 800T - Tungsten, RED halation
+          applyCinestill800T(data, width, height, halation);
+          break;
+
+        case 2: // Kodak Gold 200 - Warm, saturated, nostalgic
+          applyKodakGold(data, width, height);
+          break;
+
+        case 3: // Fuji Pro 400H - Cool shadows, pastel highlights
+          applyFujiPro400H(data, width, height);
+          break;
+
+        case 4: // Ilford HP5 - High-contrast B&W
+          applyIlfordHP5(data, width, height);
+          break;
+
+        case 5: // Kodachrome - Saturated, punchy, iconic
+          applyKodachrome(data, width, height);
+          break;
+      }
+
+      // Apply film grain
+      if (grainIntensity > 0) {
+        applyFilmStockGrain(data, width, height, grainIntensity, preset);
+      }
+
+      // Apply fade/age effect
+      if (fade > 0) {
+        applyFilmFade(data, width, height, fade);
+      }
+
+      // Apply opacity blend
+      if (originalForBlend && opacity < 1) {
+        applyOpacityBlend(data, originalForBlend, opacity);
+      }
+    } finally {
+      pool.release(original);
+      if (originalForBlend) pool.release(originalForBlend);
+    }
+  };
+};
+
+// Portra 400 - Natural skin tones, slightly warm, low contrast
+const applyPortra400 = (data: Uint8ClampedArray, width: number, height: number) => {
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+
+    // Warm shadows, neutral highlights
+    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+    const shadowLift = Math.max(0, (128 - lum) / 128) * 0.1;
+
+    // Subtle orange-red shift in shadows
+    r = clampByte(r + shadowLift * 15);
+    g = clampByte(g + shadowLift * 5);
+
+    // Soft contrast curve
+    r = clampByte(128 + (r - 128) * 0.9 + 5);
+    g = clampByte(128 + (g - 128) * 0.9 + 3);
+    b = clampByte(128 + (b - 128) * 0.88);
+
+    // Slight desaturation in highlights
+    const highlightDesat = Math.max(0, (lum - 180) / 75) * 0.15;
+    const avg = (r + g + b) / 3;
+    r = clampByte(lerp(r, avg, highlightDesat));
+    g = clampByte(lerp(g, avg, highlightDesat));
+    b = clampByte(lerp(b, avg, highlightDesat));
+
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+  }
+};
+
+// Cinestill 800T - Tungsten balance, RED halation around highlights
+const applyCinestill800T = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  halation: number
+) => {
+  const pool = getBufferPool();
+  const highlights = pool.acquire(data.length);
+
+  try {
+    // Extract bright areas for halation
+    for (let i = 0; i < data.length; i += 4) {
+      const lum = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      if (lum > 200) {
+        highlights[i] = 255; // Red halation
+        highlights[i + 1] = 50;
+        highlights[i + 2] = 0;
+        highlights[i + 3] = 255;
+      } else {
+        highlights[i] = highlights[i + 1] = highlights[i + 2] = 0;
+        highlights[i + 3] = 255;
+      }
+    }
+
+    // Blur the highlights for halation
+    if (halation > 0) {
+      stackBlur(highlights, width, height, Math.ceil(halation * 30));
+    }
+
+    // Apply tungsten white balance + halation
+    for (let i = 0; i < data.length; i += 4) {
+      let r = data[i];
+      let g = data[i + 1];
+      let b = data[i + 2];
+
+      // Tungsten: boost blues/cyans, reduce reds/yellows
+      r = clampByte(r * 0.85);
+      g = clampByte(g * 0.95);
+      b = clampByte(b * 1.15 + 10);
+
+      // Add halation bloom
+      const halR = (highlights[i] / 255) * halation;
+      r = clampByte(r + halR * 80);
+      g = clampByte(g + halR * 20);
+
+      // Cinematic contrast
+      const lum = r * 0.299 + g * 0.587 + b * 0.114;
+      r = clampByte(128 + (r - 128) * 1.1);
+      g = clampByte(128 + (g - 128) * 1.1);
+      b = clampByte(128 + (b - 128) * 1.1);
+
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+    }
+  } finally {
+    pool.release(highlights);
+  }
+};
+
+// Kodak Gold 200 - Warm, saturated, classic consumer film
+const applyKodakGold = (data: Uint8ClampedArray, width: number, height: number) => {
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+
+    // Warm shift throughout
+    r = clampByte(r * 1.08 + 8);
+    g = clampByte(g * 1.02 + 3);
+    b = clampByte(b * 0.92);
+
+    // Boost saturation
+    const avg = (r + g + b) / 3;
+    r = clampByte(avg + (r - avg) * 1.25);
+    g = clampByte(avg + (g - avg) * 1.2);
+    b = clampByte(avg + (b - avg) * 1.15);
+
+    // S-curve contrast
+    const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+    const sCurve = lum < 0.5 ? 2 * lum * lum : 1 - 2 * (1 - lum) * (1 - lum);
+    const contrastBoost = (sCurve - lum) * 30;
+
+    r = clampByte(r + contrastBoost);
+    g = clampByte(g + contrastBoost);
+    b = clampByte(b + contrastBoost);
+
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+  }
+};
+
+// Fuji Pro 400H - Cool shadows, pastel highlights, low saturation
+const applyFujiPro400H = (data: Uint8ClampedArray, width: number, height: number) => {
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+
+    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+
+    // Cool shadows (add blue/green)
+    const shadowAmount = Math.max(0, (100 - lum) / 100);
+    r = clampByte(r - shadowAmount * 5);
+    g = clampByte(g + shadowAmount * 3);
+    b = clampByte(b + shadowAmount * 10);
+
+    // Pastel highlights (desaturate, lift)
+    const highlightAmount = Math.max(0, (lum - 150) / 105);
+    const avg = (r + g + b) / 3;
+    r = clampByte(lerp(r, avg + 20, highlightAmount * 0.4));
+    g = clampByte(lerp(g, avg + 18, highlightAmount * 0.4));
+    b = clampByte(lerp(b, avg + 15, highlightAmount * 0.4));
+
+    // Lower overall saturation
+    const newAvg = (r + g + b) / 3;
+    r = clampByte(newAvg + (r - newAvg) * 0.85);
+    g = clampByte(newAvg + (g - newAvg) * 0.85);
+    b = clampByte(newAvg + (b - newAvg) * 0.85);
+
+    // Soft contrast
+    r = clampByte(128 + (r - 128) * 0.95 + 3);
+    g = clampByte(128 + (g - 128) * 0.95 + 3);
+    b = clampByte(128 + (b - 128) * 0.95 + 3);
+
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+  }
+};
+
+// Ilford HP5 - Classic high-contrast B&W
+const applyIlfordHP5 = (data: Uint8ClampedArray, width: number, height: number) => {
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    // B&W conversion with HP5 response (good red sensitivity)
+    let lum = r * 0.35 + g * 0.5 + b * 0.15;
+
+    // High contrast S-curve
+    lum = lum / 255;
+    lum = lum < 0.5 ? 2 * lum * lum : 1 - 2 * (1 - lum) * (1 - lum);
+    lum = lum * 255;
+
+    // Boost contrast further
+    lum = clampByte(128 + (lum - 128) * 1.3);
+
+    data[i] = lum;
+    data[i + 1] = lum;
+    data[i + 2] = lum;
+  }
+};
+
+// Kodachrome - Iconic saturated colors, punchy contrast
+const applyKodachrome = (data: Uint8ClampedArray, width: number, height: number) => {
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+
+    // Kodachrome's distinctive color shifts
+    // Deep reds, rich blues, slightly muted greens
+    r = clampByte(r * 1.1 + 5);
+    g = clampByte(g * 0.95);
+    b = clampByte(b * 1.05 + 8);
+
+    // High saturation
+    const avg = (r + g + b) / 3;
+    r = clampByte(avg + (r - avg) * 1.4);
+    g = clampByte(avg + (g - avg) * 1.3);
+    b = clampByte(avg + (b - avg) * 1.35);
+
+    // Punchy contrast
+    r = clampByte(128 + (r - 128) * 1.15);
+    g = clampByte(128 + (g - 128) * 1.15);
+    b = clampByte(128 + (b - 128) * 1.15);
+
+    // Lifted blacks (Kodachrome doesn't go pure black)
+    r = clampByte(Math.max(r, 10));
+    g = clampByte(Math.max(g, 8));
+    b = clampByte(Math.max(b, 12));
+
+    data[i] = r;
+    data[i + 1] = g;
+    data[i + 2] = b;
+  }
+};
+
+// Film grain helper for unified film effect - varies by film stock
+const applyFilmStockGrain = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number,
+  preset: number
+) => {
+  // Different grain characteristics per film
+  const grainSize = preset === 4 ? 1.5 : 1; // HP5 has larger grain
+  const grainVariance = preset === 0 ? 0.7 : 1; // Portra has finer grain
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+
+      // Perlin-like noise for more realistic grain
+      const noiseBase = Math.random() - 0.5;
+      const noise = noiseBase * intensity * 50 * grainVariance;
+
+      // Grain is more visible in midtones
+      const lum = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      const midtoneFactor = 1 - Math.abs(lum - 128) / 128;
+      const grainAmount = noise * (0.5 + midtoneFactor * 0.5);
+
+      data[i] = clampByte(data[i] + grainAmount);
+      data[i + 1] = clampByte(data[i + 1] + grainAmount);
+      data[i + 2] = clampByte(data[i + 2] + grainAmount);
+    }
+  }
+};
+
+// Film fade/age effect
+const applyFilmFade = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  intensity: number
+) => {
+  for (let i = 0; i < data.length; i += 4) {
+    // Lift blacks
+    data[i] = clampByte(data[i] + intensity * 30);
+    data[i + 1] = clampByte(data[i + 1] + intensity * 28);
+    data[i + 2] = clampByte(data[i + 2] + intensity * 25);
+
+    // Reduce contrast
+    data[i] = clampByte(128 + (data[i] - 128) * (1 - intensity * 0.3));
+    data[i + 1] = clampByte(128 + (data[i + 1] - 128) * (1 - intensity * 0.3));
+    data[i + 2] = clampByte(128 + (data[i + 2] - 128) * (1 - intensity * 0.3));
+
+    // Slight color shift (aged film tends to shift magenta/yellow)
+    data[i] = clampByte(data[i] + intensity * 5);
+    data[i + 2] = clampByte(data[i + 2] - intensity * 8);
+  }
+};
+
 // Define all available effects with their settings
 export const effectsConfig: Record<string, EffectConfig> = {
   // Basic Adjustments - Standardized to intuitive percentage-based ranges
@@ -5217,6 +6056,173 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         group: 'appearance',
         description: 'Blend between original image and blurred result',
+      },
+    ],
+  },
+
+  // UNIFIED PRINT - Analog Print Simulations
+  unifiedPrint: {
+    label: 'Print',
+    category: 'Stylize',
+    presetNames: ['Risograph', 'Newsprint', 'Linocut', 'Screen Print', 'Letterpress'],
+    settings: [
+      {
+        id: 'preset',
+        label: 'Style',
+        min: 0,
+        max: 4,
+        defaultValue: 0,
+        step: 1,
+        group: 'style',
+        description:
+          'Print technique: Risograph (vibrant spot colors), Newsprint (CMYK halftone), Linocut (carved relief), Screen Print (flat layers), Letterpress (debossed ink)',
+      },
+      {
+        id: 'intensity',
+        label: 'Intensity (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 70,
+        step: 5,
+        group: 'intensity',
+        description: 'Strength of the print effect - higher values create more stylized results',
+      },
+      {
+        id: 'colorCount',
+        label: 'Color Count',
+        min: 2,
+        max: 4,
+        defaultValue: 2,
+        step: 1,
+        group: 'style',
+        description: 'Number of spot colors for Risograph and Screen Print (2-4 colors)',
+      },
+      {
+        id: 'dotSize',
+        label: 'Dot/Line Size',
+        min: 2,
+        max: 20,
+        defaultValue: 6,
+        step: 1,
+        group: 'appearance',
+        description: 'Size of halftone dots or carved lines - larger creates bolder patterns',
+      },
+      {
+        id: 'registration',
+        label: 'Registration Error',
+        min: 0,
+        max: 10,
+        defaultValue: 3,
+        step: 1,
+        group: 'appearance',
+        description: 'Color misalignment for authentic multi-pass print look (Risograph)',
+      },
+      {
+        id: 'paperTexture',
+        label: 'Paper Texture (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 50,
+        step: 5,
+        group: 'appearance',
+        description: 'Grain and texture of the paper surface',
+      },
+      {
+        id: 'inkBleed',
+        label: 'Ink Bleed (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 30,
+        step: 5,
+        group: 'appearance',
+        description: 'How much ink spreads into surrounding areas',
+      },
+      {
+        id: 'opacity',
+        label: 'Effect Opacity',
+        min: 0,
+        max: 1,
+        defaultValue: 1,
+        step: 0.05,
+        group: 'appearance',
+        description: 'Blend between original image and print result',
+      },
+    ],
+  },
+
+  // UNIFIED FILM - Film Stock Emulations
+  unifiedFilm: {
+    label: 'Film',
+    category: 'Filters',
+    presetNames: [
+      'Portra 400',
+      'Cinestill 800T',
+      'Kodak Gold',
+      'Fuji Pro 400H',
+      'Ilford HP5',
+      'Kodachrome',
+    ],
+    settings: [
+      {
+        id: 'preset',
+        label: 'Film Stock',
+        min: 0,
+        max: 5,
+        defaultValue: 0,
+        step: 1,
+        group: 'style',
+        description:
+          'Classic film stocks: Portra (warm portraits), Cinestill (tungsten night), Kodak Gold (nostalgic), Fuji Pro (pastel), Ilford HP5 (B&W), Kodachrome (saturated)',
+      },
+      {
+        id: 'grain',
+        label: 'Film Grain (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 30,
+        step: 5,
+        group: 'intensity',
+        description: 'Authentic film grain texture - varies by film stock',
+      },
+      {
+        id: 'halation',
+        label: 'Halation (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 20,
+        step: 5,
+        group: 'intensity',
+        description: 'Red/orange glow around bright highlights (strongest on Cinestill)',
+      },
+      {
+        id: 'fade',
+        label: 'Fade/Age (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 0,
+        step: 5,
+        group: 'appearance',
+        description: 'Simulates aged, faded film with lifted blacks and color shift',
+      },
+      {
+        id: 'exposure',
+        label: 'Exposure (Stops)',
+        min: -2,
+        max: 2,
+        defaultValue: 0,
+        step: 0.25,
+        group: 'intensity',
+        description: 'Exposure compensation in stops (-2 to +2)',
+      },
+      {
+        id: 'opacity',
+        label: 'Effect Opacity',
+        min: 0,
+        max: 1,
+        defaultValue: 1,
+        step: 0.05,
+        group: 'appearance',
+        description: 'Blend between original image and film result',
       },
     ],
   },
@@ -9247,6 +10253,8 @@ export const effectCategories = {
       'unifiedVintage', // Sepia, Old Photo, Faded, Cross Process, Scratched, Polaroid
       'unifiedWarp', // Pixelate, Swirl, Kaleidoscope, Fisheye, Spherize, Wave, Shatter
       'unifiedMono', // Grayscale, B&W, Duotone, Gradient Map
+      'unifiedPrint', // Risograph, Newsprint, Linocut, Screen Print, Letterpress
+      'unifiedFilm', // Portra 400, Cinestill 800T, Kodak Gold, Fuji Pro 400H, Ilford HP5, Kodachrome
       'advancedDithering', // Floyd-Steinberg, Atkinson, Ordered, + Retro Palettes
     ],
   },
