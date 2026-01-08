@@ -14,6 +14,7 @@ interface EffectSetting {
   defaultValue: number;
   step: number;
   description?: string; // Tooltip text explaining the setting
+  group?: string; // Group name for organizing settings (e.g., 'style', 'intensity', 'position', 'appearance')
 }
 
 // Define the structure for effect configuration
@@ -4646,6 +4647,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 4,
         defaultValue: 0,
         step: 1,
+        group: 'style',
         description:
           'Glow style: Bloom for highlights, Dreamy for soft focus, Neon for vibrant edges, Bioluminescent for organic glow, Halation for film-like light bleeding',
       },
@@ -4656,6 +4658,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 100,
         defaultValue: 50,
         step: 5,
+        group: 'intensity',
         description: 'Controls the strength of the glow effect',
       },
       {
@@ -4665,6 +4668,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 100,
         defaultValue: 20,
         step: 1,
+        group: 'intensity',
         description: 'Size of the glow spread in pixels',
       },
       {
@@ -4674,6 +4678,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 100,
         defaultValue: 50,
         step: 5,
+        group: 'intensity',
         description: 'Brightness level above which glow is applied',
       },
       {
@@ -4683,6 +4688,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 100,
         defaultValue: 0,
         step: 5,
+        group: 'appearance',
         description: 'Shifts glow colors for creative tinting',
       },
       {
@@ -4692,6 +4698,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 100,
         defaultValue: 0,
         step: 5,
+        group: 'appearance',
         description: 'Darkens non-glowing areas to make the glow stand out',
       },
       {
@@ -4701,6 +4708,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 1,
         step: 0.05,
+        group: 'appearance',
         description: 'Blend the effect with the original image',
       },
     ],
@@ -4730,6 +4738,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 6,
         defaultValue: 0,
         step: 1,
+        group: 'style',
         description:
           'Glitch style: RGB Split separates color channels, Chromatic adds fringing, Scanlines for CRT look, VHS for tape artifacts, Corrupt for data errors, Databend for file corruption, Pixel Sort for sorted pixels',
       },
@@ -4740,6 +4749,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
+        group: 'intensity',
         description: 'Overall strength of the glitch effect',
       },
       {
@@ -4749,6 +4759,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 50,
         defaultValue: 10,
         step: 1,
+        group: 'intensity',
         description: 'Pixel offset distance for color separation',
       },
       {
@@ -4758,6 +4769,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 2,
         defaultValue: 0,
         step: 1,
+        group: 'pattern',
         description: 'Direction of the glitch displacement',
       },
       {
@@ -4767,6 +4779,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 32,
         defaultValue: 8,
         step: 1,
+        group: 'pattern',
         description: 'Size of glitch blocks or bands',
       },
       {
@@ -4776,6 +4789,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
+        group: 'pattern',
         description: 'How unpredictable the glitch pattern is',
       },
       {
@@ -4785,6 +4799,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 1,
         step: 0.05,
+        group: 'appearance',
         description: 'Blend the effect with the original image',
       },
     ],
@@ -4801,6 +4816,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 5,
         defaultValue: 0,
         step: 1,
+        group: 'style',
         description:
           'Vintage style: Sepia for brown tones, Old Photo for aged look, Faded for washed-out colors, Cross Process for bold color shifts, Scratched for film damage, Polaroid for instant film',
       },
@@ -4811,6 +4827,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.7,
         step: 0.05,
+        group: 'color',
         description: 'Strength of the color transformation',
       },
       {
@@ -4820,6 +4837,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
+        group: 'texture',
         description: 'Darkening around the edges for a classic photo look',
       },
       {
@@ -4829,6 +4847,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.3,
         step: 0.05,
+        group: 'texture',
         description: 'Film grain texture for an analog feel',
       },
       {
@@ -4838,6 +4857,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0,
         step: 0.05,
+        group: 'texture',
         description: 'Add scratch marks like damaged film',
       },
       {
@@ -4847,6 +4867,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0,
         step: 0.05,
+        group: 'color',
         description: 'Lifts black levels for a faded, aged appearance',
       },
       {
@@ -4856,6 +4877,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
+        group: 'color',
         description: 'Color temperature: lower is cooler, higher is warmer',
       },
       {
@@ -4865,6 +4887,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 1,
         step: 0.05,
+        group: 'appearance',
         description: 'Blend the effect with the original image',
       },
     ],
@@ -4890,6 +4913,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 7,
         defaultValue: 1,
         step: 1,
+        group: 'style',
         description:
           'Warp type: Pixelate for blocks, Swirl for spiral, Kaleidoscope for mirror segments, Fisheye for wide lens, Sphere for 3D ball, Pinch for squeeze/bulge, Wave for ripples, Shatter for broken glass',
       },
@@ -4900,6 +4924,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
+        group: 'intensity',
         description: 'Strength of the distortion effect',
       },
       {
@@ -4909,6 +4934,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
+        group: 'position',
         description: 'Horizontal position of the effect center (0=left, 1=right)',
       },
       {
@@ -4918,6 +4944,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
+        group: 'position',
         description: 'Vertical position of the effect center (0=top, 1=bottom)',
       },
       {
@@ -4927,6 +4954,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 16,
         defaultValue: 6,
         step: 1,
+        group: 'pattern',
         description: 'Number of mirror segments for kaleidoscope effect',
       },
       {
@@ -4936,6 +4964,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
+        group: 'intensity',
         description: 'Size of the affected area from the center',
       },
       {
@@ -4945,6 +4974,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 50,
         defaultValue: 10,
         step: 1,
+        group: 'pattern',
         description: 'Number of wave cycles across the image',
       },
       {
@@ -4954,6 +4984,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 1,
         step: 0.05,
+        group: 'appearance',
         description: 'Blend the effect with the original image',
       },
     ],
@@ -4970,6 +5001,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 4,
         defaultValue: 0,
         step: 1,
+        group: 'style',
         description:
           'Blur algorithm: Gaussian (smooth), Bokeh (dreamy circles), Tilt Shift (miniature), Motion (directional), Radial (spin)',
       },
@@ -4980,6 +5012,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 50,
         defaultValue: 10,
         step: 1,
+        group: 'intensity',
         description: 'Size of the blur effect - larger values create softer, more diffused results',
       },
       {
@@ -4989,6 +5022,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
+        group: 'focus',
         description: 'Horizontal position of the focus point (0=left, 1=right)',
       },
       {
@@ -4998,6 +5032,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
+        group: 'focus',
         description: 'Vertical position of the focus point (0=top, 1=bottom)',
       },
       {
@@ -5007,6 +5042,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 0.3,
         step: 0.05,
+        group: 'focus',
         description: 'Size of the sharp focus area - smaller values create tighter focus',
       },
       {
@@ -5016,6 +5052,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 360,
         defaultValue: 0,
         step: 15,
+        group: 'intensity',
         description: 'Direction of motion blur in degrees (0=horizontal, 90=vertical)',
       },
       {
@@ -5025,6 +5062,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 1,
         defaultValue: 1,
         step: 0.05,
+        group: 'appearance',
         description: 'Blend between original image and blurred result',
       },
     ],
