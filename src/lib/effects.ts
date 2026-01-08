@@ -652,6 +652,10 @@ export const applyEffect = async (
       case 'unifiedFilm':
         return [createUnifiedFilmEffect(settings), {}];
 
+      // --- TRENDING EFFECTS ---
+      case 'y2kChrome':
+        return [createY2kChromeEffect(settings), {}];
+
       default:
         console.warn(`Unknown effect or no Konva filter: ${effectName}`);
         return [null, null];
@@ -4977,6 +4981,145 @@ const applyFilmFade = (
   }
 };
 
+// ============================================================================
+// Y2K CHROME EFFECT - Metallic/Holographic Aesthetic
+// Creates the iconic chrome, metallic, and rainbow holographic look
+// ============================================================================
+const createY2kChromeEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const chromeIntensity = (settings.intensity ?? 70) / 100;
+    const rainbowShift = (settings.rainbow ?? 50) / 100;
+    const highlightSharpness = (settings.highlights ?? 60) / 100;
+    const reflectionStrength = (settings.reflection ?? 40) / 100;
+    const scanlines = (settings.scanlines ?? 0) / 100;
+    const opacity = settings.opacity ?? 1;
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    const originalForBlend = opacity < 1 ? pool.acquire(data.length) : null;
+
+    try {
+      original.set(data);
+      if (originalForBlend) originalForBlend.set(data);
+
+      // Pre-calculate gradient for chrome reflection
+      const gradientLUT = new Float32Array(256);
+      for (let i = 0; i < 256; i++) {
+        // S-curve for metallic reflection response
+        const t = i / 255;
+        gradientLUT[i] = t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
+      }
+
+      // Process each pixel
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const i = (y * width + x) * 4;
+          const r = original[i];
+          const g = original[i + 1];
+          const b = original[i + 2];
+
+          // Calculate luminance for chrome mapping
+          const lum = r * 0.299 + g * 0.587 + b * 0.114;
+          const lumNorm = lum / 255;
+
+          // Chrome gradient - metallic reflection based on luminance
+          const chromeValue = gradientLUT[Math.floor(lum)];
+
+          // Calculate surface "angle" based on local gradient for holographic effect
+          // Use neighboring pixels to estimate surface normal
+          let dx = 0,
+            dy = 0;
+          if (x > 0 && x < width - 1) {
+            const leftLum =
+              original[i - 4] * 0.299 + original[i - 3] * 0.587 + original[i - 2] * 0.114;
+            const rightLum =
+              original[i + 4] * 0.299 + original[i + 5] * 0.587 + original[i + 6] * 0.114;
+            dx = (rightLum - leftLum) / 255;
+          }
+          if (y > 0 && y < height - 1) {
+            const topI = i - width * 4;
+            const botI = i + width * 4;
+            const topLum =
+              original[topI] * 0.299 + original[topI + 1] * 0.587 + original[topI + 2] * 0.114;
+            const botLum =
+              original[botI] * 0.299 + original[botI + 1] * 0.587 + original[botI + 2] * 0.114;
+            dy = (botLum - topLum) / 255;
+          }
+
+          // Holographic/rainbow color based on surface angle
+          const angle = Math.atan2(dy, dx) / Math.PI; // -1 to 1
+          const hue = ((angle + 1) / 2 + (x / width) * 0.3 + (y / height) * 0.2) % 1;
+
+          // Convert hue to RGB for rainbow effect
+          const rainbow = hslToRgb(hue, 0.8, 0.5);
+
+          // Chrome base color (silver/white gradient)
+          const chromeBase = 128 + chromeValue * 127;
+
+          // Specular highlights - sharp white reflections on bright areas
+          const specular = Math.pow(chromeValue, 2 + highlightSharpness * 4) * highlightSharpness;
+
+          // Reflection simulation - environment mapping effect
+          const reflectX = (x / width - 0.5) * 2;
+          const reflectY = (y / height - 0.5) * 2;
+          const reflectAngle = Math.atan2(reflectY, reflectX);
+          const reflectDist = Math.sqrt(reflectX * reflectX + reflectY * reflectY);
+          const reflectionGradient = (Math.sin(reflectAngle * 2 + reflectDist * 3) + 1) / 2;
+
+          // Combine chrome components
+          let finalR = chromeBase;
+          let finalG = chromeBase;
+          let finalB = chromeBase;
+
+          // Add rainbow holographic shift
+          finalR = lerp(finalR, rainbow.r * 255, rainbowShift * 0.6);
+          finalG = lerp(finalG, rainbow.g * 255, rainbowShift * 0.6);
+          finalB = lerp(finalB, rainbow.b * 255, rainbowShift * 0.6);
+
+          // Add specular highlights
+          finalR = Math.min(255, finalR + specular * 200);
+          finalG = Math.min(255, finalG + specular * 200);
+          finalB = Math.min(255, finalB + specular * 200);
+
+          // Add reflection gradient
+          const reflectColor = reflectionGradient * reflectionStrength * 60;
+          finalR = clampByte(finalR + reflectColor);
+          finalG = clampByte(finalG + reflectColor * 0.9);
+          finalB = clampByte(finalB + reflectColor * 1.1);
+
+          // Preserve some original color in midtones for depth
+          const midtoneMask = 1 - Math.abs(lumNorm - 0.5) * 2;
+          finalR = lerp(finalR, r * 0.7 + finalR * 0.3, midtoneMask * 0.3);
+          finalG = lerp(finalG, g * 0.7 + finalG * 0.3, midtoneMask * 0.3);
+          finalB = lerp(finalB, b * 0.7 + finalB * 0.3, midtoneMask * 0.3);
+
+          // Apply scanlines for extra Y2K aesthetic
+          if (scanlines > 0 && y % 2 === 0) {
+            const scanlineAmount = scanlines * 0.3;
+            finalR *= 1 - scanlineAmount;
+            finalG *= 1 - scanlineAmount;
+            finalB *= 1 - scanlineAmount;
+          }
+
+          // Blend with original based on intensity
+          data[i] = clampByte(lerp(r, finalR, chromeIntensity));
+          data[i + 1] = clampByte(lerp(g, finalG, chromeIntensity));
+          data[i + 2] = clampByte(lerp(b, finalB, chromeIntensity));
+        }
+      }
+
+      // Apply opacity blend
+      if (originalForBlend && opacity < 1) {
+        applyOpacityBlend(data, originalForBlend, opacity);
+      }
+    } finally {
+      pool.release(original);
+      if (originalForBlend) pool.release(originalForBlend);
+    }
+  };
+};
+
 // Define all available effects with their settings
 export const effectsConfig: Record<string, EffectConfig> = {
   // Basic Adjustments - Standardized to intuitive percentage-based ranges
@@ -6223,6 +6366,74 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         group: 'appearance',
         description: 'Blend between original image and film result',
+      },
+    ],
+  },
+
+  // Y2K CHROME - Metallic/Holographic Effect
+  y2kChrome: {
+    label: 'Y2K Chrome',
+    category: 'Special FX',
+    settings: [
+      {
+        id: 'intensity',
+        label: 'Chrome Intensity (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 70,
+        step: 5,
+        group: 'intensity',
+        description: 'Strength of the metallic chrome effect',
+      },
+      {
+        id: 'rainbow',
+        label: 'Rainbow/Holographic (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 50,
+        step: 5,
+        group: 'style',
+        description: 'Amount of holographic rainbow color shift based on surface angle',
+      },
+      {
+        id: 'highlights',
+        label: 'Highlight Sharpness (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 60,
+        step: 5,
+        group: 'intensity',
+        description: 'Sharpness of specular highlights - higher values create harder reflections',
+      },
+      {
+        id: 'reflection',
+        label: 'Reflection (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 40,
+        step: 5,
+        group: 'appearance',
+        description: 'Simulated environment reflection gradient',
+      },
+      {
+        id: 'scanlines',
+        label: 'Scanlines (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 0,
+        step: 5,
+        group: 'appearance',
+        description: 'Add retro CRT scanlines for extra Y2K aesthetic',
+      },
+      {
+        id: 'opacity',
+        label: 'Effect Opacity',
+        min: 0,
+        max: 1,
+        defaultValue: 1,
+        step: 0.05,
+        group: 'appearance',
+        description: 'Blend between original image and chrome result',
       },
     ],
   },
@@ -10321,6 +10532,7 @@ export const effectCategories = {
     icon: '✨',
     description: 'Special effects and simulations',
     effects: [
+      'y2kChrome', // Metallic chrome, holographic rainbow, Y2K aesthetic
       'doubleExposure',
       'liquidMetal',
       'neuralDream',
