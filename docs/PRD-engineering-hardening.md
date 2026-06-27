@@ -30,7 +30,15 @@
 >   intentionally deviates; audit-downgraded to low) · WS-4.4 layer caching (rewrites ImageEditor compositing; needs
 >   visual check of stacked effects) · WS-5.6 SVG colour tracing (low; SVG export path) · WS-6.x modular-dir purge
 >   (effectsUtils/index/dead modular effect files + their tests — dead-code-eliminated already; removal needs test handling).
-> - ⏭ WS-7 (GPU path, worker pipeline, full per-effect registry) — large, requires the screenshot-diff harness; not started.
+> - ✅ Checkpoint 4 (verified: `tsc` clean · `jest` 192 passed/0 failed · `next build` green):
+>   SCREENSHOT-DIFF HARNESS (`visualHarness.test.ts`: pixel-diff util + path-equivalence test + opt-in PNG dump) ·
+>   WS-4.4 LAYER CACHING — new `LayerPipeline.ts` (composite-filter prefix cache; proxy `this` for Konva built-ins),
+>   wired into `ImageEditor` as a single composite filter; prefix cache cleared on image swap / resize / unmount.
+>   Editing layer k reuses the cached cumulative result of [0..k-1]. Proven `cached == uncached` byte-identical
+>   (incl. a real bloom+chromatic+temperature stack, maxDiff=0) and visually confirmed; goldenEffects unchanged
+>   (effects.ts untouched). Test count 180 → 192.
+> - ⏭ Still staged (stylistic / unwired / out-of-scope-large): WS-3.2 dither-in-linear, WS-1.6 film saturation pivot,
+>   WS-5.6 SVG colour tracing, modular-dir purge; and WS-7 (GPU path, worker pipeline, full per-effect registry).
 >   **Author:** Engineering audit synthesis (45-agent audit, 38 findings, 35 verified)
 >   **Baseline (pre-work):** `tsc --noEmit` clean · `jest` 14 suites / 143 passed / 27 skipped / 0 failed
 >   **Scope:** Code, engineering, and performance improvements only (the **engineering** audit). The UX/UI "moves" (Looks Deck, Effect Chip) are a separate design track and are **out of scope** here.
