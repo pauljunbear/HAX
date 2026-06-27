@@ -26,6 +26,8 @@ export type PipelineFilter = (img: PipelineImage) => void;
 export interface LayerSpec {
   /** Stable identity of this layer (effectId + serialized settings). */
   sig: string;
+  /** Effect id, used to route a layer to the GPU path when supported. */
+  effectId?: string;
   filter: PipelineFilter;
   /** Params for Konva built-in filters (empty for custom closures). */
   params: Record<string, number>;

@@ -37,8 +37,17 @@
 >   Editing layer k reuses the cached cumulative result of [0..k-1]. Proven `cached == uncached` byte-identical
 >   (incl. a real bloom+chromatic+temperature stack, maxDiff=0) and visually confirmed; goldenEffects unchanged
 >   (effects.ts untouched). Test count 180 → 192.
-> - ⏭ Still staged (stylistic / unwired / out-of-scope-large): WS-3.2 dither-in-linear, WS-1.6 film saturation pivot,
->   WS-5.6 SVG colour tracing, modular-dir purge; and WS-7 (GPU path, worker pipeline, full per-effect registry).
+> - ✅ Checkpoint 5 — WS-7 GPU PATH (verified: `tsc` clean · `jest` 198 passed/0 failed · `next build` green ·
+>   **GPU==CPU verified in real headless-Chrome WebGL2**, maxDiff ≤ 1):
+>   New `webgl/WebGL2Renderer.ts` (shader-chain renderer, ping-pong FBOs, returns null on any failure) +
+>   `webgl/gpuEffects.ts` (7 shaders matched to CPU math: invert, grayscale, sepia, brightness, contrast,
+>   saturation, hue). Verification harness route `/devtest/gpu` diffs GPU vs CPU per effect (driven by
+>   `chrome --use-gl=angle --use-angle=swiftshader`). Wired into `ImageEditor`: when GPU is enabled and EVERY
+>   visible layer has a verified shader, the whole stack runs on GPU in one upload+readback; otherwise / on any
+>   GL failure it falls back to the CPU prefix-cache path. Opt-out via `localStorage 'hax:gpu'='0'`. Test count 192 → 198.
+> - ⏭ Remaining WS-7 (NOT done — large, separate phase): broaden GPU coverage (blur/pixelate/chromatic/threshold/
+>   posterize + hybrid GPU-prefix/CPU-rest), worker pipeline (depends on the registry), full per-effect registry.
+> - ⏭ Still staged (stylistic / unwired): WS-3.2 dither-in-linear, WS-1.6 film saturation pivot, WS-5.6 SVG tracing, modular-dir purge.
 >   **Author:** Engineering audit synthesis (45-agent audit, 38 findings, 35 verified)
 >   **Baseline (pre-work):** `tsc --noEmit` clean · `jest` 14 suites / 143 passed / 27 skipped / 0 failed
 >   **Scope:** Code, engineering, and performance improvements only (the **engineering** audit). The UX/UI "moves" (Looks Deck, Effect Chip) are a separate design track and are **out of scope** here.
