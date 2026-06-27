@@ -69,7 +69,7 @@ imager2/
 │   │   └── useImage.ts          # Image loading
 │   │
 │   ├── lib/                 # Utilities & core logic
-│   │   ├── effects.ts       # Main effects engine (9500+ lines)
+│   │   ├── effects.ts       # Main effects engine (~12,800 lines)
 │   │   ├── store.ts         # Zustand global store
 │   │   ├── themes.ts        # Theme system
 │   │   ├── effects/         # Modular effects system
@@ -304,9 +304,9 @@ npm run test:e2e:open       # Interactive
 
 ## Known Issues & Gotchas
 
-### Build Error Suppression
+### Build Errors Block Builds
 
-`next.config.js` has `ignoreBuildErrors: true` - TypeScript errors don't block builds.
+`next.config.js` sets `ignoreBuildErrors: false` and `eslint.ignoreDuringBuilds: false` — TypeScript **and** lint errors DO fail the production build. Keep `npm run build` green.
 
 ### SSR & Konva
 
@@ -319,12 +319,9 @@ const loadKonva = async () => {
 };
 ```
 
-### FFmpeg WASM Requirements
+### FFmpeg WASM (currently unwired)
 
-Needs CORS headers for SharedArrayBuffer:
-
-- `Cross-Origin-Embedder-Policy: require-corp`
-- `Cross-Origin-Opener-Policy: same-origin`
+The video/GIF encoders (`@ffmpeg/ffmpeg`, `gif.js`) exist but are not wired into the live export path (only PNG/JPEG ship). The site-wide COEP/COOP headers that SharedArrayBuffer would need were **removed** (they can block cross-origin images for zero current benefit). Re-add them scoped to a route when video export is actually wired.
 
 ### Worker Limitations
 

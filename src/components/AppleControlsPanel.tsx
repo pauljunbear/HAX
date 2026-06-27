@@ -830,9 +830,11 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                     return (
                       <button
                         key={option.format}
-                        onClick={() => onExport?.(option.format)}
-                        disabled={!hasImage}
-                        className="w-full p-3 transition-all text-left group glass-effect-button disabled:opacity-50"
+                        type="button"
+                        disabled
+                        title="Animated GIF/WEBM export isn't available yet"
+                        aria-disabled="true"
+                        className="w-full p-3 text-left group glass-effect-button opacity-50 cursor-not-allowed"
                       >
                         <div className="flex items-center">
                           <div className="w-8 h-8 flex items-center justify-center mr-3 liquid-material">
@@ -845,7 +847,7 @@ const AppleControlsPanel: React.FC<AppleControlsPanelProps> = ({
                             </div>
                           </div>
                           <div className="text-[10px] font-medium px-2 py-0.5 ml-3 glass-badge">
-                            {option.format}
+                            Soon
                           </div>
                         </div>
                       </button>

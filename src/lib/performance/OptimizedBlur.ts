@@ -7,6 +7,7 @@
  */
 
 import { getBufferPool } from './BufferPool';
+import { SRGB_TO_LINEAR, linearToSrgbByte } from '../effects/color-space';
 
 /**
  * Pre-computed Gaussian kernel cache
@@ -75,7 +76,7 @@ export function separableGaussianBlur(
   const halfKernel = Math.floor(kernelSize / 2);
 
   const pool = getBufferPool();
-  const temp = pool.acquire(data.length);
+  const temp = pool.acquire(data.length, false); // horizontal pass fills temp fully before the vertical pass reads it
 
   try {
     // Horizontal pass
@@ -169,7 +170,7 @@ export function fastBoxBlur(
 
   const clampedRadius = Math.min(Math.max(1, Math.floor(radius)), 100);
   const pool = getBufferPool();
-  const temp = pool.acquire(data.length);
+  const temp = pool.acquire(data.length, false); // horizontal pass fills temp fully before the vertical pass reads it
 
   try {
     // Horizontal pass using running sum
@@ -200,25 +201,27 @@ export function fastBoxBlur(
         temp[outIdx + 2] = sumB / count;
         temp[outIdx + 3] = sumA / count;
 
-        // Slide window
+        // Slide window. removeX/addX are already clamped to the edges
+        // (extend-boundary), so the shed/add must ALWAYS run to keep the
+        // window at exactly `count` = 2r+1 samples. The previous `if`
+        // guards skipped the shed at the left edge and the add at the right
+        // edge while count stayed fixed, leaving r duplicate copies of the
+        // first pixel permanently in the running sum -> a uniform additive
+        // brightness bias of +r*p0/(2r+1) across the whole row/column.
         const removeX = Math.max(0, x - clampedRadius);
         const addX = Math.min(width - 1, x + clampedRadius + 1);
 
-        if (x - clampedRadius >= 0) {
-          const removeIdx = (y * width + removeX) * 4;
-          sumR -= data[removeIdx];
-          sumG -= data[removeIdx + 1];
-          sumB -= data[removeIdx + 2];
-          sumA -= data[removeIdx + 3];
-        }
+        const removeIdx = (y * width + removeX) * 4;
+        sumR -= data[removeIdx];
+        sumG -= data[removeIdx + 1];
+        sumB -= data[removeIdx + 2];
+        sumA -= data[removeIdx + 3];
 
-        if (x + clampedRadius + 1 < width) {
-          const addIdx = (y * width + addX) * 4;
-          sumR += data[addIdx];
-          sumG += data[addIdx + 1];
-          sumB += data[addIdx + 2];
-          sumA += data[addIdx + 3];
-        }
+        const addIdx = (y * width + addX) * 4;
+        sumR += data[addIdx];
+        sumG += data[addIdx + 1];
+        sumB += data[addIdx + 2];
+        sumA += data[addIdx + 3];
       }
     }
 
@@ -249,24 +252,22 @@ export function fastBoxBlur(
         data[outIdx + 2] = sumB / count;
         data[outIdx + 3] = sumA / count;
 
-        // Slide window
-        if (y - clampedRadius >= 0) {
-          const removeY = y - clampedRadius;
-          const removeIdx = (removeY * width + x) * 4;
-          sumR -= temp[removeIdx];
-          sumG -= temp[removeIdx + 1];
-          sumB -= temp[removeIdx + 2];
-          sumA -= temp[removeIdx + 3];
-        }
+        // Slide window. Always shed/add the clamped (extend-boundary)
+        // samples so the window stays at `count` = 2r+1 - see the
+        // horizontal pass for why the guards were a bug.
+        const removeY = Math.max(0, y - clampedRadius);
+        const removeIdx = (removeY * width + x) * 4;
+        sumR -= temp[removeIdx];
+        sumG -= temp[removeIdx + 1];
+        sumB -= temp[removeIdx + 2];
+        sumA -= temp[removeIdx + 3];
 
-        if (y + clampedRadius + 1 < height) {
-          const addY = y + clampedRadius + 1;
-          const addIdx = (addY * width + x) * 4;
-          sumR += temp[addIdx];
-          sumG += temp[addIdx + 1];
-          sumB += temp[addIdx + 2];
-          sumA += temp[addIdx + 3];
-        }
+        const addY = Math.min(height - 1, y + clampedRadius + 1);
+        const addIdx = (addY * width + x) * 4;
+        sumR += temp[addIdx];
+        sumG += temp[addIdx + 1];
+        sumB += temp[addIdx + 2];
+        sumA += temp[addIdx + 3];
       }
     }
   } finally {
@@ -290,12 +291,119 @@ export function stackBlur(
     return;
   }
 
-  // For larger radii, use multiple box blur passes (3 passes ≈ Gaussian)
+  // For larger radii, use multiple box blur passes (3 passes ≈ Gaussian).
+  // Derive the box radius from the SAME target sigma the Gaussian path uses
+  // (sigma = radius/3). Kovesi/Wells: ideal box width w = sqrt(12*sigma^2/n + 1),
+  // boxRadius = (w-1)/2. The old radius/sqrt(3) over-blurred ~1.7x and jumped
+  // discontinuously the moment radius crossed 3.
   const passes = 3;
-  const boxRadius = Math.round(radius / Math.sqrt(passes));
+  const sigma = radius / 3;
+  const idealWidth = Math.sqrt((12 * sigma * sigma) / passes + 1);
+  const boxRadius = Math.max(1, Math.round((idealWidth - 1) / 2));
 
   for (let i = 0; i < passes; i++) {
     fastBoxBlur(data, width, height, boxRadius);
+  }
+}
+
+/**
+ * Separable Gaussian blur over a Float32 RGBA buffer (in-place).
+ * Used by the linear-light blur path; identical structure to the byte version
+ * but keeps full precision so linear values aren't crushed into 8 bits.
+ */
+export function separableGaussianBlurF32(
+  data: Float32Array,
+  width: number,
+  height: number,
+  radius: number,
+  sigma?: number
+): void {
+  if (radius <= 0 || width === 0 || height === 0) return;
+  const clampedRadius = Math.min(Math.max(1, Math.floor(radius)), 100);
+  const kernel = createGaussianKernel(clampedRadius, sigma);
+  const k = kernel.length;
+  const half = k >> 1;
+  const temp = new Float32Array(data.length);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let r = 0,
+        g = 0,
+        b = 0,
+        a = 0,
+        ws = 0;
+      for (let i = 0; i < k; i++) {
+        const sx = Math.min(width - 1, Math.max(0, x + i - half));
+        const idx = (y * width + sx) * 4;
+        const w = kernel[i];
+        r += data[idx] * w;
+        g += data[idx + 1] * w;
+        b += data[idx + 2] * w;
+        a += data[idx + 3] * w;
+        ws += w;
+      }
+      const o = (y * width + x) * 4;
+      temp[o] = r / ws;
+      temp[o + 1] = g / ws;
+      temp[o + 2] = b / ws;
+      temp[o + 3] = a / ws;
+    }
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let r = 0,
+        g = 0,
+        b = 0,
+        a = 0,
+        ws = 0;
+      for (let i = 0; i < k; i++) {
+        const sy = Math.min(height - 1, Math.max(0, y + i - half));
+        const idx = (sy * width + x) * 4;
+        const w = kernel[i];
+        r += temp[idx] * w;
+        g += temp[idx + 1] * w;
+        b += temp[idx + 2] * w;
+        a += temp[idx + 3] * w;
+        ws += w;
+      }
+      const o = (y * width + x) * 4;
+      data[o] = r / ws;
+      data[o + 1] = g / ws;
+      data[o + 2] = b / ws;
+      data[o + 3] = a / ws;
+    }
+  }
+}
+
+/**
+ * Gaussian blur performed in LINEAR light, in place on an sRGB byte buffer.
+ * Decodes RGB to linear, blurs (energy-correct spreading), re-encodes. This is
+ * the physically-correct way to spread light for bloom / glow / halation: a
+ * gamma-space blur darkens bright spreads and produces muddy halos.
+ * Allocates one transient Float32 buffer; freed on return.
+ */
+export function gaussianBlurLinear(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number,
+  sigma?: number
+): void {
+  if (radius <= 0 || width === 0 || height === 0) return;
+  const lin = new Float32Array(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    lin[i] = SRGB_TO_LINEAR[data[i]];
+    lin[i + 1] = SRGB_TO_LINEAR[data[i + 1]];
+    lin[i + 2] = SRGB_TO_LINEAR[data[i + 2]];
+    lin[i + 3] = data[i + 3] / 255;
+  }
+  separableGaussianBlurF32(lin, width, height, radius, sigma);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = linearToSrgbByte(lin[i]);
+    data[i + 1] = linearToSrgbByte(lin[i + 1]);
+    data[i + 2] = linearToSrgbByte(lin[i + 2]);
+    data[i + 3] = Math.round(lin[i + 3] * 255);
   }
 }
 

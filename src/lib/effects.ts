@@ -3,7 +3,13 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 // Import optimized blur utilities for performance
-import { separableGaussianBlur, stackBlur, getBufferPool } from './performance';
+import { separableGaussianBlur, stackBlur, gaussianBlurLinear, getBufferPool } from './performance';
+import {
+  makeExposureLUT,
+  mulberry32,
+  SRGB_TO_LINEAR,
+  linearToSrgbByte,
+} from './effects/color-space';
 
 // Define the structure for effect settings
 interface EffectSetting {
@@ -105,7 +111,10 @@ const clamp = (value: number, min: number, max: number): number => {
  * Uses bitwise operations for speed when possible
  */
 const clampByte = (value: number): number => {
-  return value < 0 ? 0 : value > 255 ? 255 : value | 0;
+  // Round-half-up rather than truncate (`| 0`): truncation biased every
+  // channel write down by ~0.5 LSB, compounding into banding/darkening
+  // across chained tone effects.
+  return value < 0 ? 0 : value > 255 ? 255 : (value + 0.5) | 0;
 };
 
 /**
@@ -266,8 +275,8 @@ const createOrtonFallback = (settings: Record<string, number>): KonvaFilterFunct
       original.set(data);
       blurred.set(data);
 
-      // Use optimized separable blur
-      stackBlur(blurred, width, height, blurRadius);
+      // Orton glow spreads light, so blur in linear light (not gamma).
+      gaussianBlurLinear(blurred, width, height, blurRadius);
 
       const blendChannel = (base: number, overlay: number) => {
         switch (blendMode) {
@@ -383,8 +392,11 @@ export const applyEffect = async (
       }
 
       case 'saturation': {
-        // Convert from percentage (-100 to 100) to Konva range (-10 to 10)
-        const scaledSaturation = (settings.value ?? 0) / 10;
+        // Konva applies HSL saturation as s = 2^value. Map the -100..100
+        // percent slider to a -1..1 exponent so +100 => 2x and -100 => ~0x.
+        // (The previous /10 produced 2^10 = 1024x at +100, clipping to pure
+        // primaries and collapsing the usable range to roughly +/-5.)
+        const scaledSaturation = (settings.value ?? 0) / 100;
         return [Konva.Filters.HSL, { saturation: scaledSaturation }];
       }
 
@@ -1542,8 +1554,9 @@ const createBloomEffect = (settings: Record<string, number>) => {
       originalData.set(data);
       blurData.set(data);
 
-      // Use optimized separable blur instead of O(n² × r²) box blur
-      stackBlur(blurData, width, height, radius);
+      // Bloom is light spreading from highlights - blur in linear light so
+      // bright halos don't darken/muddy (gamma-space averaging loses energy).
+      gaussianBlurLinear(blurData, width, height, radius);
 
       // Apply bloom: add blurred highlights to original
       for (let i = 0; i < data.length; i += 4) {
@@ -1647,8 +1660,8 @@ const createUnifiedGlowEffect = (settings: Record<string, number>) => {
         glowLayer[i + 3] = 255;
       }
 
-      // Apply blur to glow layer
-      stackBlur(glowLayer, width, height, radius);
+      // Apply blur to glow layer (in linear light - glow is light spreading)
+      gaussianBlurLinear(glowLayer, width, height, radius);
 
       // Composite glow with original
       const bgMultiplier = 1 - darkenBg;
@@ -1863,46 +1876,46 @@ const createChromaticAberrationEffect = (settings: Record<string, number>) => {
     const amount = settings.amount ?? 5;
     const angleRad = (settings.angle ?? 45) * (Math.PI / 180);
 
-    // Pre-calculate constant offsets OUTSIDE the loop (these don't change per pixel)
+    // Fractional offsets + bilinear sampling so sub-pixel amounts (the lower
+    // half of the slider) actually shift the channels. Integer rounding made
+    // any amount below ~0.5px a no-op and quantised the fringe to whole pixels.
     const cosAngle = Math.cos(angleRad);
     const sinAngle = Math.sin(angleRad);
-    const rOffsetX = Math.round(amount * cosAngle);
-    const rOffsetY = Math.round(amount * sinAngle);
-    const bOffsetX = -rOffsetX;
-    const bOffsetY = -rOffsetY;
+    const rOffsetX = amount * cosAngle;
+    const rOffsetY = amount * sinAngle;
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
 
-    // Pre-calculate max bounds for clamping
     const maxX = width - 1;
     const maxY = height - 1;
+    const sampleBilinear = (fx: number, fy: number, channel: number): number => {
+      const x0 = Math.floor(fx);
+      const y0 = Math.floor(fy);
+      const tx = fx - x0;
+      const ty = fy - y0;
+      const cx0 = Math.min(maxX, Math.max(0, x0));
+      const cx1 = Math.min(maxX, Math.max(0, x0 + 1));
+      const cy0 = Math.min(maxY, Math.max(0, y0));
+      const cy1 = Math.min(maxY, Math.max(0, y0 + 1));
+      const top =
+        tempData[(cy0 * width + cx0) * 4 + channel] * (1 - tx) +
+        tempData[(cy0 * width + cx1) * 4 + channel] * tx;
+      const bot =
+        tempData[(cy1 * width + cx0) * 4 + channel] * (1 - tx) +
+        tempData[(cy1 * width + cx1) * 4 + channel] * tx;
+      return top * (1 - ty) + bot * ty;
+    };
 
     for (let y = 0; y < height; y++) {
       const rowOffset = y * width;
-      // Pre-calculate clamped Y values for this row
-      const rY = Math.min(maxY, Math.max(0, y + rOffsetY));
-      const bY = Math.min(maxY, Math.max(0, y + bOffsetY));
-      const rRowOffset = rY * width;
-      const bRowOffset = bY * width;
-
       for (let x = 0; x < width; x++) {
         const index = (rowOffset + x) * 4;
-
-        // Sample Red channel from offset position
-        const rX = Math.min(maxX, Math.max(0, x + rOffsetX));
-        const rIndex = (rRowOffset + rX) * 4;
-        data[index] = tempData[rIndex]; // Red
-
-        // Green channel remains at original position
-        data[index + 1] = tempData[index + 1]; // Green
-
-        // Sample Blue channel from offset position
-        const bX = Math.min(maxX, Math.max(0, x + bOffsetX));
-        const bIndex = (bRowOffset + bX) * 4;
-        data[index + 2] = tempData[bIndex + 2]; // Blue
-
-        data[index + 3] = tempData[index + 3]; // Alpha
+        // Red shifted one way, Blue the other; Green stays at origin.
+        data[index] = clampByte(sampleBilinear(x + rOffsetX, y + rOffsetY, 0));
+        data[index + 1] = tempData[index + 1];
+        data[index + 2] = clampByte(sampleBilinear(x - rOffsetX, y - rOffsetY, 2));
+        data[index + 3] = tempData[index + 3];
       }
     }
   };
@@ -2306,16 +2319,19 @@ const createGlitchArtEffect = (settings: Record<string, number>) => {
     const { data, width, height } = imageData;
     const blockiness = settings.blockiness ?? 0.05;
     const colorShift = Math.round(settings.colorShift ?? 5);
+    // Seeded PRNG so the live preview and the export are byte-identical.
+    // Global Math.random() re-rolled on every render pass and on export.
+    const rng = mulberry32(Math.floor(settings.seed ?? 1));
 
-    const blockHeight = Math.max(1, Math.floor(height * blockiness * Math.random()));
+    const blockHeight = Math.max(1, Math.floor(height * blockiness * rng()));
     const numBlocks = Math.floor(height / blockHeight);
 
     for (let block = 0; block < numBlocks; block++) {
-      if (Math.random() < 0.3) {
+      if (rng() < 0.3) {
         // Chance to glitch this block
         const startY = block * blockHeight;
         const endY = Math.min(height, startY + blockHeight);
-        const shiftX = Math.floor((Math.random() - 0.5) * width * 0.1); // Max 10% shift
+        const shiftX = Math.floor((rng() - 0.5) * width * 0.1); // Max 10% shift
 
         // Horizontal shift
         const tempRow = new Uint8ClampedArray(width * blockHeight * 4);
@@ -2343,10 +2359,10 @@ const createGlitchArtEffect = (settings: Record<string, number>) => {
         }
 
         // Color channel shift within the block
-        if (colorShift > 0 && Math.random() < 0.5) {
-          const rOffset = Math.floor((Math.random() - 0.5) * colorShift);
-          const gOffset = Math.floor((Math.random() - 0.5) * colorShift);
-          const bOffset = Math.floor((Math.random() - 0.5) * colorShift);
+        if (colorShift > 0 && rng() < 0.5) {
+          const rOffset = Math.floor((rng() - 0.5) * colorShift);
+          const gOffset = Math.floor((rng() - 0.5) * colorShift);
+          const bOffset = Math.floor((rng() - 0.5) * colorShift);
 
           for (let y = startY; y < endY; y++) {
             for (let x = 0; x < width; x++) {
@@ -2355,9 +2371,13 @@ const createGlitchArtEffect = (settings: Record<string, number>) => {
               const gX = Math.min(width - 1, Math.max(0, x + gOffset));
               const bX = Math.min(width - 1, Math.max(0, x + bOffset));
 
-              const rIdx = (y * width + rX) * 4;
-              const gIdx = (y * width + gX) * 4;
-              const bIdx = (y * width + bX) * 4;
+              // tempRow holds ONLY this block's rows, filled relative to
+              // startY, so it must be indexed by the relative row (y-startY).
+              // Indexing by absolute y read out of bounds (NaN->0 = black)
+              // for every block after the first.
+              const rIdx = ((y - startY) * width + rX) * 4;
+              const gIdx = ((y - startY) * width + gX) * 4;
+              const bIdx = ((y - startY) * width + bX) * 4;
 
               // Only copy shifted channels, keep original alpha
               data[index] = tempRow[rIdx]; // Shifted Red
@@ -2922,37 +2942,42 @@ const createColorTemperatureEffect = (settings: Record<string, number>) => {
     const temperature = settings.temperature ?? 0; // -100 to 100 (Cool to Warm)
     const tint = settings.tint ?? 0; // -100 to 100 (Green to Magenta)
 
-    // Convert temperature/tint sliders to approximate RGB multipliers
-    // These are simplified approximations
+    // White balance is a per-channel gain that belongs in LINEAR light, and
+    // it should preserve luminance (a temperature move shouldn't brighten or
+    // darken the image). The old code multiplied gamma bytes with no
+    // luminance normalisation, so warming brightened and cooling darkened.
     const tempFactor = temperature / 200.0; // Range -0.5 to 0.5
     const tintFactor = tint / 200.0; // Range -0.5 to 0.5
-
-    // Temperature affects Red and Blue inversely
-    const redTempMultiplier = 1.0 + tempFactor;
-    const blueTempMultiplier = 1.0 - tempFactor;
-
-    // Tint affects Green and Red/Blue inversely
-    const greenTintMultiplier = 1.0 - tintFactor;
-    const redBlueTintMultiplier = 1.0 + tintFactor;
+    const gainR = (1 + tempFactor) * (1 + tintFactor);
+    const gainG = 1 - tintFactor;
+    const gainB = (1 - tempFactor) * (1 + tintFactor);
+    // Rec.709 luminance weights (linear light)
+    const LR = 0.2126;
+    const LG = 0.7152;
+    const LB = 0.0722;
 
     for (let i = 0; i < data.length; i += 4) {
-      let r = data[i];
-      let g = data[i + 1];
-      let b = data[i + 2];
+      const lr = SRGB_TO_LINEAR[data[i]];
+      const lg = SRGB_TO_LINEAR[data[i + 1]];
+      const lb = SRGB_TO_LINEAR[data[i + 2]];
 
-      // Apply Temperature Shift
-      r *= redTempMultiplier;
-      b *= blueTempMultiplier;
+      let nr = lr * gainR;
+      let ng = lg * gainG;
+      let nb = lb * gainB;
 
-      // Apply Tint Shift (affecting R/B and G)
-      r *= redBlueTintMultiplier;
-      g *= greenTintMultiplier;
-      b *= redBlueTintMultiplier;
+      // Renormalise so output luminance == input luminance (per pixel)
+      const yIn = LR * lr + LG * lg + LB * lb;
+      const yOut = LR * nr + LG * ng + LB * nb;
+      if (yOut > 1e-6) {
+        const k = yIn / yOut;
+        nr *= k;
+        ng *= k;
+        nb *= k;
+      }
 
-      // Clamp values
-      data[i] = clampByte(r);
-      data[i + 1] = clampByte(g);
-      data[i + 2] = clampByte(b);
+      data[i] = linearToSrgbByte(nr);
+      data[i + 1] = linearToSrgbByte(ng);
+      data[i + 2] = linearToSrgbByte(nb);
     }
   };
 };
@@ -4123,6 +4148,10 @@ const applyRadialBlur = (
       const dy = y - cy;
       const angle = Math.atan2(dy, dx);
       const dist = Math.sqrt(dx * dx + dy * dy);
+      // Hoist the trig: the radial direction is constant per pixel, so cos/sin
+      // were being recomputed 2*(2r+1) times per pixel for no reason.
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
 
       let r = 0,
         g = 0,
@@ -4132,8 +4161,8 @@ const applyRadialBlur = (
       // Sample along the radial direction
       for (let i = -radius; i <= radius; i++) {
         const sampleDist = dist + i;
-        const sampleX = Math.round(cx + sampleDist * Math.cos(angle));
-        const sampleY = Math.round(cy + sampleDist * Math.sin(angle));
+        const sampleX = Math.round(cx + sampleDist * cosA);
+        const sampleY = Math.round(cy + sampleDist * sinA);
 
         if (sampleX >= 0 && sampleX < width && sampleY >= 0 && sampleY < height) {
           const idx = (sampleY * width + sampleX) * 4;
@@ -4647,13 +4676,17 @@ const createUnifiedFilmEffect = (settings: Record<string, number>) => {
       original.set(data);
       if (originalForBlend) originalForBlend.set(data);
 
-      // Apply exposure shift first
+      // Apply exposure shift first, in LINEAR light. Exposure in stops is a
+      // multiply of radiance, so it must happen on linearized values then be
+      // re-encoded; multiplying the gamma byte (the old code) blew mid-gray
+      // to white at +1 stop. Precompute a byte->byte LUT so the loop stays a
+      // single table read per channel.
       if (exposure !== 0) {
-        const expFactor = Math.pow(2, exposure);
+        const expLUT = makeExposureLUT(exposure);
         for (let i = 0; i < data.length; i += 4) {
-          data[i] = clampByte(data[i] * expFactor);
-          data[i + 1] = clampByte(data[i + 1] * expFactor);
-          data[i + 2] = clampByte(data[i + 2] * expFactor);
+          data[i] = expLUT[data[i]];
+          data[i + 1] = expLUT[data[i + 1]];
+          data[i + 2] = expLUT[data[i + 2]];
         }
       }
 
@@ -4762,9 +4795,9 @@ const applyCinestill800T = (
       }
     }
 
-    // Blur the highlights for halation
+    // Blur the highlights for halation (linear light - halation is glow)
     if (halation > 0) {
-      stackBlur(highlights, width, height, Math.ceil(halation * 30));
+      gaussianBlurLinear(highlights, width, height, Math.ceil(halation * 30));
     }
 
     // Apply tungsten white balance + halation
@@ -8567,7 +8600,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
       {
         id: 'algorithm',
         label:
-          'Algorithm (0=Floyd-Steinberg, 1=Atkinson, 2=Ordered, 3=Stucki, 4=Sierra, 5=Blue Noise)',
+          'Algorithm (0=Floyd-Steinberg, 1=Atkinson, 2=Ordered, 3=Stucki, 4=Sierra, 5=Gradient Noise)',
         min: 0,
         max: 5,
         defaultValue: 1,
@@ -8687,7 +8720,9 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
   blueNoiseDithering: {
-    label: 'Blue Noise Dithering',
+    // Implemented as interleaved-gradient-noise dithering (not true blue noise);
+    // label kept honest. Internal key unchanged so legacy aliases keep resolving.
+    label: 'Gradient Noise Dithering',
     category: 'Artistic',
     settings: [
       {
@@ -9504,8 +9539,8 @@ const createHalationGlowEffect = (settings: Record<string, number>) => {
         }
       }
 
-      // Blur the highlights using optimized blur
-      stackBlur(highlights, width, height, radius);
+      // Blur the highlights in linear light (halation is light spreading)
+      gaussianBlurLinear(highlights, width, height, radius);
 
       // Add blurred highlights back to original
       for (let i = 0; i < data.length; i += 4) {
@@ -11637,8 +11672,8 @@ const createNeonGlowEdgesEffect = (settings: Record<string, number>) => {
         }
       }
 
-      // Blur the glow layer using optimized blur
-      stackBlur(glowLayer, width, height, glowRadius);
+      // Blur the glow layer in linear light (neon glow is light spreading)
+      gaussianBlurLinear(glowLayer, width, height, glowRadius);
 
       // Composite: dark background + blurred neon glow
       const bgFactor = 0.08;
@@ -11951,93 +11986,124 @@ const createAdvancedDitheringEffect = (settings: Record<string, number>) => {
   };
 };
 
+// Error-diffusion kernel descriptor: each tap is [dx, dy, weight].
+type DiffusionKernel = { taps: ReadonlyArray<readonly [number, number, number]>; divisor: number };
+
+/**
+ * Generic error-diffusion dithering on a FULL-PRECISION (Float32) working
+ * buffer. The previous per-algorithm code accumulated diffused error directly
+ * into the 8-bit Uint8ClampedArray, which clamped (and silently lost) error
+ * whenever a neighbour was already near 0 or 255 - degrading highlights and
+ * shadows - and rounded inconsistently between the first tap and the rest.
+ * Diffusing in float and clamping only on the final write fixes both.
+ * (Quantisation stays in gamma/byte space to preserve the retro-palette look;
+ * a perceptual linear-space variant would be a separate stylistic change.)
+ */
+const applyErrorDiffusion = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  levels: number,
+  kernel: DiffusionKernel
+) => {
+  const buf = new Float32Array(width * height * 3);
+  for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+    buf[j] = data[i];
+    buf[j + 1] = data[i + 1];
+    buf[j + 2] = data[i + 2];
+  }
+  const { taps, divisor } = kernel;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = (y * width + x) * 3;
+      for (let c = 0; c < 3; c++) {
+        const oldVal = buf[p + c];
+        const newVal = quantize(oldVal, levels);
+        buf[p + c] = newVal;
+        const error = oldVal - newVal;
+        if (error === 0) continue;
+        for (let t = 0; t < taps.length; t++) {
+          const nx = x + taps[t][0];
+          const ny = y + taps[t][1];
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            buf[(ny * width + nx) * 3 + c] += (error * taps[t][2]) / divisor;
+          }
+        }
+      }
+    }
+  }
+  for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+    data[i] = clampByte(buf[j]);
+    data[i + 1] = clampByte(buf[j + 1]);
+    data[i + 2] = clampByte(buf[j + 2]);
+  }
+};
+
+const FLOYD_STEINBERG_KERNEL: DiffusionKernel = {
+  taps: [
+    [1, 0, 7],
+    [-1, 1, 3],
+    [0, 1, 5],
+    [1, 1, 1],
+  ],
+  divisor: 16,
+};
+const ATKINSON_KERNEL: DiffusionKernel = {
+  // Atkinson distributes only 6/8 of the error (divisor 8, six unit taps).
+  taps: [
+    [1, 0, 1],
+    [2, 0, 1],
+    [-1, 1, 1],
+    [0, 1, 1],
+    [1, 1, 1],
+    [0, 2, 1],
+  ],
+  divisor: 8,
+};
+const STUCKI_KERNEL: DiffusionKernel = {
+  taps: [
+    [1, 0, 8],
+    [2, 0, 4],
+    [-2, 1, 2],
+    [-1, 1, 4],
+    [0, 1, 8],
+    [1, 1, 4],
+    [2, 1, 2],
+    [-2, 2, 1],
+    [-1, 2, 2],
+    [0, 2, 4],
+    [1, 2, 2],
+    [2, 2, 1],
+  ],
+  divisor: 42,
+};
+const SIERRA_KERNEL: DiffusionKernel = {
+  taps: [
+    [1, 0, 5],
+    [2, 0, 3],
+    [-2, 1, 2],
+    [-1, 1, 4],
+    [0, 1, 5],
+    [1, 1, 4],
+    [2, 1, 2],
+    [-1, 2, 2],
+    [0, 2, 3],
+    [1, 2, 2],
+  ],
+  divisor: 32,
+};
+
 // Floyd-Steinberg dithering algorithm
 const applyFloydSteinberg = (
   data: Uint8ClampedArray,
   width: number,
   height: number,
   levels: number
-) => {
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4;
-
-      for (let c = 0; c < 3; c++) {
-        const oldVal = data[idx + c];
-        const newVal = quantize(oldVal, levels);
-        data[idx + c] = newVal;
-        const error = oldVal - newVal;
-
-        if (x < width - 1) {
-          data[idx + 4 + c] = clampByte(data[idx + 4 + c] + (error * 7) / 16);
-        }
-        if (y < height - 1) {
-          if (x > 0) {
-            data[idx + (width - 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width - 1) * 4 + c] + (error * 3) / 16)
-            );
-          }
-          data[idx + width * 4 + c] = Math.max(
-            0,
-            Math.min(255, data[idx + width * 4 + c] + (error * 5) / 16)
-          );
-          if (x < width - 1) {
-            data[idx + (width + 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width + 1) * 4 + c] + (error * 1) / 16)
-            );
-          }
-        }
-      }
-    }
-  }
-};
+) => applyErrorDiffusion(data, width, height, levels, FLOYD_STEINBERG_KERNEL);
 
 // Atkinson dithering - Classic Mac look, only diffuses 6/8 of error
-const applyAtkinson = (data: Uint8ClampedArray, width: number, height: number, levels: number) => {
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4;
-
-      for (let c = 0; c < 3; c++) {
-        const oldVal = data[idx + c];
-        const newVal = quantize(oldVal, levels);
-        data[idx + c] = newVal;
-        const error = (oldVal - newVal) / 8; // Only 6/8 of error is distributed
-
-        // Distribute error to 6 neighbors (Atkinson pattern)
-        if (x < width - 1) {
-          data[idx + 4 + c] = clampByte(data[idx + 4 + c] + error);
-        }
-        if (x < width - 2) {
-          data[idx + 8 + c] = clampByte(data[idx + 8 + c] + error);
-        }
-        if (y < height - 1) {
-          if (x > 0) {
-            data[idx + (width - 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width - 1) * 4 + c] + error)
-            );
-          }
-          data[idx + width * 4 + c] = clampByte(data[idx + width * 4 + c] + error);
-          if (x < width - 1) {
-            data[idx + (width + 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width + 1) * 4 + c] + error)
-            );
-          }
-        }
-        if (y < height - 2) {
-          data[idx + width * 2 * 4 + c] = Math.max(
-            0,
-            Math.min(255, data[idx + width * 2 * 4 + c] + error)
-          );
-        }
-      }
-    }
-  }
-};
+const applyAtkinson = (data: Uint8ClampedArray, width: number, height: number, levels: number) =>
+  applyErrorDiffusion(data, width, height, levels, ATKINSON_KERNEL);
 
 // Ordered (Bayer) dithering
 const applyOrdered = (
@@ -12057,7 +12123,10 @@ const applyOrdered = (
       const idx = (y * width + x) * 4;
       const mx = x % matrixSize;
       const my = y % matrixSize;
-      const bayerValue = matrix[my][mx] / maxMatrixValue;
+      // (M + 0.5)/n^2 centres the threshold distribution exactly on 0.5.
+      // Plain M/n^2 has mean (n^2-1)/(2 n^2) < 0.5, injecting a constant
+      // DC darkening bias into every ordered-dithered image.
+      const bayerValue = (matrix[my][mx] + 0.5) / maxMatrixValue;
 
       for (let c = 0; c < 3; c++) {
         const oldVal = data[idx + c] / 255;
@@ -12070,145 +12139,12 @@ const applyOrdered = (
 };
 
 // Stucki dithering - Higher quality, larger diffusion kernel
-const applyStucki = (data: Uint8ClampedArray, width: number, height: number, levels: number) => {
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4;
-
-      for (let c = 0; c < 3; c++) {
-        const oldVal = data[idx + c];
-        const newVal = quantize(oldVal, levels);
-        data[idx + c] = newVal;
-        const error = oldVal - newVal;
-
-        // Stucki kernel (42 divisor)
-        // Current row
-        if (x < width - 1) data[idx + 4 + c] = clampByte(data[idx + 4 + c] + (error * 8) / 42);
-        if (x < width - 2) data[idx + 8 + c] = clampByte(data[idx + 8 + c] + (error * 4) / 42);
-
-        // Next row
-        if (y < height - 1) {
-          if (x > 1)
-            data[idx + (width - 2) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width - 2) * 4 + c] + (error * 2) / 42)
-            );
-          if (x > 0)
-            data[idx + (width - 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width - 1) * 4 + c] + (error * 4) / 42)
-            );
-          data[idx + width * 4 + c] = Math.max(
-            0,
-            Math.min(255, data[idx + width * 4 + c] + (error * 8) / 42)
-          );
-          if (x < width - 1)
-            data[idx + (width + 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width + 1) * 4 + c] + (error * 4) / 42)
-            );
-          if (x < width - 2)
-            data[idx + (width + 2) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width + 2) * 4 + c] + (error * 2) / 42)
-            );
-        }
-
-        // Two rows down
-        if (y < height - 2) {
-          if (x > 1)
-            data[idx + (width * 2 - 2) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width * 2 - 2) * 4 + c] + (error * 1) / 42)
-            );
-          if (x > 0)
-            data[idx + (width * 2 - 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width * 2 - 1) * 4 + c] + (error * 2) / 42)
-            );
-          data[idx + width * 2 * 4 + c] = Math.max(
-            0,
-            Math.min(255, data[idx + width * 2 * 4 + c] + (error * 4) / 42)
-          );
-          if (x < width - 1)
-            data[idx + (width * 2 + 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width * 2 + 1) * 4 + c] + (error * 2) / 42)
-            );
-          if (x < width - 2)
-            data[idx + (width * 2 + 2) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width * 2 + 2) * 4 + c] + (error * 1) / 42)
-            );
-        }
-      }
-    }
-  }
-};
+const applyStucki = (data: Uint8ClampedArray, width: number, height: number, levels: number) =>
+  applyErrorDiffusion(data, width, height, levels, STUCKI_KERNEL);
 
 // Sierra dithering - Good balance between quality and speed
-const applySierra = (data: Uint8ClampedArray, width: number, height: number, levels: number) => {
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4;
-
-      for (let c = 0; c < 3; c++) {
-        const oldVal = data[idx + c];
-        const newVal = quantize(oldVal, levels);
-        data[idx + c] = newVal;
-        const error = oldVal - newVal;
-
-        // Sierra kernel (32 divisor)
-        if (x < width - 1) data[idx + 4 + c] = clampByte(data[idx + 4 + c] + (error * 5) / 32);
-        if (x < width - 2) data[idx + 8 + c] = clampByte(data[idx + 8 + c] + (error * 3) / 32);
-
-        if (y < height - 1) {
-          if (x > 1)
-            data[idx + (width - 2) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width - 2) * 4 + c] + (error * 2) / 32)
-            );
-          if (x > 0)
-            data[idx + (width - 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width - 1) * 4 + c] + (error * 4) / 32)
-            );
-          data[idx + width * 4 + c] = Math.max(
-            0,
-            Math.min(255, data[idx + width * 4 + c] + (error * 5) / 32)
-          );
-          if (x < width - 1)
-            data[idx + (width + 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width + 1) * 4 + c] + (error * 4) / 32)
-            );
-          if (x < width - 2)
-            data[idx + (width + 2) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width + 2) * 4 + c] + (error * 2) / 32)
-            );
-        }
-
-        if (y < height - 2) {
-          if (x > 0)
-            data[idx + (width * 2 - 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width * 2 - 1) * 4 + c] + (error * 2) / 32)
-            );
-          data[idx + width * 2 * 4 + c] = Math.max(
-            0,
-            Math.min(255, data[idx + width * 2 * 4 + c] + (error * 3) / 32)
-          );
-          if (x < width - 1)
-            data[idx + (width * 2 + 1) * 4 + c] = Math.max(
-              0,
-              Math.min(255, data[idx + (width * 2 + 1) * 4 + c] + (error * 2) / 32)
-            );
-        }
-      }
-    }
-  }
-};
+const applySierra = (data: Uint8ClampedArray, width: number, height: number, levels: number) =>
+  applyErrorDiffusion(data, width, height, levels, SIERRA_KERNEL);
 
 // Blue noise dithering - Organic, visually pleasing patterns
 const applyBlueNoise = (
@@ -12751,9 +12687,9 @@ const createBioluminescenceEffect = (settings: Record<string, number>) => {
         }
       }
 
-      // Blur the glow layer using optimized separable blur
+      // Blur the glow layer in linear light (bioluminescent glow spreads light)
       const glowRadius = Math.ceil(5 + glowSpread * 55);
-      stackBlur(glowLayer, width, height, Math.min(glowRadius, 60));
+      gaussianBlurLinear(glowLayer, width, height, Math.min(glowRadius, 60));
 
       // Darkness factor for background
       const darknessFactor = 0.05 + (1 - glowSpread) * 0.15;

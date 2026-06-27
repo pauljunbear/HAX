@@ -19,16 +19,19 @@ export class BufferPool {
    * Acquire a buffer of the specified size
    * Returns a recycled buffer if available, otherwise creates a new one
    */
-  acquire(size: number): Uint8ClampedArray {
+  acquire(size: number, clear: boolean = true): Uint8ClampedArray {
     const pool = this.pools.get(size);
 
     if (pool && pool.length > 0) {
       const pooledBuffer = pool.pop()!;
-      // Zero out the buffer for clean state
-      pooledBuffer.buffer.fill(0);
+      // Zero only when the caller will read before fully writing. Callers that
+      // overwrite every element first (blur temp buffers, acquireFrom) pass
+      // clear:false to skip an O(n) fill of up to ~48MB per 4000x3000 frame.
+      if (clear) pooledBuffer.buffer.fill(0);
       return pooledBuffer.buffer;
     }
 
+    // Freshly allocated typed arrays are already zero-initialised.
     return new Uint8ClampedArray(size);
   }
 
@@ -58,7 +61,8 @@ export class BufferPool {
    * Acquire a buffer and copy data from source
    */
   acquireFrom(source: Uint8ClampedArray): Uint8ClampedArray {
-    const buffer = this.acquire(source.length);
+    // set() overwrites every element, so skip the redundant zero-fill.
+    const buffer = this.acquire(source.length, false);
     buffer.set(source);
     return buffer;
   }

@@ -11,7 +11,7 @@ import React, {
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from '@/hooks/useImage';
 import { applyEffect } from '@/lib/effects';
-import { EffectLayer } from './EffectLayers';
+import type { EffectLayer } from '@/hooks/useEffectLayers';
 import Konva from 'konva';
 
 type FilterParams = Record<string, unknown>;
@@ -557,9 +557,12 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
       const node = imageNodeRef.current ?? stageRef.current?.findOne<Konva.Image>('Image');
       if (!node) return;
 
+      // The cache is stale after an image swap or a container resize. Just
+      // invalidate it here; the debounced scheduler below owns the single
+      // re-render (preview + settle). Previously this also fired an immediate
+      // full-resolution render, so one image load did THREE full renders.
       node.clearCache();
-      void applyEffectsToNode(node);
-    }, [applyEffectsToNode, containerDimensions.height, containerDimensions.width, image]);
+    }, [containerDimensions.height, containerDimensions.width, image]);
 
     // Apply effects function
     // Apply effects with adjustable quality (pixelRatio) so we can render
@@ -584,11 +587,15 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         await applyEffectsToNode(imageNode, 0.6); // faster, lower pixel ratio
       }, 50) as unknown as number;
 
-      // Final quality after user idle (~180ms since last change)
+      // Final quality after user idle (~180ms since last change). Cap the
+      // interactive pixelRatio: the result is shown in a CSS-downscaled canvas,
+      // so rendering at full devicePixelRatio (2-4x the pixels on Retina) buys
+      // no visible detail. True full-resolution is reserved for export, which
+      // renders independently off-screen.
       if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
       finalTimerRef.current = window.setTimeout(async () => {
         if (myVersion !== versionRef.current) return; // superseded
-        await applyEffectsToNode(imageNode, window.devicePixelRatio || 1);
+        await applyEffectsToNode(imageNode, Math.min(window.devicePixelRatio || 1, 1.5));
       }, 180) as unknown as number;
 
       // Cleanup timers on dependency change or unmount
@@ -596,7 +603,9 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
         if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
       };
-    }, [effectLayers, image]);
+      // containerDimensions included so a resize re-renders through this single
+      // debounced path instead of the (now removed) immediate render above.
+    }, [effectLayers, image, containerDimensions.width, containerDimensions.height]);
 
     // Cleanup effect cache on unmount
     useEffect(() => {

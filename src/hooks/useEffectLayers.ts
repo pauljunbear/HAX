@@ -1,6 +1,16 @@
 import { useState, useCallback } from 'react';
-import { EffectLayer } from '@/components/EffectLayers';
 import { effectsConfig } from '@/lib/effects';
+
+// Canonical effect-layer shape. Lives with the hook that owns layer state
+// (moved here from the now-deleted EffectLayers component).
+export interface EffectLayer {
+  id: string;
+  effectId: string;
+  settings: Record<string, number>;
+  opacity: number;
+  visible: boolean;
+  locked: boolean;
+}
 
 const generateLayerId = () =>
   `effect-layer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
