@@ -14,7 +14,21 @@ import { applyEffect } from '@/lib/effects';
 import type { EffectLayer } from '@/hooks/useEffectLayers';
 import { PrefixRenderCache } from '@/lib/performance/LayerPipeline';
 import type { LayerSpec, PipelineFilter } from '@/lib/performance/LayerPipeline';
+import { getWebGL2Renderer } from '@/lib/webgl/WebGL2Renderer';
+import type { GpuPass } from '@/lib/webgl/WebGL2Renderer';
+import { isGpuSupportedEffect, buildGpuPass } from '@/lib/webgl/gpuEffects';
 import Konva from 'konva';
+
+// GPU acceleration is opt-out: on by default (verified GPU==CPU within ±1 in
+// the headless-Chrome harness) with automatic CPU fallback. Disable at runtime
+// with localStorage.setItem('hax:gpu','0').
+function gpuEnabled(): boolean {
+  try {
+    return typeof window !== 'undefined' && window.localStorage?.getItem('hax:gpu') !== '0';
+  } catch {
+    return true;
+  }
+}
 
 type FilterParams = Record<string, unknown>;
 type FilterResult = [((imageData: ImageData) => void) | null, FilterParams | null];
@@ -299,6 +313,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
               if (filter) {
                 specs.push({
                   sig: cacheKey,
+                  effectId: layer.effectId,
                   filter: filter as unknown as PipelineFilter,
                   params: (params || {}) as Record<string, number>,
                 });
@@ -315,7 +330,30 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
           }
 
           const prefixCache = prefixCacheRef.current;
+          // GPU fast path: when enabled and EVERY visible layer has a verified
+          // GPU shader, run the whole stack on the GPU in one upload+readback.
+          // Any failure (no WebGL2, shader error) returns null and we fall back
+          // to the CPU prefix-cache path below. Mixed stacks use the CPU path.
+          const allGpu =
+            gpuEnabled() &&
+            specs.length > 0 &&
+            specs.every(s => !!s.effectId && isGpuSupportedEffect(s.effectId));
           const composite = (imageData: ImageData) => {
+            if (allGpu) {
+              const renderer = getWebGL2Renderer();
+              if (renderer.isSupported()) {
+                const passes = specs
+                  .map(s => buildGpuPass(s.effectId as string, s.params))
+                  .filter((p): p is GpuPass => p !== null);
+                if (passes.length === specs.length) {
+                  const out = renderer.render(imageData, passes);
+                  if (out) {
+                    imageData.data.set(out.data);
+                    return;
+                  }
+                }
+              }
+            }
             prefixCache.render(imageData, specs);
           };
           konvaNode.filters([composite as unknown as (imageData: ImageData) => void]);
