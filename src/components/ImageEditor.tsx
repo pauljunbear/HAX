@@ -12,6 +12,8 @@ import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from '@/hooks/useImage';
 import { applyEffect } from '@/lib/effects';
 import type { EffectLayer } from '@/hooks/useEffectLayers';
+import { PrefixRenderCache } from '@/lib/performance/LayerPipeline';
+import type { LayerSpec, PipelineFilter } from '@/lib/performance/LayerPipeline';
 import Konva from 'konva';
 
 type FilterParams = Record<string, unknown>;
@@ -250,6 +252,9 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
     const [error, setError] = useState<string | null>(null);
     const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
     const effectCacheRef = useRef<Map<string, FilterResult>>(new Map());
+    // Prefix cache of cumulative processed buffers, so editing layer k reuses
+    // the cached result of layers [0..k-1] instead of re-running the whole stack.
+    const prefixCacheRef = useRef<PrefixRenderCache>(new PrefixRenderCache());
 
     const applyEffectsToNode = useCallback(
       async (node: Konva.Image | null, pixelRatio: number = 1) => {
@@ -267,36 +272,13 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
             return;
           }
 
-          const filters: ((imageData: ImageData) => void)[] = [];
-
-          const resetNumberProp = (key: string, value: number) => {
-            const nodeRecord = konvaNode as unknown as Record<string, unknown>;
-            const maybeSetter = nodeRecord[key];
-            if (typeof maybeSetter === 'function') {
-              (maybeSetter as (input: number) => void).call(konvaNode, value);
-            } else {
-              nodeRecord[key] = value;
-            }
-          };
-
-          // Reset commonly-used Konva filter props (guarded so we don't crash if a filter module isn't loaded yet)
-          [
-            'brightness',
-            'contrast',
-            'saturation',
-            'hue',
-            'blurRadius',
-            'noise',
-            'enhance',
-            'pixelSize',
-          ].forEach(key => {
-            try {
-              resetNumberProp(key, 0);
-            } catch {
-              // ignore
-            }
-          });
-
+          // Resolve each visible layer's [filter, params] (closure-cached so we
+          // don't re-create effect closures), then run the whole stack as ONE
+          // composite filter backed by the prefix cache. Params for Konva
+          // built-ins are carried on the spec (applied via a proxy `this` inside
+          // the pipeline) instead of being mutated onto the node, so we no
+          // longer need to reset/set node filter props here.
+          const specs: LayerSpec[] = [];
           for (const layer of effectLayers) {
             if (layer.visible && layer.effectId) {
               const settings = (layer.settings || {}) as Record<string, number>;
@@ -314,24 +296,29 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
               }
 
               const [filter, params] = cached;
-
               if (filter) {
-                filters.push(filter);
-                if (params) {
-                  Object.entries(params).forEach(([key, value]) => {
-                    const maybeSetter = konvaNode[key];
-                    if (typeof maybeSetter === 'function') {
-                      (maybeSetter as (input: unknown) => void)(value);
-                    } else {
-                      konvaNode[key] = value;
-                    }
-                  });
-                }
+                specs.push({
+                  sig: cacheKey,
+                  filter: filter as unknown as PipelineFilter,
+                  params: (params || {}) as Record<string, number>,
+                });
               }
             }
           }
 
-          konvaNode.filters(filters);
+          if (specs.length === 0) {
+            konvaNode.filters([]);
+            konvaNode.cache({ pixelRatio: Math.max(0.5, pixelRatio) });
+            konvaNode.getLayer()?.draw();
+            setError(null);
+            return;
+          }
+
+          const prefixCache = prefixCacheRef.current;
+          const composite = (imageData: ImageData) => {
+            prefixCache.render(imageData, specs);
+          };
+          konvaNode.filters([composite as unknown as (imageData: ImageData) => void]);
           konvaNode.cache({ pixelRatio: Math.max(0.5, pixelRatio) });
           konvaNode.getLayer()?.draw();
           setError(null);
@@ -562,6 +549,9 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
       // re-render (preview + settle). Previously this also fired an immediate
       // full-resolution render, so one image load did THREE full renders.
       node.clearCache();
+      // The rasterised source changes on image swap / resize, so cached
+      // prefixes are stale - drop them.
+      prefixCacheRef.current.clear();
     }, [containerDimensions.height, containerDimensions.width, image]);
 
     // Apply effects function
@@ -611,6 +601,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
     useEffect(() => {
       return () => {
         effectCacheRef.current.clear();
+        prefixCacheRef.current.clear();
       };
     }, []);
 
@@ -628,6 +619,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         const objectUrl = URL.createObjectURL(file);
         setUploadedImageUrl(objectUrl);
         effectCacheRef.current.clear();
+        prefixCacheRef.current.clear();
       } catch {
         setError('Error reading the file.');
       }
