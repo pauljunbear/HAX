@@ -2,6 +2,7 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { buildFfmpegArgs } from './exportHelpers';
 
 export interface VideoExportOptions {
   frames: HTMLCanvasElement[];
@@ -170,53 +171,13 @@ export class VideoExporter {
     height: number;
     outputFileName: string;
   }): string[] {
-    const { frameRate, quality, format, width, height, outputFileName } = options;
-
-    const baseArgs = [
-      '-y', // Overwrite output file
-      '-framerate',
-      frameRate.toString(),
-      '-i',
-      'frame_%04d.png',
-      '-s',
-      `${width}x${height}`,
-    ];
-
-    if (format === 'webm') {
-      // WebM with VP9 codec
-      const crf = Math.max(15, Math.min(63, 63 - quality * 4.8)); // Convert quality 1-10 to CRF 63-15
-      return [
-        ...baseArgs,
-        '-c:v',
-        'libvpx-vp9',
-        '-crf',
-        crf.toString(),
-        '-b:v',
-        '0', // Use CRF mode
-        '-pix_fmt',
-        'yuv420p',
-        '-f',
-        'webm',
-        outputFileName,
-      ];
-    } else {
-      // MP4 with H.264 codec
-      const crf = Math.max(15, Math.min(51, 51 - quality * 3.6)); // Convert quality 1-10 to CRF 51-15
-      return [
-        ...baseArgs,
-        '-c:v',
-        'libx264',
-        '-crf',
-        crf.toString(),
-        '-preset',
-        'medium',
-        '-pix_fmt',
-        'yuv420p',
-        '-f',
-        'mp4',
-        outputFileName,
-      ];
-    }
+    // Delegates to the pure, unit-tested arg builder (no ffmpeg import).
+    return buildFfmpegArgs({
+      frameRate: options.frameRate,
+      quality: options.quality,
+      format: options.format === 'webm' ? 'webm' : 'mp4',
+      outputFileName: options.outputFileName,
+    });
   }
 
   private async cleanup(files: string[]): Promise<void> {

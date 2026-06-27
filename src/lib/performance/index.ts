@@ -6,6 +6,8 @@ export { BufferPool, getBufferPool, withPooledBuffer, copyWithPool } from './Buf
 export {
   separableGaussianBlur,
   separableGaussianBlurCopy,
+  separableGaussianBlurF32,
+  gaussianBlurLinear,
   fastBoxBlur,
   stackBlur,
   selectiveBlur,

@@ -9,6 +9,7 @@ import {
   GIF_QUALITY_PRESETS,
   GifQualityPreset,
 } from './export/gifOptimizer';
+import { gifSampleIntervalFromQuality } from './export/exportHelpers';
 
 export interface AnimationOptions {
   duration: number;
@@ -225,15 +226,27 @@ export async function exportAsGif(
         `Creating optimized GIF with quality ${optimizedSettings.quality}, estimated size: ${optimizedSettings.estimatedSizeKB}KB`
       );
 
+      // gif.js `quality` is the NeuQuant SAMPLE INTERVAL: 1 samples every
+      // pixel (best palette, slowest), 10 is the default, higher = coarser.
+      // Our optimizer reports quality on a 1-10 higher-is-better UI scale, so
+      // it must be INVERTED before handing it to gif.js (previously the best
+      // preset fed gif.js its coarsest sampling).
+      const gifSampleInterval = gifSampleIntervalFromQuality(optimizedSettings.quality);
+
       const gif = new GIF({
-        quality: optimizedSettings.quality,
+        quality: gifSampleInterval,
         workers: Math.min(optimizedSettings.workers, 4), // Cap workers for browser compatibility
         workerScript: '/gif.worker.js',
         width: frames[0]?.canvas.width || 800,
         height: frames[0]?.canvas.height || 600,
         debug: false, // Disable debug for production
-        dithering: optimizedSettings.dithering,
-        transparent: optimizedSettings.transparency ? 'rgba(0,0,0,0)' : undefined,
+        // gif.js reads the option `dither` (NOT `dithering`); pass a kernel
+        // name or false. The old `dithering` key was silently ignored, so
+        // dithering never actually ran.
+        dither: optimizedSettings.dithering ? 'FloydSteinberg-serpentine' : false,
+        // `transparent` expects an integer colour key (or null), not an rgba
+        // string; a string left cleared regions encoded as opaque black.
+        transparent: optimizedSettings.transparency ? 0x00ff00 : null,
         background: '#ffffff',
         globalPalette: optimizationOptions.optimizeColors !== false,
         repeat: 0, // Loop forever

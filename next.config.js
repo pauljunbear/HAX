@@ -38,24 +38,10 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
   distDir: '.next',
-  // Headers required for ffmpeg-wasm (SharedArrayBuffer support)
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Cross-Origin-Embedder-Policy',
-            value: 'require-corp',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
-          },
-        ],
-      },
-    ];
-  },
+  // NOTE: site-wide COEP/COOP (cross-origin isolation) headers were removed.
+  // They existed only to enable SharedArrayBuffer for ffmpeg-wasm, which is not
+  // wired into the app, and COEP: require-corp can block loading cross-origin
+  // images/scripts. Re-add them scoped to a route if/when video export ships.
 };
 
 module.exports = withBundleAnalyzer(nextConfig);
