@@ -20,7 +20,7 @@ import { randSeed } from '@/lib/randomizer/seed';
 import { effectCategories } from '@/lib/effects/categories';
 import { effectsConfig, getEffectSettings } from '@/lib/effects';
 import { useEffectPreview } from '@/hooks/useEffectPreview';
-import { PRESETS, type Preset } from '@/lib/presets';
+import { LOOKS, lookToStackLayers, getLook, type Look } from '@/lib/looks/looks';
 import { MOOD_IDS } from '@/lib/randomizer/effectMeta';
 
 const C = {
@@ -51,6 +51,7 @@ const ALL = Object.entries(effectCategories).flatMap(([cat, data]) =>
   (data.effects || []).map(id => ({ id, cat }))
 );
 const CATS = ['Looks', 'All', ...Object.keys(effectCategories)];
+const STARTER_LOOKS = ['portra-soft', 'teal-and-orange'];
 
 /* ---------- styled slider (spark fill, ink thumb) ---------- */
 function Slider({
@@ -275,6 +276,30 @@ function StackRow({
   );
 }
 
+/* ---------- a curated Look (multi-layer recipe) — name + blurb, no fake single-effect preview ---------- */
+function LookCard({ look, onApply }: { look: Look; onApply: (l: Look) => void }) {
+  return (
+    <button
+      onClick={() => onApply(look)}
+      title={look.blurb}
+      style={{
+        textAlign: 'left',
+        background: C.raise,
+        border: 0,
+        borderRadius: 10,
+        padding: '12px 14px',
+        cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+      }}
+    >
+      <span style={{ fontSize: 14, fontWeight: 500, color: C.ink }}>{look.name}</span>
+      <span style={{ fontSize: 12, color: C.dim, lineHeight: 1.45 }}>{look.blurb}</span>
+    </button>
+  );
+}
+
 export default function StudioApp() {
   const selectedImage = useAppStore(state => state.selectedImage);
   const setSelectedImage = useAppStore(state => state.setSelectedImage);
@@ -294,7 +319,12 @@ export default function StudioApp() {
   const appliedIds = useMemo(() => new Set(layers.map(l => l.effectId)), [layers]);
 
   const [query, setQuery] = useState('');
-  const [chip, setChip] = useState('All');
+  const [chip, setChip] = useState(() =>
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('tab') === 'looks'
+      ? 'Looks'
+      : 'All'
+  );
   const [fxCollapsed, setFxCollapsed] = useState(false);
   const [wildness, setWildness] = useState(0.42);
   const [moodId, setMoodId] = useState('faded');
@@ -336,18 +366,11 @@ export default function StudioApp() {
     [layers, addLayer, removeLayer]
   );
 
-  /* a Look replaces the stack with its decomposable layers */
-  const applyPreset = useCallback(
-    (p: Preset) => {
+  /* a Look replaces the stack with its decomposable layers (real curated recipes from looks.ts) */
+  const applyLook = useCallback(
+    (look: Look) => {
       setSeed('');
-      setStack(
-        p.layers.map(l => ({
-          effectId: l.effectId,
-          settings: { ...l.settings },
-          opacity: 1,
-          locked: false,
-        }))
-      );
+      setStack(lookToStackLayers(look));
     },
     [setStack]
   );
@@ -398,7 +421,10 @@ export default function StudioApp() {
         const fr = new FileReader();
         fr.onload = () => {
           setSelectedImage(fr.result as string);
-          if (demo !== 'blank')
+          if (demo.startsWith('look:')) {
+            const look = getLook(demo.slice(5));
+            if (look) setTimeout(() => applyLook(look), 60);
+          } else if (demo !== 'blank')
             setTimeout(() => {
               addLayer('unifiedVintage');
               addLayer('noise');
@@ -416,10 +442,12 @@ export default function StudioApp() {
       ),
     [chip, query]
   );
-  const filteredPresets = useMemo(
-    () => PRESETS.filter(p => !query || p.label.toLowerCase().includes(query.toLowerCase())),
-    [query]
-  );
+  const filteredLooks = useMemo(() => {
+    const q = query.toLowerCase();
+    return LOOKS.filter(
+      l => !q || l.name.toLowerCase().includes(q) || l.tags.some(t => t.includes(q))
+    );
+  }, [query]);
   const totalCount = ALL.length;
 
   /* ---------- intro / upload ---------- */
@@ -603,11 +631,13 @@ export default function StudioApp() {
             minHeight: 0,
           }}
         >
-          {/* Your stack */}
+          {/* Your stack — sizes to its layers (own scroll past the cap); fills all
+              remaining space only when the Effects menu is collapsed. */}
           <div
             className="studio-scroll"
             style={{
-              flex: '1 1 auto',
+              flex: fxCollapsed ? '1 1 auto' : '0 0 auto',
+              maxHeight: fxCollapsed ? 'none' : '54%',
               overflow: 'auto',
               padding: '18px 20px 12px',
               borderBottom: `1px solid ${C.hair}`,
@@ -635,12 +665,19 @@ export default function StudioApp() {
                   Start with a look —
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                  <button onClick={() => applyPreset(PRESETS[0])} style={starterChip}>
-                    Faded
-                  </button>
-                  <button onClick={() => applyPreset(PRESETS[1])} style={starterChip}>
-                    Noir
-                  </button>
+                  {STARTER_LOOKS.map(id => {
+                    const look = getLook(id);
+                    return look ? (
+                      <button
+                        key={id}
+                        onClick={() => applyLook(look)}
+                        title={look.blurb}
+                        style={starterChip}
+                      >
+                        {look.name}
+                      </button>
+                    ) : null;
+                  })}
                   <button onClick={handleSurprise} style={{ ...starterChip, background: C.spark }}>
                     Surprise me
                   </button>
@@ -693,7 +730,7 @@ export default function StudioApp() {
                 {chip === 'Looks' ? 'Looks' : 'Effects'}
               </span>
               <span style={{ fontSize: 11, color: C.dim }}>
-                {chip === 'Looks' ? PRESETS.length : totalCount}
+                {chip === 'Looks' ? LOOKS.length : totalCount}
               </span>
             </div>
             {!fxCollapsed ? (
@@ -762,22 +799,15 @@ export default function StudioApp() {
                     flex: 1,
                     overflow: 'auto',
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
+                    gridTemplateColumns: chip === 'Looks' ? '1fr' : '1fr 1fr',
                     gap: 11,
                     paddingBottom: 12,
                     alignContent: 'start',
                   }}
                 >
                   {chip === 'Looks'
-                    ? filteredPresets.map(p => (
-                        <Tile
-                          key={p.id}
-                          previewId={p.preview}
-                          imageUrl={selectedImage}
-                          label={p.label}
-                          sublabel={`${p.layers.length} layers`}
-                          onClick={() => applyPreset(p)}
-                        />
+                    ? filteredLooks.map(look => (
+                        <LookCard key={look.id} look={look} onApply={applyLook} />
                       ))
                     : filteredEffects.map(e => (
                         <Tile
