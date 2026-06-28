@@ -117,7 +117,11 @@ function Tile({
           io.disconnect();
         }
       },
-      { rootMargin: '160px' }
+      // Observe against the grid's own scroll container (the nearest .studio-scroll
+      // ancestor) so the 160px preload margin applies to the grid edges, not the
+      // viewport — otherwise it's inert while scrolling inside the grid. Falls back
+      // to the viewport if no container is found.
+      { root: el.closest('.studio-scroll'), rootMargin: '160px' }
     );
     io.observe(el);
     return () => io.disconnect();
@@ -402,7 +406,7 @@ export default function StudioApp() {
 
   /* export */
   const handleExport = useCallback((format: 'png' | 'jpeg') => {
-    imageEditorRef.current?.exportImage({ format, quality: 0.95 });
+    imageEditorRef.current?.exportImage({ format, quality: 95 });
     setShowExport(false);
   }, []);
 
@@ -631,8 +635,13 @@ export default function StudioApp() {
             minHeight: 0,
           }}
         >
-          {/* Your stack — sizes to its layers (own scroll past the cap); fills all
-              remaining space only when the Effects menu is collapsed. */}
+          {/* Your stack — sizes to its layers (own scroll past the 54% cap) so all
+              layers stay visible without starving the Effects menu; fills all space
+              when Effects is collapsed. (Tried flex '1 1 auto' to yield under
+              pressure on short viewports, but flexbox then shrinks the stack even on
+              normal viewports and re-clips the layers — so it stays '0 0 auto' for
+              the common case, paired with the Effects grid's minHeight floor below
+              which keeps the menu scrollable when the stack hits its 54% cap.) */}
           <div
             className="studio-scroll"
             style={{
@@ -803,6 +812,7 @@ export default function StudioApp() {
                     gap: 11,
                     paddingBottom: 12,
                     alignContent: 'start',
+                    minHeight: 160,
                   }}
                 >
                   {chip === 'Looks'
