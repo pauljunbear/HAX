@@ -1,0 +1,359 @@
+/* =======================================================================
+   HAX SYSTEM — the void darkroom skin (theme-hax)
+   -----------------------------------------------------------------------
+   A single coherent design language, decoded from the design-system audit:
+   a black stage, warm off-white ink, ONE loud note (Cinnabar #F53001).
+   Type: Fraunces (display), Hanken Grotesk (text), JetBrains Mono (data).
+
+   This is a self-contained skin scoped to `html.theme-hax`, so none of the
+   legacy `html.theme-light / studio / terminal / instrument` rules match —
+   no !important war to fight. It restyles the existing glass-* class names
+   (same mechanism as studio-theme.css) AND overrides the shadcn HSL tokens
+   so every utility class (muted-foreground, border, primary, ring…) resolves
+   to the void palette. No glassy panels, no decorative gradients, no chrome
+   over the hero — Cinnabar earns its place only on the spark moments.
+   ======================================================================= */
+
+html.theme-hax {
+  color-scheme: dark;
+
+  /* ---- raw palette ---- */
+  --void: #0b0b0c;
+  --void-2: #101012;
+  --panel: #0c0c0e;
+  --raise: rgba(255, 255, 255, 0.025);
+  --raise-2: rgba(255, 255, 255, 0.05);
+  --hair: rgba(255, 255, 255, 0.085);
+  --hair-2: rgba(255, 255, 255, 0.14);
+  --ink: #eceae3;
+  --ink-2: #a8a49a;
+  --ink-3: #6e6b62;
+  --spark: #f53001;
+  --spark-soft: rgba(245, 48, 1, 0.16);
+
+  /* ---- fonts (variables set by next/font in layout.tsx) ---- */
+  --font-sans: var(--font-hanken), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-serif: var(--font-fraunces), Georgia, serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ---- shadcn tokens remapped to the void palette (HSL triplets) ---- */
+  --background: 240 7% 4%;
+  --foreground: 48 18% 91%;
+  --card: 240 7% 6%;
+  --card-foreground: 48 18% 91%;
+  --popover: 240 7% 6%;
+  --popover-foreground: 48 18% 91%;
+  --primary: 12 99% 48%; /* Cinnabar */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 12%;
+  --secondary-foreground: 48 18% 91%;
+  --muted: 240 5% 12%;
+  --muted-foreground: 40 6% 56%;
+  --accent: 240 5% 14%;
+  --accent-foreground: 48 18% 91%;
+  --destructive: 12 99% 48%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 5% 14%;
+  --input: 240 5% 14%;
+  --ring: 12 99% 48%;
+  --radius: 0.625rem;
+}
+
+/* ---- canvas of the whole app ---- */
+html.theme-hax body {
+  background-color: var(--void) !important;
+  color: var(--ink) !important;
+  font-family: var(--font-sans) !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html.theme-hax .layout-bg {
+  background-color: var(--void);
+  position: relative;
+}
+
+/* faint film grain — texture, not chrome (base globals hides body::*, so use layout-bg) */
+html.theme-hax .layout-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+html.theme-hax .layout-bg::after {
+  display: none !important;
+}
+
+/* ---- panels: flush, hairline-separated, void ---- */
+html.theme-hax .glass-container {
+  background: var(--panel) !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  border-radius: 0 !important;
+}
+html.theme-hax .left-panel.glass-container {
+  border-right: 1px solid var(--hair) !important;
+}
+html.theme-hax .right-panel.glass-container {
+  border-left: 1px solid var(--hair) !important;
+}
+html.theme-hax .canvas-area.glass-container {
+  background: var(--void) !important;
+}
+html.theme-hax .glass-filter,
+html.theme-hax .glass-overlay,
+html.theme-hax .glass-specular {
+  display: none !important;
+}
+
+/* ---- panel section titles (h2 "Effects" / "Controls") ---- */
+html.theme-hax .glass-content h2 {
+  font-family: var(--font-serif) !important;
+  font-weight: 500 !important;
+  font-size: 17px !important;
+  letter-spacing: -0.02em !important;
+  text-transform: none !important;
+  color: var(--ink) !important;
+}
+
+/* ---- search field ---- */
+html.theme-hax .glass-input {
+  background: var(--raise) !important;
+  border: 1px solid var(--hair) !important;
+  border-radius: 9px !important;
+  color: var(--ink) !important;
+  font-family: var(--font-sans) !important;
+  padding-left: 34px !important;
+}
+html.theme-hax .glass-input::placeholder {
+  color: var(--ink-3) !important;
+}
+html.theme-hax .glass-input:focus {
+  border-color: rgba(245, 48, 1, 0.55) !important;
+  outline: none !important;
+  background: var(--raise-2) !important;
+}
+
+/* ---- category header rows ---- */
+html.theme-hax .glass-effect-button {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 8px !important;
+  color: var(--ink-2) !important;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease !important;
+}
+html.theme-hax .glass-effect-button:hover {
+  color: var(--ink) !important;
+  background: var(--raise) !important;
+}
+html.theme-hax .glass-effect-button.glass-active {
+  color: var(--ink) !important;
+  background: transparent !important;
+}
+
+/* ---- count badges / chips ---- */
+html.theme-hax .glass-badge {
+  background: var(--raise-2) !important;
+  color: var(--ink-2) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 10.5px !important;
+  border-radius: 5px !important;
+  border: none !important;
+}
+
+/* ---- cards (control groups, export blocks) ---- */
+html.theme-hax .glass-card {
+  background: var(--raise) !important;
+  border: 1px solid var(--hair) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+/* ---- buttons ---- */
+html.theme-hax .glass-button {
+  background: var(--raise-2) !important;
+  border: 1px solid var(--hair) !important;
+  border-radius: 9px !important;
+  color: var(--ink) !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease !important;
+}
+html.theme-hax .glass-button:hover {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: var(--hair-2) !important;
+}
+
+/* ---- icon plates ---- */
+html.theme-hax .liquid-material {
+  background: var(--raise) !important;
+  border: 1px solid var(--hair) !important;
+  border-radius: 12px !important;
+}
+
+/* ---- tabs (Effects / Layers / Export / +) — kill blue pill + micro-caps ---- */
+html.theme-hax .tabs-list {
+  background: var(--raise) !important;
+  border: 1px solid var(--hair) !important;
+  border-radius: 11px !important;
+  padding: 3px !important;
+  gap: 2px !important;
+  height: auto !important;
+}
+html.theme-hax .tabs-trigger {
+  border-radius: 8px !important;
+  color: var(--ink-2) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: -0.005em !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 7px 8px !important;
+}
+html.theme-hax .tabs-trigger:hover {
+  color: var(--ink) !important;
+}
+html.theme-hax .tabs-trigger[data-state='active'] {
+  background: var(--raise-2) !important;
+  color: var(--ink) !important;
+  box-shadow: none !important;
+}
+
+/* ---- sliders: track/range are token-driven (Cinnabar); tune the thumb ---- */
+html.theme-hax .slider-track {
+  height: 4px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 999px !important;
+}
+html.theme-hax .slider-range {
+  background: var(--spark) !important;
+}
+html.theme-hax .slider-thumb {
+  width: 14px !important;
+  height: 14px !important;
+  background: var(--ink) !important;
+  border: 2px solid var(--spark) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55) !important;
+}
+
+/* ---- value pills inside controls (bg-muted etc. already void via tokens) ---- */
+html.theme-hax .font-mono,
+html.theme-hax .control-panel-label,
+html.theme-hax .control-panel-category {
+  font-family: var(--font-mono) !important;
+}
+
+/* ---- the legacy theme-cycle toggle: one design now, hide it ---- */
+html.theme-hax .theme-toggle-button {
+  display: none !important;
+}
+
+/* ---- scrollbars ---- */
+html.theme-hax ::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+html.theme-hax ::-webkit-scrollbar-track {
+  background: transparent;
+}
+html.theme-hax ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  border: 2px solid var(--panel);
+}
+html.theme-hax ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+html.theme-hax ::selection {
+  background: var(--spark);
+  color: #fff;
+}
+
+/* =======================================================================
+   New surfaces introduced by the reimagine (own class namespace: hx-*)
+   ======================================================================= */
+
+/* ---- top chrome bar ---- */
+html.theme-hax .hx-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 54px;
+  flex-shrink: 0;
+  padding: 0 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--hair);
+  position: relative;
+  z-index: 20;
+}
+.hx-wordmark {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 26px;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  line-height: 1;
+  display: inline-flex;
+  align-items: baseline;
+}
+.hx-wordmark .pt {
+  color: var(--spark);
+}
+.hx-tagline {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: -0.01em;
+  color: var(--ink-3);
+}
+.hx-topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--raise-2);
+  border: 1px solid var(--hair);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.hx-topbar-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--hair-2);
+}
+.hx-topbar-btn.spark {
+  background: var(--spark);
+  border-color: var(--spark);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(245, 48, 1, 0.22);
+}
+.hx-topbar-btn.spark:hover {
+  background: #ff3a0a;
+}
+
+/* ---- randomizer dock (docked beneath the canvas, never over the hero) ---- */
+html.theme-hax .hx-dock {
+  flex-shrink: 0;
+  background: var(--panel);
+  border-top: 1px solid var(--hair);
+  z-index: 20;
+}

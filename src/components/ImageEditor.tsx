@@ -311,11 +311,14 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
 
               const [filter, params] = cached;
               if (filter) {
+                const opacity = layer.opacity ?? 1;
                 specs.push({
-                  sig: cacheKey,
+                  // opacity in the sig so a cached prefix is invalidated when it changes
+                  sig: `${cacheKey}|o${opacity}`,
                   effectId: layer.effectId,
                   filter: filter as unknown as PipelineFilter,
                   params: (params || {}) as Record<string, number>,
+                  opacity,
                 });
               }
             }
@@ -337,7 +340,10 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
           const allGpu =
             gpuEnabled() &&
             specs.length > 0 &&
-            specs.every(s => !!s.effectId && isGpuSupportedEffect(s.effectId));
+            // opacity<1 needs the CPU blend path; only go GPU when every layer is full-opacity
+            specs.every(
+              s => !!s.effectId && isGpuSupportedEffect(s.effectId) && (s.opacity ?? 1) === 1
+            );
           const composite = (imageData: ImageData) => {
             if (allGpu) {
               const renderer = getWebGL2Renderer();

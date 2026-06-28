@@ -1,9 +1,13 @@
 // Theme definitions and utilities
 import { useState, useEffect } from 'react';
 
-export type Theme = 'light' | 'instrument' | 'terminal' | 'studio';
+export type Theme = 'hax' | 'light' | 'instrument' | 'terminal' | 'studio';
 
 export const themes = {
+  hax: {
+    name: 'HAX',
+    class: 'theme-hax',
+  },
   light: {
     name: 'Light',
     class: 'theme-light',
@@ -22,27 +26,23 @@ export const themes = {
   },
 } as const;
 
-const THEME_ORDER: Theme[] = ['light', 'instrument', 'terminal', 'studio'];
+const THEME_ORDER: Theme[] = ['hax', 'light', 'instrument', 'terminal', 'studio'];
 
 const isTheme = (value: string | null): value is Theme => {
-  return value === 'light' || value === 'instrument' || value === 'terminal' || value === 'studio';
+  return (
+    value === 'hax' ||
+    value === 'light' ||
+    value === 'instrument' ||
+    value === 'terminal' ||
+    value === 'studio'
+  );
 };
 
 export const getTheme = (): Theme => {
-  if (typeof window === 'undefined') return 'studio'; // Default to studio for new users
-
-  // Migration: Convert old 'apple' theme to 'light'
-  const stored = localStorage.getItem('app-theme');
-  if (stored === 'apple') {
-    localStorage.setItem('app-theme', 'light');
-    return 'light';
-  }
-
-  if (isTheme(stored)) {
-    return stored;
-  }
-
-  return 'studio'; // Default to studio
+  // Single-design reimagine: the void darkroom skin is the product. The theme
+  // toggle is retired; everyone is on 'hax'. (isTheme retained for the API.)
+  void isTheme;
+  return 'hax';
 };
 
 export const setTheme = (theme: Theme) => {
@@ -50,6 +50,7 @@ export const setTheme = (theme: Theme) => {
 
   localStorage.setItem('app-theme', theme);
   document.documentElement.classList.remove(
+    'theme-hax',
     'theme-light',
     'theme-instrument',
     'theme-terminal',

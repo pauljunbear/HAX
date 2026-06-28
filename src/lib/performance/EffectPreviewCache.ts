@@ -1,6 +1,5 @@
 import { applyEffect, effectsConfig } from '@/lib/effects';
-
-type KonvaModule = typeof import('konva');
+import { filterThis } from '@/lib/performance/LayerPipeline';
 
 interface CacheEntry {
   imageUrl: string;
@@ -71,77 +70,45 @@ export class EffectPreviewCache {
   ): Promise<string> {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
 
       img.onload = async () => {
         try {
-          // Create canvas for thumbnail
           const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
           if (!ctx) throw new Error('Failed to get 2D context');
 
-          // Calculate dimensions maintaining aspect ratio
-          const scale = Math.min(this.thumbnailSize / img.width, this.thumbnailSize / img.height);
-          canvas.width = img.width * scale;
-          canvas.height = img.height * scale;
-
-          // Draw scaled image
+          // Scale down maintaining aspect ratio (never upscale).
+          const scale = Math.min(
+            this.thumbnailSize / img.width,
+            this.thumbnailSize / img.height,
+            1
+          );
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-          // Apply effect
+          // Apply the real effect directly on the ImageData. Built-in Konva
+          // filters read params from `this`, so call through the same proxy the
+          // live render pipeline uses. (The old detached-Konva-stage path never
+          // resolved — this is the proven method used by the editor + GPU harness.)
           const [filterFunc, filterParams] = await applyEffect(effectId, settings);
-
           if (filterFunc) {
-            // Apply filter using a temporary Konva stage
-            const konvaModule: KonvaModule = await import('konva');
-            const Konva = konvaModule.default;
-            const stage = new Konva.Stage({
-              container: document.createElement('div'),
-              width: canvas.width,
-              height: canvas.height,
-            });
-
-            const layer = new Konva.Layer();
-            stage.add(layer);
-
-            const image = new Konva.Image({
-              image: canvas,
-              x: 0,
-              y: 0,
-              width: canvas.width,
-              height: canvas.height,
-            });
-
-            image.filters([filterFunc]);
-            if (filterParams) {
-              Object.entries(filterParams).forEach(([key, value]) => {
-                const imageAny = image as unknown as Record<string, unknown>;
-                const maybeSetter = imageAny[key];
-                if (typeof maybeSetter === 'function') {
-                  (maybeSetter as (input: unknown) => void)(value);
-                }
-              });
-            }
-
-            layer.add(image);
-            image.cache();
-            layer.batchDraw();
-
-            // Get result
-            const dataURL = stage.toDataURL({ pixelRatio: 1 });
-            stage.destroy();
-
-            resolve(dataURL);
-          } else {
-            // No filter, return original
-            resolve(canvas.toDataURL('image/jpeg', 0.8));
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            (filterFunc as (i: ImageData) => void).call(
+              filterThis((filterParams || {}) as Record<string, number>),
+              imageData
+            );
+            ctx.putImageData(imageData, 0, 0);
           }
+          resolve(canvas.toDataURL('image/png'));
         } catch (error) {
           reject(error);
         }
       };
 
       img.onerror = () => reject(new Error('Failed to load image'));
+      // Only set crossOrigin for remote URLs; data:/blob: are same-origin.
+      if (/^https?:/i.test(imageUrl)) img.crossOrigin = 'anonymous';
       img.src = imageUrl;
     });
   }
@@ -152,8 +119,9 @@ export class EffectPreviewCache {
 
     const settings: Record<string, number> = {};
     for (const [key, setting] of Object.entries(config.settings)) {
-      const s = setting as { default?: number };
-      settings[key] = s.default ?? 0;
+      const s = setting as { id?: string; defaultValue?: number };
+      // config.settings is an array; use the setting's own id + defaultValue.
+      settings[s.id ?? key] = s.defaultValue ?? 0;
     }
     return settings;
   }

@@ -4,23 +4,28 @@ import '../styles/light-theme.css';
 import '../styles/instrument-theme.css';
 import '../styles/terminal-theme.css';
 import '../styles/studio-theme.css';
+import '../styles/hax-system.css'; // void darkroom skin — imported last so it wins
 import type { Metadata } from 'next';
-import { Inter, Fira_Code, Space_Mono } from 'next/font/google';
+import { Fraunces, Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
 
-const inter = Inter({
+// HAX type system: Fraunces (display) · Hanken Grotesk (text) · JetBrains Mono (data)
+const fraunces = Fraunces({
   subsets: ['latin'],
-  variable: '--font-inter',
+  weight: ['400', '500', '600'],
+  style: ['normal', 'italic'],
+  variable: '--font-fraunces',
 });
 
-const firaCode = Fira_Code({
+const hanken = Hanken_Grotesk({
   subsets: ['latin'],
-  variable: '--font-fira-code',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-hanken',
 });
 
-const spaceMono = Space_Mono({
+const jetbrains = JetBrains_Mono({
   subsets: ['latin'],
-  weight: ['400', '700'],
-  variable: '--font-space-mono',
+  weight: ['400', '500'],
+  variable: '--font-jetbrains',
 });
 
 export const metadata: Metadata = {
@@ -39,7 +44,7 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#007aff',
+  themeColor: '#0b0b0c',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -51,25 +56,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              // Initialize theme before React hydration to prevent flash
+              // Initialize theme before React hydration to prevent flash.
+              // The reimagined single design is 'hax' (void darkroom). The theme
+              // toggle is retired, so legacy stored themes migrate to 'hax' —
+              // existing users land on the new design, not a stale skin.
               (function() {
-                const stored = localStorage.getItem('app-theme');
-                // Migration: Convert old 'apple' theme to 'light'
-                if (stored === 'apple') {
-                  localStorage.setItem('app-theme', 'light');
-                }
-
-                const resolved = stored === 'apple' ? 'light' : stored;
-                const allowed = new Set(['light', 'instrument', 'terminal', 'studio']);
-                const theme = allowed.has(resolved) ? resolved : 'light';
-
-                document.documentElement.classList.add('theme-' + theme);
+                try {
+                  const stored = localStorage.getItem('app-theme');
+                  if (stored && stored !== 'hax') localStorage.setItem('app-theme', 'hax');
+                } catch (e) {}
+                document.documentElement.classList.add('theme-hax');
               })();
             `,
           }}
         />
       </head>
-      <body className={`${inter.variable} ${firaCode.variable} ${spaceMono.variable}`}>
+      <body className={`${fraunces.variable} ${hanken.variable} ${jetbrains.variable}`}>
         <svg style={{ position: 'absolute', width: 0, height: 0 }} aria-hidden="true">
           <defs>
             <filter id="lg-dist">

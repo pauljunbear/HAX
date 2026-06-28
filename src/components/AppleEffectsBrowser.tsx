@@ -1,15 +1,19 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback, memo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { effectsConfig, effectCategories, hiddenLegacyEffects } from '@/lib/effects';
-import { ChevronRight, Plus, Search, Star, Clock } from 'lucide-react';
+import { ChevronRight, Plus, Search, Star, Clock, Check } from 'lucide-react';
 import { useEffectFavorites } from '@/hooks/useEffectFavorites';
+import { getEffectPreviewCache } from '@/lib/performance/EffectPreviewCache';
 
 interface AppleEffectsBrowserProps {
   activeEffect?: string | null;
+  /** Set of effectIds currently applied as layers — drives the "ON" tile state. */
+  appliedEffectIds?: Set<string>;
   onEffectChange?: (effectName: string | null) => void;
   hasImage?: boolean;
+  imageUrl?: string | null;
   onNewImage?: () => void;
   onHidePanel?: () => void;
 }
@@ -49,29 +53,65 @@ interface EffectButtonProps {
   label: string;
   isActive: boolean;
   hasImage: boolean;
-  isCompact: boolean;
+  isCompact?: boolean;
   isFavorite: boolean;
+  imageUrl?: string | null;
   onClick: (effectId: string) => void;
   onToggleFavorite: (effectId: string) => void;
 }
 
+// A live-preview tile: the user's photo rendered through this effect (lazy,
+// IntersectionObserver-gated, cached). The "contact sheet" discovery move —
+// browsing IS testing. Falls back to a colour shimmer while loading / no image.
 const EffectButton = memo(function EffectButton({
   effectId,
   label,
   isActive,
   hasImage,
-  isCompact,
   isFavorite,
+  imageUrl,
   onClick,
   onToggleFavorite,
 }: EffectButtonProps) {
-  const [isHovered, setIsHovered] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [thumb, setThumb] = useState<string | null>(null);
   const gradient = useMemo(() => getEffectGradient(effectId), [effectId]);
 
-  const handleClick = useCallback(() => {
-    onClick(effectId);
-  }, [onClick, effectId]);
+  // Only render the preview once the tile scrolls into view.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting)) {
+          setVisible(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '140px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
+  // Generate (or fetch cached) preview when visible + image present; reset on image change.
+  useEffect(() => {
+    let cancelled = false;
+    setThumb(null);
+    if (!visible || !hasImage || !imageUrl) return;
+    getEffectPreviewCache()
+      .generatePreview(imageUrl, effectId)
+      .then(t => {
+        if (!cancelled) setThumb(t);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, hasImage, imageUrl, effectId]);
+
+  const handleClick = useCallback(() => onClick(effectId), [onClick, effectId]);
   const handleFavoriteClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -82,56 +122,46 @@ const EffectButton = memo(function EffectButton({
 
   return (
     <motion.button
+      ref={ref}
       onClick={handleClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       disabled={!hasImage}
-      className={`
-        effect-button-modern glass-button group relative
-        ${isActive ? 'glass-active' : ''}
-        ${!hasImage ? 'opacity-40 cursor-not-allowed' : ''}
-        ${isCompact ? 'px-2 py-2 text-xs' : 'px-3 py-2 text-sm'}
-      `}
-      whileHover={hasImage && !isActive ? { scale: 1.02, y: -1 } : {}}
+      title={label}
+      className={`group relative w-full overflow-hidden rounded-lg text-left
+        ${isActive ? 'ring-2 ring-[#F53001]' : 'ring-1 ring-white/10'}
+        ${!hasImage ? 'opacity-40 cursor-not-allowed' : ''}`}
+      style={{ aspectRatio: '4 / 3', background: '#0c0c0e' }}
+      whileHover={hasImage && !isActive ? { y: -1 } : {}}
       whileTap={hasImage ? { scale: 0.98 } : {}}
     >
-      {/* Gradient background on hover */}
-      <div
-        className={`
-          absolute inset-0 rounded-md opacity-0 transition-opacity duration-200
-          ${isHovered && !isActive ? 'opacity-100' : ''}
-          bg-gradient-to-r ${gradient.from} ${gradient.to}
-        `}
-      />
+      {thumb ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      ) : (
+        <div
+          className={`absolute inset-0 bg-gradient-to-br ${gradient.from} ${gradient.to} opacity-50`}
+        />
+      )}
 
       <span
-        className={`
-          block relative z-10 transition-colors duration-200 pr-5
-          ${isCompact ? 'truncate' : ''}
-          ${isHovered && !isActive ? 'text-white' : ''}
-        `}
+        className="absolute inset-x-0 bottom-0 px-2 pt-5 pb-1.5 text-[11px] font-medium text-white truncate"
+        style={{ background: 'linear-gradient(180deg,transparent,rgba(0,0,0,.8))' }}
       >
         {label}
       </span>
 
-      {/* Favorite star button */}
+      {isActive && (
+        <span className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#F53001]">
+          <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+        </span>
+      )}
+
       <div
         onClick={handleFavoriteClick}
-        className={`
-          absolute right-1.5 top-1/2 -translate-y-1/2 z-20
-          p-0.5 rounded transition-all duration-200
-          ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}
-          hover:opacity-100 hover:scale-110
-        `}
+        className={`absolute right-1 top-1 z-20 rounded p-0.5 transition-all
+          ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-80'} hover:scale-110`}
       >
         <Star
-          className={`w-3.5 h-3.5 transition-colors ${
-            isFavorite
-              ? 'fill-yellow-400 text-yellow-400'
-              : isHovered && !isActive
-                ? 'text-white/70'
-                : 'text-current'
-          }`}
+          className={`h-3.5 w-3.5 ${isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-white/80'}`}
         />
       </div>
     </motion.button>
@@ -139,17 +169,20 @@ const EffectButton = memo(function EffectButton({
 });
 
 const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
-  activeEffect,
+  appliedEffectIds,
   onEffectChange,
   hasImage = false,
+  imageUrl,
   onNewImage,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const { favorites, recentlyUsed, isFavorite, toggleFavorite, addToRecent } = useEffectFavorites();
 
-  // Start with curated categories collapsed by default, but Favorites expanded
+  // The contact sheet is the point: every category is OPEN by default so the
+  // user lands on a wall of live previews of their own photo, not closed
+  // accordions. Only the catch-all "More" bucket starts collapsed.
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
-    () => new Set([...Object.keys(effectCategories), 'More', 'Recently Used'])
+    () => new Set(['More'])
   );
 
   // Group effects by category
@@ -326,7 +359,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                 </div>
               </button>
 
-              <AnimatePresence mode="sync">
+              <AnimatePresence mode="sync" initial={false}>
                 {!collapsedCategories.has('Favorites') && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
@@ -344,8 +377,9 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                           key={effectId}
                           effectId={effectId}
                           label={effect.label}
-                          isActive={activeEffect === effectId}
+                          isActive={appliedEffectIds?.has(effectId) ?? false}
                           hasImage={hasImage}
+                          imageUrl={imageUrl}
                           isCompact={true}
                           isFavorite={true}
                           onClick={handleEffectClick}
@@ -385,7 +419,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                 </div>
               </button>
 
-              <AnimatePresence mode="sync">
+              <AnimatePresence mode="sync" initial={false}>
                 {!collapsedCategories.has('Recently Used') && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
@@ -403,8 +437,9 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                           key={effectId}
                           effectId={effectId}
                           label={effect.label}
-                          isActive={activeEffect === effectId}
+                          isActive={appliedEffectIds?.has(effectId) ?? false}
                           hasImage={hasImage}
+                          imageUrl={imageUrl}
                           isCompact={true}
                           isFavorite={isFavorite(effectId)}
                           onClick={handleEffectClick}
@@ -449,7 +484,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                   </button>
 
                   {/* Effects List */}
-                  <AnimatePresence mode="sync">
+                  <AnimatePresence mode="sync" initial={false}>
                     {isExpanded && (
                       <motion.div
                         initial={{ height: 0, opacity: 0 }}
@@ -461,19 +496,15 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                         }}
                         style={{ overflow: 'hidden' }}
                       >
-                        <div
-                          className={`
-                          px-2 pb-2
-                          ${effects.length > 8 ? 'grid grid-cols-2 gap-1.5' : 'space-y-0.5'}
-                        `}
-                        >
+                        <div className="px-2 pb-2 grid grid-cols-2 gap-1.5">
                           {effects.map(([effectId, effect]) => (
                             <EffectButton
                               key={effectId}
                               effectId={effectId}
                               label={effect.label}
-                              isActive={activeEffect === effectId}
+                              isActive={appliedEffectIds?.has(effectId) ?? false}
                               hasImage={hasImage}
+                              imageUrl={imageUrl}
                               isCompact={effects.length > 8}
                               isFavorite={isFavorite(effectId)}
                               onClick={handleEffectClick}

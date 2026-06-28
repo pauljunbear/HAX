@@ -110,6 +110,35 @@ const useEffectLayers = () => {
     setActiveLayerId(null);
   }, []);
 
+  // Replace the whole stack from a composed recipe (the Smart Randomizer).
+  const setStack = useCallback(
+    (
+      recipe: Array<{
+        effectId: string;
+        settings: Record<string, number>;
+        opacity?: number;
+        locked?: boolean;
+      }>
+    ) => {
+      const next: EffectLayer[] = recipe.map(r => ({
+        id: generateLayerId(),
+        effectId: r.effectId,
+        settings: { ...r.settings },
+        opacity: r.opacity ?? 1,
+        visible: true,
+        locked: r.locked ?? false,
+      }));
+      setLayers(next);
+      setActiveLayerId(next.length ? next[next.length - 1].id : null);
+    },
+    []
+  );
+
+  // Toggle a layer's lock (padlock-what-you-love for the randomizer).
+  const toggleLayerLock = useCallback((layerId: string) => {
+    setLayers(prev => prev.map(l => (l.id === layerId ? { ...l, locked: !l.locked } : l)));
+  }, []);
+
   // Duplicate a layer
   const duplicateLayer = useCallback(
     (layerId: string) => {
@@ -142,6 +171,8 @@ const useEffectLayers = () => {
     getCombinedEffect,
     clearLayers,
     duplicateLayer,
+    setStack,
+    toggleLayerLock,
   };
 };
 
