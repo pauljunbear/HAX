@@ -11,7 +11,14 @@ const Slider = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SliderPrimitive.Root
     ref={ref}
-    className={cn('relative flex w-full touch-none select-none items-center group', className)}
+    // py-2.5 gives a ~24px clickable band around the 4px track so a click ANYWHERE
+    // on the bar jumps the thumb to that position (Radix maps the Root's pointerdown
+    // to the value). Without it the only reliable target was the 14px thumb, so the
+    // track felt unclickable. cursor-pointer signals the bar is interactive.
+    className={cn(
+      'relative flex w-full touch-none select-none items-center group cursor-pointer py-2.5',
+      className
+    )}
     {...props}
   >
     <SliderPrimitive.Track className="slider-track relative h-1 w-full grow overflow-hidden rounded-full bg-primary/20">
