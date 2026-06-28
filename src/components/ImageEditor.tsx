@@ -46,6 +46,8 @@ interface ImageEditorProps {
   selectedImage?: string | null;
   effectLayers?: EffectLayer[];
   onExportComplete?: () => void;
+  /** STUDIO supplies its own export UI; hide the built-in pill there. */
+  hideExport?: boolean;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -256,7 +258,7 @@ export type ImageEditorHandle = {
 };
 
 const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
-  ({ selectedImage, effectLayers, onExportComplete }, ref) => {
+  ({ selectedImage, effectLayers, onExportComplete, hideExport }, ref) => {
     const stageRef = useRef<Konva.Stage | null>(null);
     const imageNodeRef = useRef<Konva.Image | null>(null);
     const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
@@ -769,7 +771,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         )}
 
         {/* Export control only */}
-        {imageUrlToUse && (
+        {imageUrlToUse && !hideExport && (
           <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1">
             <button
               data-testid="export-button"

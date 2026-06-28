@@ -785,3 +785,49 @@ html.theme-terminal .search-input-container input {
     @apply bg-background text-foreground;
   }
 }
+
+/* STUDIO (new editor) — styled range slider: spark fill + ink thumb */
+input[type='range'].haxr {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    #f53001 var(--pct, 40%),
+    rgba(236, 234, 227, 0.12) var(--pct, 40%)
+  );
+}
+input[type='range'].haxr::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #eceae3;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+input[type='range'].haxr::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  background: #eceae3;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+input[type='range'].haxr::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: transparent;
+}
+.studio-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.studio-input::placeholder {
+  color: #8b8780;
+}
