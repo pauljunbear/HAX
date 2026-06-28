@@ -338,18 +338,30 @@ export default function StudioApp() {
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
 
-  /* image load */
+  /* image load — object URL, not a base64 data URL: avoids inflating a multi-MB
+     File into a ~33%-larger string duplicated through the store and every preview
+     tile, plus the encode/re-decode round trip. Revoke the prior URL on swap. */
+  const objectUrlRef = useRef<string | null>(null);
+  const setImageUrl = useCallback(
+    (url: string) => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = url;
+      setSelectedImage(url);
+    },
+    [setSelectedImage]
+  );
   const handleImageUpload = useCallback(
     (file: File) => {
       clearLayers();
-      const reader = new FileReader();
-      reader.onload = e => {
-        const url = e.target?.result as string;
-        if (url?.startsWith('data:image/')) setSelectedImage(url);
-      };
-      reader.readAsDataURL(file);
+      setImageUrl(URL.createObjectURL(file));
     },
-    [clearLayers, setSelectedImage]
+    [clearLayers, setImageUrl]
+  );
+  useEffect(
+    () => () => {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    },
+    []
   );
   const pickImage = useCallback(() => {
     const input = document.createElement('input');
@@ -496,19 +508,15 @@ export default function StudioApp() {
     fetch('/studio-sample.jpg')
       .then(r => r.blob())
       .then(b => {
-        const fr = new FileReader();
-        fr.onload = () => {
-          setSelectedImage(fr.result as string);
-          if (demo.startsWith('look:')) {
-            const look = getLook(demo.slice(5));
-            if (look) setTimeout(() => applyLook(look), 60);
-          } else if (demo !== 'blank')
-            setTimeout(() => {
-              addLayer('unifiedVintage');
-              addLayer('noise');
-            }, 60);
-        };
-        fr.readAsDataURL(b);
+        setImageUrl(URL.createObjectURL(b));
+        if (demo.startsWith('look:')) {
+          const look = getLook(demo.slice(5));
+          if (look) setTimeout(() => applyLook(look), 60);
+        } else if (demo !== 'blank')
+          setTimeout(() => {
+            addLayer('unifiedVintage');
+            addLayer('noise');
+          }, 60);
       })
       .catch(() => {});
   }, []);

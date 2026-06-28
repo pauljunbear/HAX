@@ -81,6 +81,9 @@ const createTemporaryStage = (imageElement: HTMLImageElement): TemporaryStageRes
     height: imageElement.height,
     listening: false,
     perfectDrawEnabled: false,
+    // Only ever translated (scale baked into width/height) — skip the per-draw
+    // rotate/scale/skew matrix decompose. Free + lossless.
+    transformsEnabled: 'position',
   });
 
   tempLayer.add(tempImageNode);
@@ -282,9 +285,12 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
           const konvaNode = node as KonvaImageNode;
 
           if (!effectLayers || effectLayers.length === 0) {
+            // No effects: draw the source element directly, uncached. Pixel-identical
+            // to (and sharper than) a downscaled-preview cache, and skips a scene +
+            // hit-canvas allocation — the exact hold-to-compare hot path.
             konvaNode.filters([]);
-            konvaNode.cache({ pixelRatio: Math.max(0.5, pixelRatio) });
-            konvaNode.getLayer()?.draw();
+            konvaNode.clearCache();
+            konvaNode.getLayer()?.batchDraw();
             return;
           }
 
@@ -328,8 +334,8 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
 
           if (specs.length === 0) {
             konvaNode.filters([]);
-            konvaNode.cache({ pixelRatio: Math.max(0.5, pixelRatio) });
-            konvaNode.getLayer()?.draw();
+            konvaNode.clearCache();
+            konvaNode.getLayer()?.batchDraw();
             setError(null);
             return;
           }
@@ -365,8 +371,11 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
             prefixCache.render(imageData, specs);
           };
           konvaNode.filters([composite as unknown as (imageData: ImageData) => void]);
-          konvaNode.cache({ pixelRatio: Math.max(0.5, pixelRatio) });
-          konvaNode.getLayer()?.draw();
+          // hitCanvasPixelRatio:0.1 — the node/layer are non-interactive
+          // (listening:false), so Konva's full-size hit canvas is pure waste; shrink
+          // it. batchDraw coalesces a superseded preview + final into one rAF paint.
+          konvaNode.cache({ pixelRatio: Math.max(0.5, pixelRatio), hitCanvasPixelRatio: 0.1 });
+          konvaNode.getLayer()?.batchDraw();
           setError(null);
         } catch (err) {
           console.error('Failed to apply effects', err);
@@ -374,8 +383,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
             const konvaNode = node as KonvaImageNode;
             konvaNode.filters([]);
             konvaNode.clearCache?.();
-            konvaNode.cache({ pixelRatio: Math.max(0.5, pixelRatio) });
-            konvaNode.getLayer()?.draw();
+            konvaNode.getLayer()?.batchDraw();
           } catch {
             // ignore
           }
@@ -422,55 +430,42 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         let exportResources: TemporaryStageResources | null = null;
 
         try {
-          const existingImageNode = stageRef.current.findOne('Image') as Konva.Image | null;
-          const existingHasCache = !!existingImageNode?.cache();
-
-          if (existingImageNode && existingHasCache) {
-            const dataURL = stageRef.current.toDataURL({
-              mimeType: mime,
-              pixelRatio: Math.max(1, image.width / existingImageNode.width()),
-              quality: exportQuality,
-            });
-
-            if (dataURL && dataURL !== 'data:,') {
-              const link = document.createElement('a');
-              link.download = `hax-export-${Date.now()}.${normalizedFormat === 'jpeg' ? 'jpg' : 'png'}`;
-              link.href = dataURL;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              onExportComplete?.();
-              return;
-            }
-          }
-
+          // Always re-render at native resolution off-screen. The on-screen node is
+          // cached at a PREVIEW pixelRatio (capped ≤1.5, or 0.6 mid-drag), so exporting
+          // from that cache would upscale preview-res pixels and bilinearly smear grain,
+          // halation, and warps on any large photo. A fresh native render is the only
+          // lossless export — the zero-degradation constraint depends on it.
           exportResources = createTemporaryStage(image);
-
           await applyEffectsToNode(exportResources.tempImageNode, 1);
           exportResources.tempLayer.draw();
 
           const offscreenCanvas = exportResources.tempStage.toCanvas();
           const targetCanvas = cropCanvasToContent(offscreenCanvas);
 
-          const dataURL = targetCanvas.toDataURL(mime, exportQuality);
-
-          if (!dataURL || dataURL === 'data:,') {
+          // toBlob over toDataURL: same encoder + identical pixels, no synchronous
+          // base64 inflation of a multi-MB string on the main thread.
+          const blob = await new Promise<Blob | null>(resolve =>
+            targetCanvas.toBlob(resolve, mime, exportQuality)
+          );
+          if (!blob) {
             setError('Export failed. Please try again.');
             return;
           }
 
+          const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.download = `hax-export-${Date.now()}.${normalizedFormat === 'jpeg' ? 'jpg' : normalizedFormat}`;
-          link.href = dataURL;
+          link.href = url;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
+          // Revoke once the download has had time to grab the blob.
+          window.setTimeout(() => URL.revokeObjectURL(url), 4000);
           onExportComplete?.();
-
-          cleanupTemporaryStage(exportResources);
         } catch (err) {
           console.error('Failed to export image', err);
           setError('Export failed. Please try again.');
+        } finally {
           cleanupTemporaryStage(exportResources);
         }
       },
@@ -607,6 +602,9 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
     const previewTimerRef = useRef<number | null>(null);
     const finalTimerRef = useRef<number | null>(null);
     const versionRef = useRef(0);
+    // Signature of the stack STRUCTURE (which layers + on/off + opacity, not slider
+    // values) so the scheduler can tell a discrete toggle from a slider drag.
+    const prevStructRef = useRef<string>('');
 
     useEffect(() => {
       if (!image) return;
@@ -615,32 +613,45 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
       if (!imageNode) return;
 
       const myVersion = ++versionRef.current;
+      const finalRatio = Math.min(window.devicePixelRatio || 1, 1.5);
 
-      // Preview pass (throttled ~50ms)
+      // Discrete (add/remove/toggle/reorder/Look/compare) vs slider drag of one layer.
+      const struct = (effectLayers || [])
+        .map(l => `${l.id}:${l.effectId}:${l.visible === false ? 0 : 1}:${l.opacity ?? 1}`)
+        .join('|');
+      const discrete = struct !== prevStructRef.current;
+      prevStructRef.current = struct;
+
       if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
-      previewTimerRef.current = window.setTimeout(async () => {
-        if (myVersion !== versionRef.current) return; // superseded
-        await applyEffectsToNode(imageNode, 0.6); // faster, lower pixel ratio
-      }, 50) as unknown as number;
-
-      // Final quality after user idle (~180ms since last change). Cap the
-      // interactive pixelRatio: the result is shown in a CSS-downscaled canvas,
-      // so rendering at full devicePixelRatio (2-4x the pixels on Retina) buys
-      // no visible detail. True full-resolution is reserved for export, which
-      // renders independently off-screen.
       if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
-      finalTimerRef.current = window.setTimeout(async () => {
-        if (myVersion !== versionRef.current) return; // superseded
-        await applyEffectsToNode(imageNode, Math.min(window.devicePixelRatio || 1, 1.5));
-      }, 180) as unknown as number;
 
-      // Cleanup timers on dependency change or unmount
+      if (discrete) {
+        // One full-quality pass, ASAP. The 0.6 preview was wasted work here AND a
+        // visible low-res 'pop' before the final replaced it; skipping it halves the
+        // cache() calls on every toggle/Look/compare and removes the flash.
+        finalTimerRef.current = window.setTimeout(async () => {
+          if (myVersion !== versionRef.current) return; // superseded
+          await applyEffectsToNode(imageNode, finalRatio);
+        }, 16) as unknown as number;
+      } else {
+        // Slider drag: cheap 0.6 preview now, full settle after idle. The interactive
+        // pixelRatio is capped (canvas is CSS-downscaled, so full devicePixelRatio buys
+        // no visible detail); true full-resolution is reserved for export.
+        previewTimerRef.current = window.setTimeout(async () => {
+          if (myVersion !== versionRef.current) return; // superseded
+          await applyEffectsToNode(imageNode, 0.6);
+        }, 50) as unknown as number;
+        finalTimerRef.current = window.setTimeout(async () => {
+          if (myVersion !== versionRef.current) return; // superseded
+          await applyEffectsToNode(imageNode, finalRatio);
+        }, 180) as unknown as number;
+      }
+
       return () => {
         if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
         if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
       };
-      // containerDimensions included so a resize re-renders through this single
-      // debounced path instead of the (now removed) immediate render above.
+      // containerDimensions included so a resize re-renders through this single path.
     }, [effectLayers, image, containerDimensions.width, containerDimensions.height]);
 
     // Cleanup effect cache on unmount
@@ -650,6 +661,14 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         prefixCacheRef.current.clear();
       };
     }, []);
+
+    // Revoke the internally-created upload object URL when it changes / on unmount
+    // (the classic-editor file input path; STUDIO manages its own URL lifecycle).
+    useEffect(() => {
+      return () => {
+        if (uploadedImageUrl?.startsWith('blob:')) URL.revokeObjectURL(uploadedImageUrl);
+      };
+    }, [uploadedImageUrl]);
 
     // Handle file upload
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -725,7 +744,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
                     display: 'block',
                   }}
                 >
-                  <Layer data-testid="layer">
+                  <Layer data-testid="layer" listening={false}>
                     {image && (
                       <KonvaImage
                         data-testid="image"
@@ -736,6 +755,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
                         y={imageY}
                         listening={false}
                         perfectDrawEnabled={false}
+                        transformsEnabled="position"
                         filters={[]}
                         ref={setImageNodeRef}
                       />
