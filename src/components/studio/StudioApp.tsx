@@ -335,6 +335,8 @@ export default function StudioApp() {
   const [seed, setSeed] = useState('');
   const [showExport, setShowExport] = useState(false);
   const [comparing, setComparing] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
 
   /* image load */
   const handleImageUpload = useCallback(
@@ -359,6 +361,72 @@ export default function StudioApp() {
     };
     input.click();
   }, [handleImageUpload]);
+
+  /* drop / paste a photo anywhere → load the first image (swaps if one's open) */
+  const loadFirstImageFile = useCallback(
+    (files: FileList | null | undefined) => {
+      if (!files) return false;
+      const file = Array.from(files).find(f => f.type.startsWith('image/'));
+      if (file) {
+        handleImageUpload(file);
+        return true;
+      }
+      return false;
+    },
+    [handleImageUpload]
+  );
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) =>
+      !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+    const onEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth.current += 1;
+      setDragging(true);
+    };
+    const onOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    };
+    const onLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      dragDepth.current = Math.max(0, dragDepth.current - 1);
+      if (dragDepth.current === 0) setDragging(false);
+    };
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault();
+      dragDepth.current = 0;
+      setDragging(false);
+      loadFirstImageFile(e.dataTransfer?.files);
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const it of Array.from(items)) {
+        if (it.type.startsWith('image/')) {
+          const f = it.getAsFile();
+          if (f) {
+            handleImageUpload(f);
+            e.preventDefault();
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener('dragenter', onEnter);
+    window.addEventListener('dragover', onOver);
+    window.addEventListener('dragleave', onLeave);
+    window.addEventListener('drop', onDrop);
+    window.addEventListener('paste', onPaste);
+    return () => {
+      window.removeEventListener('dragenter', onEnter);
+      window.removeEventListener('dragover', onOver);
+      window.removeEventListener('dragleave', onLeave);
+      window.removeEventListener('drop', onDrop);
+      window.removeEventListener('paste', onPaste);
+    };
+  }, [loadFirstImageFile, handleImageUpload]);
 
   /* atomic effect: toggle add/remove, instant */
   const toggleEffect = useCallback(
@@ -460,48 +528,7 @@ export default function StudioApp() {
   }, [query]);
   const totalCount = ALL.length;
 
-  /* ---------- intro / upload ---------- */
-  if (!selectedImage) {
-    return (
-      <div
-        style={{
-          height: '100vh',
-          background: C.void,
-          color: C.ink,
-          fontFamily: FONT,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 26,
-        }}
-      >
-        <div style={{ fontWeight: 700, fontSize: 76, letterSpacing: '-0.04em' }}>
-          HAX<span style={{ color: C.spark }}>.</span>
-        </div>
-        <div style={{ fontSize: 13, color: C.dim }}>real-time image effects</div>
-        <button
-          onClick={pickImage}
-          style={{
-            marginTop: 6,
-            background: C.spark,
-            color: C.ink,
-            border: 0,
-            borderRadius: 12,
-            padding: '12px 24px',
-            fontSize: 15,
-            fontWeight: 500,
-            cursor: 'pointer',
-            fontFamily: FONT,
-          }}
-        >
-          Choose Image
-        </button>
-      </div>
-    );
-  }
-
-  /* ---------- editor ---------- */
+  /* ---------- editor (renders immediately; empty canvas IS the drop target) ---------- */
   return (
     <div
       style={{
@@ -532,62 +559,64 @@ export default function StudioApp() {
         <div style={{ fontWeight: 700, fontSize: 21, letterSpacing: '-0.03em' }}>
           HAX<span style={{ color: C.spark }}>.</span>
         </div>
-        <div
-          style={{ position: 'relative' }}
-          onMouseEnter={() => setShowExport(true)}
-          onMouseLeave={() => setShowExport(false)}
-        >
-          <button
-            style={{
-              background: 'none',
-              border: 0,
-              color: C.ink,
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: 'pointer',
-              padding: '8px 14px',
-              borderRadius: 10,
-              fontFamily: FONT,
-            }}
+        {selectedImage ? (
+          <div
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setShowExport(true)}
+            onMouseLeave={() => setShowExport(false)}
           >
-            Export
-          </button>
-          {showExport ? (
-            <div
+            <button
               style={{
-                position: 'absolute',
-                top: 40,
-                right: 0,
-                width: 226,
-                background: '#141416',
-                border: `1px solid ${C.hair}`,
+                background: 'none',
+                border: 0,
+                color: C.ink,
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'pointer',
+                padding: '8px 14px',
                 borderRadius: 10,
-                padding: 7,
-                boxShadow: '0 18px 50px rgba(0,0,0,.6)',
+                fontFamily: FONT,
               }}
             >
-              <div onClick={() => handleExport('png')} style={popOpt}>
-                <span style={{ fontWeight: 500, fontSize: 13 }}>PNG</span>
-                <span style={{ fontSize: 11, color: C.dim }}>lossless</span>
-              </div>
-              <div onClick={() => handleExport('jpeg')} style={popOpt}>
-                <span style={{ fontWeight: 500, fontSize: 13 }}>JPEG</span>
-                <span style={{ fontSize: 11, color: C.dim }}>smaller file</span>
-              </div>
+              Export
+            </button>
+            {showExport ? (
               <div
                 style={{
-                  padding: '9px 11px 4px',
-                  marginTop: 4,
-                  borderTop: `1px solid ${C.hair}`,
-                  fontSize: 11,
-                  color: C.dim,
+                  position: 'absolute',
+                  top: 40,
+                  right: 0,
+                  width: 226,
+                  background: '#141416',
+                  border: `1px solid ${C.hair}`,
+                  borderRadius: 10,
+                  padding: 7,
+                  boxShadow: '0 18px 50px rgba(0,0,0,.6)',
                 }}
               >
-                highest resolution
+                <div onClick={() => handleExport('png')} style={popOpt}>
+                  <span style={{ fontWeight: 500, fontSize: 13 }}>PNG</span>
+                  <span style={{ fontSize: 11, color: C.dim }}>lossless</span>
+                </div>
+                <div onClick={() => handleExport('jpeg')} style={popOpt}>
+                  <span style={{ fontWeight: 500, fontSize: 13 }}>JPEG</span>
+                  <span style={{ fontSize: 11, color: C.dim }}>smaller file</span>
+                </div>
+                <div
+                  style={{
+                    padding: '9px 11px 4px',
+                    marginTop: 4,
+                    borderTop: `1px solid ${C.hair}`,
+                    fontSize: 11,
+                    color: C.dim,
+                  }}
+                >
+                  highest resolution
+                </div>
               </div>
-            </div>
-          ) : null}
-        </div>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
@@ -602,317 +631,379 @@ export default function StudioApp() {
             justifyContent: 'center',
             padding: '20px 36px',
           }}
-          onPointerDown={() => layers.length && setComparing(true)}
+          onPointerDown={() => selectedImage && layers.length && setComparing(true)}
           onPointerUp={() => setComparing(false)}
           onPointerLeave={() => setComparing(false)}
         >
-          <ImageEditor
-            ref={imageEditorRef}
-            selectedImage={selectedImage}
-            effectLayers={comparing ? [] : layers}
-            hideExport
-          />
-          {layers.length > 0 ? (
-            <div
+          {selectedImage ? (
+            <>
+              <ImageEditor
+                ref={imageEditorRef}
+                selectedImage={selectedImage}
+                effectLayers={comparing ? [] : layers}
+                hideExport
+              />
+              {layers.length > 0 ? (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 18,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontSize: 11,
+                    color: C.dim,
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                  }}
+                >
+                  {comparing ? 'Original' : 'Hold to compare'}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <button
+              onClick={pickImage}
               style={{
-                position: 'absolute',
-                bottom: 18,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                fontSize: 11,
-                color: C.dim,
-                pointerEvents: 'none',
-                userSelect: 'none',
+                width: '100%',
+                height: '100%',
+                background: 'none',
+                border: 0,
+                cursor: 'pointer',
+                fontFamily: FONT,
+                color: C.ink,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 18,
               }}
             >
-              {comparing ? 'Original' : 'Hold to compare'}
-            </div>
-          ) : null}
+              <div style={{ fontWeight: 700, fontSize: 72, letterSpacing: '-0.04em' }}>
+                HAX<span style={{ color: C.spark }}>.</span>
+              </div>
+              <div style={{ fontSize: 15, color: C.ink, fontWeight: 500 }}>
+                Drop a photo to begin
+              </div>
+              <div style={{ fontSize: 12.5, color: C.dim, letterSpacing: '0.01em' }}>
+                drag it anywhere &middot; click to browse &middot; or paste with{' '}
+                <span style={{ color: C.ink }}>⌘V</span>
+              </div>
+            </button>
+          )}
         </div>
 
-        {/* the one control panel */}
-        <aside
-          style={{
-            flex: '0 0 392px',
-            background: C.panel,
-            borderLeft: `1px solid ${C.hair}`,
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 0,
-          }}
-        >
-          {/* Your stack — sizes to its layers (own scroll past the 54% cap) so all
+        {/* the one control panel — appears once a photo is loaded */}
+        {selectedImage ? (
+          <aside
+            style={{
+              flex: '0 0 392px',
+              background: C.panel,
+              borderLeft: `1px solid ${C.hair}`,
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0,
+            }}
+          >
+            {/* Your stack — sizes to its layers (own scroll past the 54% cap) so all
               layers stay visible without starving the Effects menu; fills all space
               when Effects is collapsed. (Tried flex '1 1 auto' to yield under
               pressure on short viewports, but flexbox then shrinks the stack even on
               normal viewports and re-clips the layers — so it stays '0 0 auto' for
               the common case, paired with the Effects grid's minHeight floor below
               which keeps the menu scrollable when the stack hits its 54% cap.) */}
-          <div
-            className="studio-scroll"
-            style={{
-              flex: fxCollapsed ? '1 1 auto' : '0 0 auto',
-              maxHeight: fxCollapsed ? 'none' : '54%',
-              overflow: 'auto',
-              padding: '18px 20px 12px',
-              borderBottom: `1px solid ${C.hair}`,
-              minHeight: 96,
-            }}
-          >
             <div
+              className="studio-scroll"
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                marginBottom: 8,
+                flex: fxCollapsed ? '1 1 auto' : '0 0 auto',
+                maxHeight: fxCollapsed ? 'none' : '54%',
+                overflow: 'auto',
+                padding: '18px 20px 12px',
+                borderBottom: `1px solid ${C.hair}`,
+                minHeight: 96,
               }}
             >
-              <span style={{ fontWeight: 500, fontSize: 12, color: C.dim }}>Your stack</span>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 13 }}>
-                {layers.length > 0 ? (
-                  <button
-                    onClick={clearAll}
-                    title="Remove all effects"
-                    style={{
-                      background: 'none',
-                      border: 0,
-                      padding: 0,
-                      cursor: 'pointer',
-                      fontFamily: FONT,
-                      fontSize: 11,
-                      color: C.dim,
-                      transition: 'color .15s',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.color = C.spark;
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.color = C.dim;
-                    }}
-                  >
-                    Clear all
-                  </button>
-                ) : null}
-                <span style={{ fontSize: 11, color: C.dim }}>
-                  {layers.length === 0
-                    ? 'empty'
-                    : `${layers.length} effect${layers.length > 1 ? 's' : ''}`}
-                </span>
-              </div>
-            </div>
-            {layers.length === 0 ? (
-              <div style={{ padding: '2px 0 4px' }}>
-                <div style={{ fontSize: 13, color: C.dim, marginBottom: 9 }}>
-                  Start with a look —
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                  {STARTER_LOOKS.map(id => {
-                    const look = getLook(id);
-                    return look ? (
-                      <button
-                        key={id}
-                        onClick={() => applyLook(look)}
-                        title={look.blurb}
-                        style={starterChip}
-                      >
-                        {look.name}
-                      </button>
-                    ) : null;
-                  })}
-                  <button onClick={handleSurprise} style={{ ...starterChip, background: C.spark }}>
-                    Surprise me
-                  </button>
-                </div>
-              </div>
-            ) : (
-              layers.map(layer => (
-                <StackRow
-                  key={layer.id}
-                  layer={layer}
-                  active={layer.id === activeLayerId}
-                  onSelect={() => setActiveLayer(layer.id === activeLayerId ? '' : layer.id)}
-                  onRemove={() => removeLayer(layer.id)}
-                  onSetting={(sid, v) => updateLayerSettings(layer.id, sid, v)}
-                />
-              ))
-            )}
-          </div>
-
-          {/* Effects + Looks menu (collapsible) */}
-          <div
-            style={{
-              flex: fxCollapsed ? '0 0 auto' : '1 1 auto',
-              display: 'flex',
-              flexDirection: 'column',
-              minHeight: 0,
-              padding: '13px 20px 0',
-            }}
-          >
-            <div
-              onClick={() => setFxCollapsed(c => !c)}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <span style={{ fontWeight: 500, fontSize: 12, color: C.dim }}>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    marginRight: 7,
-                    transform: fxCollapsed ? 'none' : 'rotate(90deg)',
-                    transition: 'transform .15s',
-                  }}
-                >
-                  ▸
-                </span>
-                {chip === 'Looks' ? 'Looks' : 'Effects'}
-              </span>
-              <span style={{ fontSize: 11, color: C.dim }}>
-                {chip === 'Looks' ? LOOKS.length : totalCount}
-              </span>
-            </div>
-            {!fxCollapsed ? (
               <div
                 style={{
-                  flex: '1 1 auto',
                   display: 'flex',
-                  flexDirection: 'column',
-                  minHeight: 0,
-                  marginTop: 11,
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
+                  marginBottom: 8,
                 }}
               >
-                <input
-                  className="studio-input"
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder={chip === 'Looks' ? 'Search looks' : `Search ${totalCount} effects`}
-                  style={{
-                    background: C.raise,
-                    border: 0,
-                    outline: 'none',
-                    borderRadius: 10,
-                    padding: '0 12px',
-                    height: 34,
-                    color: C.ink,
-                    fontSize: 13,
-                    marginBottom: 11,
-                    fontFamily: FONT,
-                  }}
-                />
-                <div
-                  className="studio-scroll"
-                  style={{
-                    display: 'flex',
-                    gap: 6,
-                    overflowX: 'auto',
-                    marginBottom: 13,
-                    paddingBottom: 2,
-                  }}
-                >
-                  {CATS.map(c => (
+                <span style={{ fontWeight: 500, fontSize: 12, color: C.dim }}>Your stack</span>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 13 }}>
+                  {layers.length > 0 ? (
                     <button
-                      key={c}
-                      onClick={() => setChip(c)}
+                      onClick={clearAll}
+                      title="Remove all effects"
                       style={{
-                        flex: '0 0 auto',
-                        fontSize: 12,
-                        fontWeight: 500,
-                        fontFamily: FONT,
-                        color: chip === c ? C.ink : C.dim,
-                        background: chip === c ? C.raise : 'none',
+                        background: 'none',
                         border: 0,
-                        borderRadius: 999,
-                        padding: '7px 11px',
+                        padding: 0,
                         cursor: 'pointer',
-                        whiteSpace: 'nowrap',
+                        fontFamily: FONT,
+                        fontSize: 11,
+                        color: C.dim,
+                        transition: 'color .15s',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.color = C.spark;
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.color = C.dim;
                       }}
                     >
-                      {c}
+                      Clear all
                     </button>
-                  ))}
-                </div>
-                <div
-                  className="studio-scroll"
-                  style={{
-                    flex: 1,
-                    overflow: 'auto',
-                    display: 'grid',
-                    gridTemplateColumns: chip === 'Looks' ? '1fr' : '1fr 1fr',
-                    gap: 11,
-                    paddingBottom: 12,
-                    alignContent: 'start',
-                    minHeight: 160,
-                  }}
-                >
-                  {chip === 'Looks'
-                    ? filteredLooks.map(look => (
-                        <LookCard key={look.id} look={look} onApply={applyLook} />
-                      ))
-                    : filteredEffects.map(e => (
-                        <Tile
-                          key={e.id}
-                          previewId={e.id}
-                          imageUrl={selectedImage}
-                          label={effectLabel(e.id)}
-                          applied={appliedIds.has(e.id)}
-                          onClick={() => toggleEffect(e.id)}
-                        />
-                      ))}
+                  ) : null}
+                  <span style={{ fontSize: 11, color: C.dim }}>
+                    {layers.length === 0
+                      ? 'empty'
+                      : `${layers.length} effect${layers.length > 1 ? 's' : ''}`}
+                  </span>
                 </div>
               </div>
-            ) : null}
-          </div>
-
-          {/* Compose footer — mood + Surprise + calm↔wild */}
-          <div
-            style={{
-              flex: '0 0 auto',
-              borderTop: `1px solid ${C.hair}`,
-              padding: '12px 20px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 11,
-            }}
-          >
-            <div className="studio-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
-              {MOOD_IDS.map(m => (
-                <button key={m} onClick={() => handleMood(m)} style={moodChipStyle(m === moodId)}>
-                  {cap(m)}
-                </button>
-              ))}
+              {layers.length === 0 ? (
+                <div style={{ padding: '2px 0 4px' }}>
+                  <div style={{ fontSize: 13, color: C.dim, marginBottom: 9 }}>
+                    Start with a look —
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                    {STARTER_LOOKS.map(id => {
+                      const look = getLook(id);
+                      return look ? (
+                        <button
+                          key={id}
+                          onClick={() => applyLook(look)}
+                          title={look.blurb}
+                          style={starterChip}
+                        >
+                          {look.name}
+                        </button>
+                      ) : null;
+                    })}
+                    <button
+                      onClick={handleSurprise}
+                      style={{ ...starterChip, background: C.spark }}
+                    >
+                      Surprise me
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                layers.map(layer => (
+                  <StackRow
+                    key={layer.id}
+                    layer={layer}
+                    active={layer.id === activeLayerId}
+                    onSelect={() => setActiveLayer(layer.id === activeLayerId ? '' : layer.id)}
+                    onRemove={() => removeLayer(layer.id)}
+                    onSetting={(sid, v) => updateLayerSettings(layer.id, sid, v)}
+                  />
+                ))
+              )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-              <button
-                onClick={handleSurprise}
+
+            {/* Effects + Looks menu (collapsible) */}
+            <div
+              style={{
+                flex: fxCollapsed ? '0 0 auto' : '1 1 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+                padding: '13px 20px 0',
+              }}
+            >
+              <div
+                onClick={() => setFxCollapsed(c => !c)}
                 style={{
-                  flex: '0 0 auto',
-                  background: C.spark,
-                  color: C.ink,
-                  border: 0,
-                  borderRadius: 10,
-                  height: 36,
-                  padding: '0 16px',
-                  fontSize: 13,
-                  fontWeight: 500,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                   cursor: 'pointer',
-                  fontFamily: FONT,
-                  boxShadow: '0 4px 16px rgba(245,48,1,.22)',
                 }}
               >
-                Surprise
-              </button>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9 }}>
-                <span style={{ fontSize: 11, color: C.dim }}>calm</span>
-                <Slider min={0} max={1} step={0.01} value={wildness} onChange={handleWildness} />
-                <span style={{ fontSize: 11, color: C.dim }}>wild</span>
+                <span style={{ fontWeight: 500, fontSize: 12, color: C.dim }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      marginRight: 7,
+                      transform: fxCollapsed ? 'none' : 'rotate(90deg)',
+                      transition: 'transform .15s',
+                    }}
+                  >
+                    ▸
+                  </span>
+                  {chip === 'Looks' ? 'Looks' : 'Effects'}
+                </span>
+                <span style={{ fontSize: 11, color: C.dim }}>
+                  {chip === 'Looks' ? LOOKS.length : totalCount}
+                </span>
+              </div>
+              {!fxCollapsed ? (
+                <div
+                  style={{
+                    flex: '1 1 auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: 0,
+                    marginTop: 11,
+                  }}
+                >
+                  <input
+                    className="studio-input"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    placeholder={chip === 'Looks' ? 'Search looks' : `Search ${totalCount} effects`}
+                    style={{
+                      background: C.raise,
+                      border: 0,
+                      outline: 'none',
+                      borderRadius: 10,
+                      padding: '0 12px',
+                      height: 34,
+                      color: C.ink,
+                      fontSize: 13,
+                      marginBottom: 11,
+                      fontFamily: FONT,
+                    }}
+                  />
+                  <div
+                    className="studio-scroll"
+                    style={{
+                      display: 'flex',
+                      gap: 6,
+                      overflowX: 'auto',
+                      marginBottom: 13,
+                      paddingBottom: 2,
+                    }}
+                  >
+                    {CATS.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setChip(c)}
+                        style={{
+                          flex: '0 0 auto',
+                          fontSize: 12,
+                          fontWeight: 500,
+                          fontFamily: FONT,
+                          color: chip === c ? C.ink : C.dim,
+                          background: chip === c ? C.raise : 'none',
+                          border: 0,
+                          borderRadius: 999,
+                          padding: '7px 11px',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                  <div
+                    className="studio-scroll"
+                    style={{
+                      flex: 1,
+                      overflow: 'auto',
+                      display: 'grid',
+                      gridTemplateColumns: chip === 'Looks' ? '1fr' : '1fr 1fr',
+                      gap: 11,
+                      paddingBottom: 12,
+                      alignContent: 'start',
+                      minHeight: 160,
+                    }}
+                  >
+                    {chip === 'Looks'
+                      ? filteredLooks.map(look => (
+                          <LookCard key={look.id} look={look} onApply={applyLook} />
+                        ))
+                      : filteredEffects.map(e => (
+                          <Tile
+                            key={e.id}
+                            previewId={e.id}
+                            imageUrl={selectedImage}
+                            label={effectLabel(e.id)}
+                            applied={appliedIds.has(e.id)}
+                            onClick={() => toggleEffect(e.id)}
+                          />
+                        ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Compose footer — mood + Surprise + calm↔wild */}
+            <div
+              style={{
+                flex: '0 0 auto',
+                borderTop: `1px solid ${C.hair}`,
+                padding: '12px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 11,
+              }}
+            >
+              <div className="studio-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+                {MOOD_IDS.map(m => (
+                  <button key={m} onClick={() => handleMood(m)} style={moodChipStyle(m === moodId)}>
+                    {cap(m)}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+                <button
+                  onClick={handleSurprise}
+                  style={{
+                    flex: '0 0 auto',
+                    background: C.spark,
+                    color: C.ink,
+                    border: 0,
+                    borderRadius: 10,
+                    height: 36,
+                    padding: '0 16px',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    fontFamily: FONT,
+                    boxShadow: '0 4px 16px rgba(245,48,1,.22)',
+                  }}
+                >
+                  Surprise
+                </button>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <span style={{ fontSize: 11, color: C.dim }}>calm</span>
+                  <Slider min={0} max={1} step={0.01} value={wildness} onChange={handleWildness} />
+                  <span style={{ fontSize: 11, color: C.dim }}>wild</span>
+                </div>
               </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        ) : null}
       </div>
+
+      {/* drop-anywhere overlay — calm Cinnabar inset ring, no dashed box */}
+      {dragging ? (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 80,
+            pointerEvents: 'none',
+            background: 'rgba(11,11,12,0.55)',
+            boxShadow: `inset 0 0 0 2px ${C.spark}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 17, fontWeight: 500, color: C.ink }}>Release to open</div>
+            <div style={{ fontSize: 12.5, color: C.dim, marginTop: 6 }}>
+              {selectedImage ? 'replaces the current photo' : 'drop your photo'}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
