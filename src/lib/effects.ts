@@ -7340,6 +7340,58 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         description: 'Blend between original image and stained glass result',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description:
+          'Changes the glass cell layout; same seed reproduces it (preview matches export)',
+      },
+    ],
+  },
+  crystalFacet: {
+    label: 'Crystal Facets',
+    category: 'Special FX',
+    settings: [
+      {
+        id: 'cellSize',
+        label: 'Facet Size',
+        min: 6,
+        max: 64,
+        defaultValue: 22,
+        step: 1,
+        description: 'Average size of each crystal facet',
+      },
+      {
+        id: 'variation',
+        label: 'Shimmer',
+        min: 0,
+        max: 1,
+        defaultValue: 0.4,
+        step: 0.05,
+        description: 'Per-facet brightness/tint variation for a crystalline glint',
+      },
+      {
+        id: 'edge',
+        label: 'Edge Glow',
+        min: 0,
+        max: 1,
+        defaultValue: 0.5,
+        step: 0.05,
+        description: 'Brightness of the thin facet edges',
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the facet layout; same seed reproduces it (preview matches export)',
+      },
     ],
   },
   doubleExposure: {
@@ -8409,7 +8461,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
   liquidMetal: {
-    label: 'Liquid Metal',
+    label: 'Liquid Chrome',
     category: 'Artistic Simulation',
     settings: [
       {
@@ -8508,17 +8560,17 @@ export const effectsConfig: Record<string, EffectConfig> = {
     ],
   },
   neuralDream: {
-    label: 'Neural Dream',
+    label: 'Dream Flow',
     category: 'Artistic Simulation',
     settings: [
       {
         id: 'style',
-        label: 'Style Intensity',
+        label: 'Flow Strength',
         min: 0,
         max: 1,
         defaultValue: 0.5,
         step: 0.05,
-        description: 'Strength of the dream-like artistic transformation',
+        description: 'How far the dream warp flows along the image (and chroma lift)',
       },
       {
         id: 'noise',
@@ -8527,12 +8579,21 @@ export const effectsConfig: Record<string, EffectConfig> = {
         max: 0.5,
         defaultValue: 0.2,
         step: 0.02,
-        description: 'Hallucinatory noise patterns',
+        description: 'Hallucinatory wobble added to the flow',
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the dream pattern; same seed reproduces it (preview matches export)',
       },
     ],
   },
   holographicInterference: {
-    label: 'Holographic Interference',
+    label: 'Holographic Foil',
     category: 'Color Effects',
     settings: [
       {
@@ -9638,51 +9699,56 @@ const createChromaticGlitchEffect = (settings: Record<string, number>) => {
 };
 
 // Liquid Metal Morph Effect
+// Liquid Chrome: the displacement follows the image's luminance gradient, so the
+// "metal" flows along real image structure (sampled smoothly via bilinear), and
+// the chromatic silver sheen ties its glints to the image's actual highlights.
 const createLiquidMetalEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const intensity = settings.intensity ?? 0.5;
+    const intensity = clamp(settings.intensity ?? 0.5, 0, 1);
     const flicker = settings.flicker ?? 0.03;
-
-    // For preview, ensure we have visible effect
-    const effectiveIntensity = intensity || 0.3;
     // Seeded PRNG so the live preview and the export are byte-identical (shimmer).
     const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
+    const pool = getBufferPool();
+    const src = pool.acquire(data.length);
+    try {
+      src.set(data);
 
-    // Create metallic reflection map based on brightness
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const index = (y * width + x) * 4;
-
-        // Calculate brightness
-        const brightness = (tempData[index] + tempData[index + 1] + tempData[index + 2]) / 3;
-
-        // Create wave-like distortion for liquid effect
-        const waveX = Math.sin(y * 0.05 + x * 0.02) * effectiveIntensity * 10;
-        const waveY = Math.cos(x * 0.05 + y * 0.02) * effectiveIntensity * 10;
-
-        // Sample from distorted position
-        const srcX = Math.min(width - 1, Math.max(0, Math.floor(x + waveX)));
-        const srcY = Math.min(height - 1, Math.max(0, Math.floor(y + waveY)));
-        const srcIndex = (srcY * width + srcX) * 4;
-
-        // Apply metallic coloring based on brightness
-        const metalFactor = 1 + Math.sin(brightness * 0.05) * effectiveIntensity;
-
-        // Silver/mercury colors
-        data[index] = Math.min(255, tempData[srcIndex] * metalFactor * 0.9);
-        data[index + 1] = Math.min(255, tempData[srcIndex + 1] * metalFactor * 0.95);
-        data[index + 2] = Math.min(255, tempData[srcIndex + 2] * metalFactor);
-
-        // Add shimmer
-        const shimmer = rng() * flicker * 255;
-        data[index] = Math.min(255, data[index] + shimmer);
-        data[index + 1] = Math.min(255, data[index + 1] + shimmer);
-        data[index + 2] = Math.min(255, data[index + 2] + shimmer);
+      const n = width * height;
+      const lum = new Float32Array(n);
+      for (let p = 0, i = 0; p < n; p++, i += 4) {
+        lum[p] = (0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2]) / 255;
       }
+
+      const disp = 8 + intensity * 36;
+      for (let y = 0; y < height; y++) {
+        const ym = y > 0 ? y - 1 : 0;
+        const yp = y < height - 1 ? y + 1 : height - 1;
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          const idx = p * 4;
+          if (src[idx + 3] === 0) continue;
+          const xm = x > 0 ? x - 1 : 0;
+          const xp = x < width - 1 ? x + 1 : width - 1;
+          const gx = lum[y * width + xp] - lum[y * width + xm];
+          const gy = lum[yp * width + x] - lum[ym * width + x];
+
+          // Chrome flows ALONG the structure: displace by the luminance gradient.
+          sampleBilinear(src, width, height, x + gx * disp, y + gy * disp, data, idx);
+
+          // Chromatic silver sheen; glints tied to the real image's highlights.
+          const l = lum[p];
+          const sheen = l * l;
+          const glint = sheen * intensity * 80;
+          const shimmer = (rng() - 0.5) * flicker * 255;
+          data[idx] = clampByte(data[idx] * 0.93 + glint + shimmer);
+          data[idx + 1] = clampByte(data[idx + 1] * 0.97 + glint + shimmer);
+          data[idx + 2] = clampByte(data[idx + 2] * 1.0 + glint * 1.15 + shimmer);
+        }
+      }
+    } finally {
+      pool.release(src);
     }
   };
 };
@@ -9887,51 +9953,192 @@ const createRetroRasterEffect = (settings: Record<string, number>) => {
   };
 };
 
-const createCrystalFacetEffect = (settings: Record<string, number>) => {
-  return function (imageData: KonvaImageData) {
-    const { data, width, height } = imageData;
-    const cellSize = Math.max(2, settings.cellSize ?? 20);
-    const shine = settings.shine ?? 0.4;
+// ── Voronoi facet helpers (shared by stainedGlass + crystalFacet) ────────────
+// Seeded jittered-grid cell centres plus a coarse spatial bucket grid, so the
+// nearest-centre lookup is O(9) per pixel (only the 3x3 neighbouring buckets) —
+// never a brute-force scan over every centre (which would hang on large images).
+type VoronoiGrid = {
+  cx: Float32Array;
+  cy: Float32Array;
+  count: number;
+  buckets: number[][];
+  gridW: number;
+  gridH: number;
+  cell: number;
+};
 
-    const temp = new Uint8ClampedArray(data.length);
-    temp.set(data);
+function buildVoronoiGrid(
+  width: number,
+  height: number,
+  spacing: number,
+  rng: () => number
+): VoronoiGrid {
+  const cell = Math.max(2, spacing);
+  const cols = Math.max(1, Math.round(width / cell));
+  const rows = Math.max(1, Math.round(height / cell));
+  const count = cols * rows;
+  const cx = new Float32Array(count);
+  const cy = new Float32Array(count);
+  const cw = width / cols;
+  const ch = height / rows;
+  let k = 0;
+  for (let gy = 0; gy < rows; gy++) {
+    for (let gx = 0; gx < cols; gx++) {
+      // Jittered grid site: seeded-random within its own cell → irregular but
+      // evenly distributed Voronoi centres (no empty buckets, no clumping).
+      cx[k] = (gx + rng()) * cw;
+      cy[k] = (gy + rng()) * ch;
+      k++;
+    }
+  }
+  const gridW = Math.max(1, Math.ceil(width / cell));
+  const gridH = Math.max(1, Math.ceil(height / cell));
+  const buckets: number[][] = new Array(gridW * gridH);
+  for (let i = 0; i < buckets.length; i++) buckets[i] = [];
+  for (let i = 0; i < count; i++) {
+    const bx = Math.min(gridW - 1, Math.max(0, Math.floor(cx[i] / cell)));
+    const by = Math.min(gridH - 1, Math.max(0, Math.floor(cy[i] / cell)));
+    buckets[by * gridW + bx].push(i);
+  }
+  return { cx, cy, count, buckets, gridW, gridH, cell };
+}
 
-    for (let y = 0; y < height; y += cellSize) {
-      for (let x = 0; x < width; x += cellSize) {
-        let r = 0;
-        let g = 0;
-        let b = 0;
-        let count = 0;
+type VoronoiAssignment = {
+  sumR: Float32Array;
+  sumG: Float32Array;
+  sumB: Float32Array;
+  cnt: Float32Array;
+  nearestIdx: Int32Array;
+  edgeGap: Float32Array;
+};
 
-        for (let cy = 0; cy < cellSize && y + cy < height; cy++) {
-          for (let cx = 0; cx < cellSize && x + cx < width; cx++) {
-            const index = ((y + cy) * width + (x + cx)) * 4;
-            r += temp[index];
-            g += temp[index + 1];
-            b += temp[index + 2];
-            count++;
-          }
-        }
+// Assign every pixel to its nearest cell (grid-bucketed 3x3 search) and
+// accumulate each cell's average colour. edgeGap = (2nd-nearest − nearest)
+// distance, used to draw cell boundaries (dark lead / bright facet edges).
+function assignVoronoi(
+  src: Uint8ClampedArray,
+  width: number,
+  height: number,
+  vg: VoronoiGrid
+): VoronoiAssignment {
+  const { cx, cy, buckets, gridW, gridH, cell, count } = vg;
+  const n = width * height;
+  const sumR = new Float32Array(count);
+  const sumG = new Float32Array(count);
+  const sumB = new Float32Array(count);
+  const cnt = new Float32Array(count);
+  const nearestIdx = new Int32Array(n);
+  const edgeGap = new Float32Array(n);
 
-        if (count === 0) continue;
-
-        r = r / count;
-        g = g / count;
-        b = b / count;
-
-        const highlight = Math.sqrt(r * r + g * g + b * b) * shine;
-
-        for (let cy = 0; cy < cellSize && y + cy < height; cy++) {
-          for (let cx = 0; cx < cellSize && x + cx < width; cx++) {
-            const index = ((y + cy) * width + (x + cx)) * 4;
-            const gradient = (cx + cy) / (cellSize * 2);
-
-            data[index] = Math.min(255, r + gradient * highlight);
-            data[index + 1] = Math.min(255, g + gradient * highlight);
-            data[index + 2] = Math.min(255, b + gradient * highlight);
+  for (let y = 0; y < height; y++) {
+    const by = Math.min(gridH - 1, (y / cell) | 0);
+    for (let x = 0; x < width; x++) {
+      const bx = Math.min(gridW - 1, (x / cell) | 0);
+      let i1 = -1;
+      let d1 = Infinity;
+      let d2 = Infinity;
+      for (let oy = -1; oy <= 1; oy++) {
+        const yy = by + oy;
+        if (yy < 0 || yy >= gridH) continue;
+        const rowBase = yy * gridW;
+        for (let ox = -1; ox <= 1; ox++) {
+          const xx = bx + ox;
+          if (xx < 0 || xx >= gridW) continue;
+          const arr = buckets[rowBase + xx];
+          for (let t = 0; t < arr.length; t++) {
+            const ci = arr[t];
+            const dx = x - cx[ci];
+            const dy = y - cy[ci];
+            const dist = dx * dx + dy * dy;
+            if (dist < d1) {
+              d2 = d1;
+              d1 = dist;
+              i1 = ci;
+            } else if (dist < d2) {
+              d2 = dist;
+            }
           }
         }
       }
+      const p = y * width + x;
+      const idx = p * 4;
+      if (i1 < 0) i1 = 0;
+      nearestIdx[p] = i1;
+      edgeGap[p] = (d2 === Infinity ? Math.sqrt(d1) : Math.sqrt(d2)) - Math.sqrt(d1);
+      if (src[idx + 3] !== 0) {
+        sumR[i1] += src[idx];
+        sumG[i1] += src[idx + 1];
+        sumB[i1] += src[idx + 2];
+        cnt[i1] += 1;
+      }
+    }
+  }
+  return { sumR, sumG, sumB, cnt, nearestIdx, edgeGap };
+}
+
+// Faceted / low-poly crystal: a real grid-bucketed Voronoi tessellation with a
+// flat per-facet colour, a deterministic per-facet brightness/tint shimmer (keyed
+// to the facet index, so each facet catches light slightly differently), and thin
+// BRIGHT facet edges (distinct from stainedGlass's dark lead came).
+const createCrystalFacetEffect = (settings: Record<string, number>) => {
+  return function (imageData: KonvaImageData) {
+    const { data, width, height } = imageData;
+    const cellSize = clamp(Math.round(settings.cellSize ?? 22), 6, 64);
+    const variation = clamp(settings.variation ?? 0.4, 0, 1);
+    const edge = clamp(settings.edge ?? 0.5, 0, 1);
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
+
+    const pool = getBufferPool();
+    const original = pool.acquire(data.length);
+    try {
+      original.set(data);
+      const vg = buildVoronoiGrid(width, height, cellSize, rng);
+      const { sumR, sumG, sumB, cnt, nearestIdx, edgeGap } = assignVoronoi(
+        original,
+        width,
+        height,
+        vg
+      );
+
+      const edgeThresh = edge > 0 ? 0.75 + edge * 2.5 : 0;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          const idx = p * 4;
+          const a = original[idx + 3];
+          if (a === 0) continue;
+          const ci = nearestIdx[p];
+          const c = cnt[ci] || 1;
+          let r = sumR[ci] / c;
+          let g = sumG[ci] / c;
+          let b = sumB[ci] / c;
+
+          // Deterministic per-facet shimmer from the facet index (not position).
+          const hb = ((Math.imul(ci + 1, 2654435761) >>> 9) & 0xffff) / 0xffff;
+          const ht = ((Math.imul(ci + 7, 40503) >>> 7) & 0xffff) / 0xffff;
+          const bright = 1 + (hb - 0.5) * variation * 0.5;
+          const tint = (ht - 0.5) * variation * 28;
+          r = r * bright + tint;
+          g = g * bright;
+          b = b * bright - tint;
+
+          // Thin BRIGHT facet edges where nearest/2nd-nearest are near-equal.
+          if (edgeThresh > 0 && edgeGap[p] < edgeThresh) {
+            const t = 1 - edgeGap[p] / edgeThresh;
+            const glow = t * t * edge * 140;
+            r += glow;
+            g += glow;
+            b += glow;
+          }
+
+          data[idx] = clampByte(r);
+          data[idx + 1] = clampByte(g);
+          data[idx + 2] = clampByte(b);
+          data[idx + 3] = a;
+        }
+      }
+    } finally {
+      pool.release(original);
     }
   };
 };
@@ -10136,139 +10343,158 @@ const createKaleidoscopeFractureEffect = (settings: Record<string, number>) => {
   };
 };
 // Neural Style Dream Effect
+// Dream Flow: a content-aware warp. The dream displacement flows along the
+// image's contours (perpendicular to the luminance gradient) with amplitude
+// scaled by the local luminance (so the dream pools over the brighter subject),
+// plus a seeded hallucinatory wobble. Smooth bilinear sampling; deterministic.
 const createNeuralDreamEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const style = settings.style ?? 0.5;
-    const noise = settings.noise ?? 0.2;
+    const style = clamp(settings.style ?? 0.5, 0, 1);
+    const noiseAmt = clamp(settings.noise ?? 0.2, 0, 0.5);
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
+    const ox = rng() * 1000;
+    const oy = rng() * 1000;
 
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
+    const pool = getBufferPool();
+    const src = pool.acquire(data.length);
+    try {
+      src.set(data);
 
-    // Simulate neural style transfer with perlin-like noise
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const index = (y * width + x) * 4;
-
-        // Create dream-like distortion
-        const noiseScale = 0.01;
-        const noiseX = x * noiseScale;
-        const noiseY = y * noiseScale;
-
-        // Multi-octave noise for organic patterns
-        const noise1 = Math.sin(noiseX * 10) * Math.cos(noiseY * 10);
-        const noise2 = Math.sin(noiseX * 20) * Math.cos(noiseY * 20) * 0.5;
-        const noise3 = Math.sin(noiseX * 40) * Math.cos(noiseY * 40) * 0.25;
-
-        const totalNoise = (noise1 + noise2 + noise3) * noise;
-
-        // Style transfer simulation - blend between photo and artistic interpretation
-        const r = tempData[index];
-        const g = tempData[index + 1];
-        const b = tempData[index + 2];
-
-        // Create impressionistic color shifts
-        const hue = Math.atan2(Math.sqrt(3) * (g - b), 2 * r - g - b);
-        const shifted_hue = hue + totalNoise * Math.PI;
-
-        // Convert back to RGB with style influence
-        const intensity = (r + g + b) / 3;
-        const saturation =
-          Math.sqrt((r - intensity) ** 2 + (g - intensity) ** 2 + (b - intensity) ** 2) / intensity;
-
-        const stylizedIntensity = intensity * (1 + totalNoise);
-        const stylizedSaturation = saturation * (1 + style);
-
-        // Apply stylized colors
-        data[index] = Math.min(
-          255,
-          Math.max(0, stylizedIntensity + stylizedSaturation * Math.cos(shifted_hue) * intensity)
-        );
-        data[index + 1] = Math.min(
-          255,
-          Math.max(
-            0,
-            stylizedIntensity + stylizedSaturation * Math.cos(shifted_hue - 2.094) * intensity
-          )
-        );
-        data[index + 2] = Math.min(
-          255,
-          Math.max(
-            0,
-            stylizedIntensity + stylizedSaturation * Math.cos(shifted_hue + 2.094) * intensity
-          )
-        );
+      const n = width * height;
+      const lum = new Float32Array(n);
+      for (let p = 0, i = 0; p < n; p++, i += 4) {
+        lum[p] = (0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2]) / 255;
       }
+
+      const amp = 6 + style * 22;
+      for (let y = 0; y < height; y++) {
+        const ym = y > 0 ? y - 1 : 0;
+        const yp = y < height - 1 ? y + 1 : height - 1;
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          const idx = p * 4;
+          if (src[idx + 3] === 0) continue;
+          const xm = x > 0 ? x - 1 : 0;
+          const xp = x < width - 1 ? x + 1 : width - 1;
+          const gx = lum[y * width + xp] - lum[y * width + xm];
+          const gy = lum[yp * width + x] - lum[ym * width + x];
+          const l = lum[p];
+
+          // Seeded swirling dream field (varies with seed via ox/oy).
+          const dn =
+            Math.sin((x + ox) * 0.045 + Math.cos((y + oy) * 0.037) * 3.1) *
+            Math.cos((y + oy) * 0.041 + (x + ox) * 0.013);
+
+          // Amplitude grows with local luminance; direction follows the contour
+          // (perpendicular to the gradient) plus the seeded wobble.
+          const aLocal = amp * (0.25 + 0.75 * l);
+          const dispX = (-gy * 4 + dn * noiseAmt * 2) * aLocal;
+          const dispY = (gx * 4 + dn * noiseAmt * 2) * aLocal;
+
+          sampleBilinear(src, width, height, x + dispX, y + dispY, data, idx);
+        }
+      }
+
+      // Dreamy chroma lift, scaled by stylisation strength.
+      if (style > 0) {
+        const s = 1 + style * 0.6;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] === 0) continue;
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+          data[i] = clampByte(gray + (r - gray) * s);
+          data[i + 1] = clampByte(gray + (g - gray) * s);
+          data[i + 2] = clampByte(gray + (b - gray) * s);
+        }
+      }
+    } finally {
+      pool.release(src);
     }
   };
 };
 // Holographic Interference Effect
+// Holographic Foil: the interference phase follows the image's form — the
+// rainbow bands run along the local contour direction and the spectrum is driven
+// by luminance, while the sheen (blend strength) is strongest on contours and
+// highlights, like foil catching light over the subject. Deterministic.
 const createHolographicInterferenceEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
     const frequency = settings.frequency ?? 5;
     const phaseShift = settings.phaseShift ?? 0.5;
 
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
+    const pool = getBufferPool();
+    const src = pool.acquire(data.length);
+    try {
+      src.set(data);
 
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const index = (y * width + x) * 4;
-
-        // Get original brightness
-        const brightness = (tempData[index] + tempData[index + 1] + tempData[index + 2]) / 3 / 255;
-
-        // Create interference pattern
-        const pattern1 = Math.sin(x * frequency * 0.05 + phaseShift * Math.PI);
-        const pattern2 = Math.sin(y * frequency * 0.05 + phaseShift * Math.PI * 1.5);
-        const interference = (pattern1 + pattern2) * 0.5;
-
-        // Create rainbow effect based on interference and brightness
-        const hue = (interference + brightness) * Math.PI * 2;
-
-        // HSL to RGB conversion for rainbow colors
-        const c = brightness * 0.8; // Chroma
-        const hp = hue / (Math.PI / 3);
-        const x2 = c * (1 - Math.abs((hp % 2) - 1));
-
-        let r = 0,
-          g = 0,
-          b = 0;
-        if (hp >= 0 && hp < 1) {
-          r = c;
-          g = x2;
-          b = 0;
-        } else if (hp >= 1 && hp < 2) {
-          r = x2;
-          g = c;
-          b = 0;
-        } else if (hp >= 2 && hp < 3) {
-          r = 0;
-          g = c;
-          b = x2;
-        } else if (hp >= 3 && hp < 4) {
-          r = 0;
-          g = x2;
-          b = c;
-        } else if (hp >= 4 && hp < 5) {
-          r = x2;
-          g = 0;
-          b = c;
-        } else if (hp >= 5 && hp < 6) {
-          r = c;
-          g = 0;
-          b = x2;
-        }
-
-        const m = brightness - c * 0.5;
-
-        // Blend holographic colors with original
-        const blend = 0.6;
-        data[index] = Math.min(255, tempData[index] * (1 - blend) + (r + m) * 255 * blend);
-        data[index + 1] = Math.min(255, tempData[index + 1] * (1 - blend) + (g + m) * 255 * blend);
-        data[index + 2] = Math.min(255, tempData[index + 2] * (1 - blend) + (b + m) * 255 * blend);
+      const n = width * height;
+      const lum = new Float32Array(n);
+      for (let p = 0, i = 0; p < n; p++, i += 4) {
+        lum[p] = (0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2]) / 255;
       }
+
+      const f = Math.max(1, frequency) * 0.05;
+      const ps = phaseShift * Math.PI * 2;
+      for (let y = 0; y < height; y++) {
+        const ym = y > 0 ? y - 1 : 0;
+        const yp = y < height - 1 ? y + 1 : height - 1;
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          const idx = p * 4;
+          const a = src[idx + 3];
+          if (a === 0) continue;
+          const xm = x > 0 ? x - 1 : 0;
+          const xp = x < width - 1 ? x + 1 : width - 1;
+          const gx = lum[y * width + xp] - lum[y * width + xm];
+          const gy = lum[yp * width + x] - lum[ym * width + x];
+          const gmag = Math.sqrt(gx * gx + gy * gy);
+          const gdir = Math.atan2(gy, gx);
+          const l = lum[p];
+
+          // Bands run along the contour direction; brightness drives the spectrum.
+          const phase = (x * Math.cos(gdir) + y * Math.sin(gdir)) * f + l * 6 + ps;
+          let t = phase / (Math.PI * 2);
+          t -= Math.floor(t);
+          const h6 = t * 6;
+          const xx = 1 - Math.abs((h6 % 2) - 1);
+          let cr = 0;
+          let cg = 0;
+          let cb = 0;
+          if (h6 < 1) {
+            cr = 1;
+            cg = xx;
+          } else if (h6 < 2) {
+            cr = xx;
+            cg = 1;
+          } else if (h6 < 3) {
+            cg = 1;
+            cb = xx;
+          } else if (h6 < 4) {
+            cg = xx;
+            cb = 1;
+          } else if (h6 < 5) {
+            cr = xx;
+            cb = 1;
+          } else {
+            cr = 1;
+            cb = xx;
+          }
+
+          // Foil catches light on contours + highlights.
+          const sheen = clamp(0.15 + gmag * 5 + l * 0.4, 0, 1);
+          const blend = sheen * 0.7;
+          data[idx] = clampByte(src[idx] * (1 - blend) + cr * 255 * blend);
+          data[idx + 1] = clampByte(src[idx + 1] * (1 - blend) + cg * 255 * blend);
+          data[idx + 2] = clampByte(src[idx + 2] * (1 - blend) + cb * 255 * blend);
+          data[idx + 3] = a;
+        }
+      }
+    } finally {
+      pool.release(src);
     }
   };
 };
@@ -10814,31 +11040,75 @@ const createCinematicLutEffect = (settings: Record<string, number>) => {
   };
 };
 
+// Real directional relighting. A per-pixel surface normal is derived from the
+// luminance gradient (Sobel) and lit by a directional light (azimuth from `angle`
+// + a fixed elevation). diffuse = max(0, N·L); the output is shaded in LINEAR
+// light by (ambient + (1-ambient)*diffuse), with `ambient` an additive floor
+// (0 = full shading, 1 = no effect) and `strength` scaling the whole effect.
 const createRelightEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const angle = ((settings.angle ?? 45) * Math.PI) / 180;
+    const az = ((settings.angle ?? 45) * Math.PI) / 180;
     const strength = clamp(settings.strength ?? 0.4, 0, 1);
     const ambient = clamp(settings.ambient ?? 0.2, 0, 1);
+    if (strength <= 0) return;
 
-    const lx = Math.cos(angle);
-    const ly = Math.sin(angle);
+    // Light direction: azimuth (0°=right, 90°=top) + fixed elevation.
+    const elev = Math.PI / 4;
+    const cosEl = Math.cos(elev);
+    const lx = Math.cos(az) * cosEl;
+    const ly = -Math.sin(az) * cosEl; // canvas y is downward
+    const lz = Math.sin(elev);
 
+    const n = width * height;
+    const lum = new Float32Array(n);
+    for (let p = 0, i = 0; p < n; p++, i += 4) {
+      lum[p] =
+        0.2126 * SRGB_TO_LINEAR[data[i]] +
+        0.7152 * SRGB_TO_LINEAR[data[i + 1]] +
+        0.0722 * SRGB_TO_LINEAR[data[i + 2]];
+    }
+
+    const bump = 2.5; // surface relief scale
     for (let y = 0; y < height; y++) {
-      const ny = height > 1 ? (y / (height - 1)) * 2 - 1 : 0;
+      const ym = y > 0 ? y - 1 : 0;
+      const yp = y < height - 1 ? y + 1 : height - 1;
       for (let x = 0; x < width; x++) {
         const idx = (y * width + x) * 4;
         const a = data[idx + 3];
         if (a === 0) continue;
+        const xm = x > 0 ? x - 1 : 0;
+        const xp = x < width - 1 ? x + 1 : width - 1;
 
-        const nx = width > 1 ? (x / (width - 1)) * 2 - 1 : 0;
-        const dot = clamp(nx * lx + ny * ly, -1, 1);
-        const light = ambient + dot * strength * 0.35;
-        const mult = clamp(1 + light, 0, 2);
+        const tl = lum[ym * width + xm];
+        const tc = lum[ym * width + x];
+        const tr = lum[ym * width + xp];
+        const ml = lum[y * width + xm];
+        const mr = lum[y * width + xp];
+        const bl = lum[yp * width + xm];
+        const bc = lum[yp * width + x];
+        const br = lum[yp * width + xp];
 
-        data[idx] = clampByte(data[idx] * mult);
-        data[idx + 1] = clampByte(data[idx + 1] * mult);
-        data[idx + 2] = clampByte(data[idx + 2] * mult);
+        // Sobel luminance gradient → surface normal N = normalize(-dx*s, -dy*s, 1).
+        const dx = tr + 2 * mr + br - (tl + 2 * ml + bl);
+        const dy = bl + 2 * bc + br - (tl + 2 * tc + tr);
+        let nx = -dx * bump;
+        let ny = -dy * bump;
+        let nz = 1;
+        const inv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+        nx *= inv;
+        ny *= inv;
+        nz *= inv;
+
+        let diffuse = nx * lx + ny * ly + nz * lz;
+        if (diffuse < 0) diffuse = 0;
+
+        const factor = ambient + (1 - ambient) * diffuse;
+        const mult = 1 + (factor - 1) * strength;
+
+        data[idx] = linearToSrgbByte(SRGB_TO_LINEAR[data[idx]] * mult);
+        data[idx + 1] = linearToSrgbByte(SRGB_TO_LINEAR[data[idx + 1]] * mult);
+        data[idx + 2] = linearToSrgbByte(SRGB_TO_LINEAR[data[idx + 2]] * mult);
         data[idx + 3] = a;
       }
     }
@@ -11145,13 +11415,19 @@ const createWatercolorEffect = (settings: Record<string, number>) => {
   };
 };
 
+// Real stained glass via a grid-bucketed Voronoi tessellation: seeded random
+// cell centres, each pixel painted its nearest cell's average colour, with dark
+// "lead came" drawn where the nearest and 2nd-nearest centres are nearly
+// equidistant (|d1−d2| below a threshold from `borderThickness`).
 const createStainedGlassEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const cellSize = Math.max(4, Math.min(64, Math.round(settings.cellSize ?? 18)));
-    const borderThickness = Math.max(0, Math.min(8, Math.round(settings.borderThickness ?? 2)));
+    const cellSize = clamp(Math.round(settings.cellSize ?? 18), 4, 64);
+    const borderThickness = clamp(Math.round(settings.borderThickness ?? 2), 0, 8);
     const borderDarkness = clamp(settings.borderDarkness ?? 0.85, 0, 1);
+    const opacity = clamp(settings.opacity ?? 1, 0, 1);
     const borderScale = 1 - borderDarkness;
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const pool = getBufferPool();
     const original = pool.acquire(data.length);
@@ -11159,55 +11435,38 @@ const createStainedGlassEffect = (settings: Record<string, number>) => {
     try {
       original.set(data);
 
-      for (let ty = 0; ty < height; ty += cellSize) {
-        for (let tx = 0; tx < width; tx += cellSize) {
-          let sumR = 0;
-          let sumG = 0;
-          let sumB = 0;
-          let count = 0;
+      const vg = buildVoronoiGrid(width, height, cellSize, rng);
+      const { sumR, sumG, sumB, cnt, nearestIdx, edgeGap } = assignVoronoi(
+        original,
+        width,
+        height,
+        vg
+      );
 
-          const yMax = Math.min(height, ty + cellSize);
-          const xMax = Math.min(width, tx + cellSize);
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          const i = p * 4;
+          const a = original[i + 3];
+          if (a === 0) continue;
 
-          for (let y = ty; y < yMax; y++) {
-            for (let x = tx; x < xMax; x++) {
-              const i = (y * width + x) * 4;
-              const a = original[i + 3];
-              if (a === 0) continue;
-              sumR += original[i];
-              sumG += original[i + 1];
-              sumB += original[i + 2];
-              count++;
-            }
+          const ci = nearestIdx[p];
+          const c = cnt[ci] || 1;
+          let r = sumR[ci] / c;
+          let g = sumG[ci] / c;
+          let b = sumB[ci] / c;
+
+          // Dark lead came along the cell boundary.
+          if (borderThickness > 0 && edgeGap[p] < borderThickness) {
+            r *= borderScale;
+            g *= borderScale;
+            b *= borderScale;
           }
 
-          if (count === 0) continue;
-
-          const avgR = sumR / count;
-          const avgG = sumG / count;
-          const avgB = sumB / count;
-
-          for (let y = ty; y < yMax; y++) {
-            for (let x = tx; x < xMax; x++) {
-              const i = (y * width + x) * 4;
-              const a = original[i + 3];
-              if (a === 0) continue;
-
-              const isBorder =
-                borderThickness > 0 &&
-                (x - tx < borderThickness ||
-                  xMax - 1 - x < borderThickness ||
-                  y - ty < borderThickness ||
-                  yMax - 1 - y < borderThickness);
-
-              const scale = isBorder ? borderScale : 1;
-
-              data[i] = clampByte(avgR * scale);
-              data[i + 1] = clampByte(avgG * scale);
-              data[i + 2] = clampByte(avgB * scale);
-              data[i + 3] = a;
-            }
-          }
+          data[i] = clampByte(lerp(original[i], r, opacity));
+          data[i + 1] = clampByte(lerp(original[i + 1], g, opacity));
+          data[i + 2] = clampByte(lerp(original[i + 2], b, opacity));
+          data[i + 3] = a;
         }
       }
     } finally {
