@@ -5664,7 +5664,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         label: 'Strength',
         min: 0,
         max: 1,
-        defaultValue: 0.4,
+        defaultValue: 0.65,
         step: 0.05,
         description: 'Intensity of the directional lighting effect.',
       },
@@ -8469,7 +8469,7 @@ export const effectsConfig: Record<string, EffectConfig> = {
         label: 'Intensity',
         min: 0,
         max: 1,
-        defaultValue: 0.5,
+        defaultValue: 0.7,
         step: 0.05,
         description: 'Strength of the metallic reflection effect',
       },
@@ -10456,7 +10456,7 @@ const createHolographicInterferenceEffect = (settings: Record<string, number>) =
           const l = lum[p];
 
           // Bands run along the contour direction; brightness drives the spectrum.
-          const phase = (x * Math.cos(gdir) + y * Math.sin(gdir)) * f + l * 6 + ps;
+          const phase = (x * Math.cos(gdir) + y * Math.sin(gdir)) * f + l * 2.5 + ps;
           let t = phase / (Math.PI * 2);
           t -= Math.floor(t);
           const h6 = t * 6;
@@ -10485,8 +10485,8 @@ const createHolographicInterferenceEffect = (settings: Record<string, number>) =
           }
 
           // Foil catches light on contours + highlights.
-          const sheen = clamp(0.15 + gmag * 5 + l * 0.4, 0, 1);
-          const blend = sheen * 0.7;
+          const sheen = clamp(0.06 + gmag * 5 + l * 0.4, 0, 1);
+          const blend = sheen * 0.55;
           data[idx] = clampByte(src[idx] * (1 - blend) + cr * 255 * blend);
           data[idx + 1] = clampByte(src[idx + 1] * (1 - blend) + cg * 255 * blend);
           data[idx + 2] = clampByte(src[idx + 2] * (1 - blend) + cb * 255 * blend);
