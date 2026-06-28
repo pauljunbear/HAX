@@ -13,7 +13,8 @@ import useImage from '@/hooks/useImage';
 import type { EffectLayer } from '@/hooks/useEffectLayers';
 import { PrefixRenderCache } from '@/lib/performance/LayerPipeline';
 import { buildSpecs } from '@/lib/effects/renderStack';
-import type { ClosureResult } from '@/lib/effects/renderStack';
+import type { ClosureResult, SerializableLayer } from '@/lib/effects/renderStack';
+import { RenderWorkerClient, workerEnabled } from '@/lib/effects/workerClient';
 import { getWebGL2Renderer } from '@/lib/webgl/WebGL2Renderer';
 import type { GpuPass } from '@/lib/webgl/WebGL2Renderer';
 import { isGpuSupportedEffect, buildGpuPass } from '@/lib/webgl/gpuEffects';
@@ -272,6 +273,12 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
     // Prefix cache of cumulative processed buffers, so editing layer k reuses
     // the cached result of layers [0..k-1] instead of re-running the whole stack.
     const prefixCacheRef = useRef<PrefixRenderCache>(new PrefixRenderCache());
+    // Off-main-thread render (opt-in: localStorage 'hax:worker'='1'). Same pipeline
+    // as the main thread (byte-identical, verified at /devtest/worker), just run off
+    // the UI thread so heavy stacks don't freeze it. Scratch canvases are reused.
+    const workerClientRef = useRef<RenderWorkerClient | null>(null);
+    const rasterCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const outCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
     const applyEffectsToNode = useCallback(
       async (node: Konva.Image | null, pixelRatio: number = 1) => {
@@ -281,6 +288,12 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
 
         try {
           const konvaNode = node as KonvaImageNode;
+          // If the worker path previously swapped in a processed canvas, restore the
+          // original image so the main-thread path operates on pristine source.
+          if (image && konvaNode.image() !== image) {
+            konvaNode.image(image);
+            konvaNode.clearCache?.();
+          }
 
           if (!effectLayers || effectLayers.length === 0) {
             // No effects: draw the source element directly, uncached. Pixel-identical
@@ -368,7 +381,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
           setError(`Failed to apply effects. ${message}`);
         }
       },
-      [effectLayers]
+      [effectLayers, image]
     );
 
     const exportWithFormat = useCallback(
@@ -577,6 +590,80 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
     // values) so the scheduler can tell a discrete toggle from a slider drag.
     const prevStructRef = useRef<string>('');
 
+    // Worker render path (opt-in via workerEnabled()). Renders the stack off the
+    // main thread and swaps the processed canvas in as the node image. Returns true
+    // when it handled the render (incl. the empty state); false to fall back to the
+    // main thread. `epoch` is the scheduler version for latest-wins.
+    const applyEffectsViaWorker = useCallback(
+      async (node: Konva.Image, pixelRatio: number, epoch: number): Promise<boolean> => {
+        if (!image) return false;
+        const konvaNode = node as KonvaImageNode;
+        try {
+          const visible = (effectLayers || []).filter(l => l.visible && l.effectId);
+          if (visible.length === 0) {
+            if (konvaNode.image() !== image) konvaNode.image(image);
+            konvaNode.filters([]);
+            konvaNode.clearCache();
+            konvaNode.getLayer()?.batchDraw();
+            return true;
+          }
+
+          const ratio = Math.max(0.5, pixelRatio);
+          const rw = Math.max(1, Math.round(node.width() * ratio));
+          const rh = Math.max(1, Math.round(node.height() * ratio));
+
+          // Rasterize the ORIGINAL image at the render resolution (never node.image,
+          // which may hold a previous processed canvas).
+          const raster = (rasterCanvasRef.current ??= document.createElement('canvas'));
+          raster.width = rw;
+          raster.height = rh;
+          const rctx = raster.getContext('2d', { willReadFrequently: true });
+          if (!rctx) return false;
+          rctx.clearRect(0, 0, rw, rh);
+          rctx.drawImage(image, 0, 0, rw, rh);
+          const srcData = rctx.getImageData(0, 0, rw, rh);
+
+          const client = (workerClientRef.current ??= new RenderWorkerClient());
+          await client.setSource(`${imageUrlToUse}|${rw}x${rh}`, srcData);
+          if (epoch !== versionRef.current) return true; // superseded mid-flight
+
+          const layers: SerializableLayer[] = visible.map(l => ({
+            effectId: l.effectId,
+            settings: (l.settings || {}) as Record<string, number>,
+            opacity: l.opacity ?? 1,
+            visible: true,
+          }));
+          const res = await client.render(layers);
+          if (epoch !== versionRef.current) return true; // superseded
+
+          const out = (outCanvasRef.current ??= document.createElement('canvas'));
+          out.width = res.width;
+          out.height = res.height;
+          const octx = out.getContext('2d');
+          if (!octx) return false;
+          octx.putImageData(new ImageData(res.data, res.width, res.height), 0, 0);
+          konvaNode.image(out);
+          konvaNode.filters([]);
+          konvaNode.clearCache();
+          konvaNode.getLayer()?.batchDraw();
+          setError(null);
+          return true;
+        } catch (err) {
+          console.warn('worker render failed; falling back to main thread', err);
+          try {
+            if (konvaNode.image() !== image) {
+              konvaNode.image(image);
+              konvaNode.clearCache();
+            }
+          } catch {
+            // ignore
+          }
+          return false;
+        }
+      },
+      [effectLayers, image, imageUrlToUse]
+    );
+
     useEffect(() => {
       if (!image) return;
       const imageNode =
@@ -593,6 +680,17 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
       const discrete = struct !== prevStructRef.current;
       prevStructRef.current = struct;
 
+      // Route a render through the worker when enabled (off-main-thread), else the
+      // main thread. Worker failures fall back to the main thread automatically.
+      const render = async (node: Konva.Image, ratio: number) => {
+        if (myVersion !== versionRef.current) return; // superseded
+        if (workerEnabled()) {
+          const handled = await applyEffectsViaWorker(node, ratio, myVersion);
+          if (handled) return;
+        }
+        await applyEffectsToNode(node, ratio);
+      };
+
       if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
       if (finalTimerRef.current) window.clearTimeout(finalTimerRef.current);
 
@@ -602,7 +700,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         // cache() calls on every toggle/Look/compare and removes the flash.
         finalTimerRef.current = window.setTimeout(async () => {
           if (myVersion !== versionRef.current) return; // superseded
-          await applyEffectsToNode(imageNode, finalRatio);
+          await render(imageNode, finalRatio);
         }, 16) as unknown as number;
       } else {
         // Slider drag: cheap 0.6 preview now, full settle after idle. The interactive
@@ -610,11 +708,11 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
         // no visible detail); true full-resolution is reserved for export.
         previewTimerRef.current = window.setTimeout(async () => {
           if (myVersion !== versionRef.current) return; // superseded
-          await applyEffectsToNode(imageNode, 0.6);
+          await render(imageNode, 0.6);
         }, 50) as unknown as number;
         finalTimerRef.current = window.setTimeout(async () => {
           if (myVersion !== versionRef.current) return; // superseded
-          await applyEffectsToNode(imageNode, finalRatio);
+          await render(imageNode, finalRatio);
         }, 180) as unknown as number;
       }
 
@@ -625,11 +723,13 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
       // containerDimensions included so a resize re-renders through this single path.
     }, [effectLayers, image, containerDimensions.width, containerDimensions.height]);
 
-    // Cleanup effect cache on unmount
+    // Cleanup effect cache + render worker on unmount
     useEffect(() => {
       return () => {
         effectCacheRef.current.clear();
         prefixCacheRef.current.clear();
+        workerClientRef.current?.terminate();
+        workerClientRef.current = null;
       };
     }, []);
 
