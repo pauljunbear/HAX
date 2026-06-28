@@ -24,13 +24,15 @@ export interface PipelineImage {
 export type PipelineFilter = (img: PipelineImage) => void;
 
 export interface LayerSpec {
-  /** Stable identity of this layer (effectId + serialized settings). */
+  /** Stable identity of this layer (effectId + serialized settings + opacity). */
   sig: string;
   /** Effect id, used to route a layer to the GPU path when supported. */
   effectId?: string;
   filter: PipelineFilter;
   /** Params for Konva built-in filters (empty for custom closures). */
   params: Record<string, number>;
+  /** Layer blend opacity (0..1). <1 blends this layer's output over its input. */
+  opacity?: number;
 }
 
 /**
@@ -47,9 +49,22 @@ export function filterThis(params: Record<string, number>): unknown {
   );
 }
 
-/** Apply one layer's filter to the image in place. */
+/** Apply one layer's filter to the image in place, honouring layer opacity
+ *  (blends the filtered result over the layer's input). */
 export function applyLayer(img: PipelineImage, spec: LayerSpec): void {
+  const op = spec.opacity ?? 1;
+  if (op >= 1) {
+    spec.filter.call(filterThis(spec.params), img);
+    return;
+  }
+  const before = img.data.slice();
   spec.filter.call(filterThis(spec.params), img);
+  const d = img.data;
+  const inv = 1 - op;
+  for (let i = 0; i < d.length; i++) {
+    if (i % 4 === 3) continue; // keep alpha
+    d[i] = d[i] * op + before[i] * inv;
+  }
 }
 
 function cloneImage(img: PipelineImage): PipelineImage {

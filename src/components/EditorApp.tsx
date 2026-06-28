@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Head from 'next/head';
 import { useAppStore } from '@/lib/store';
 import ImageEditor from '@/components/ImageEditor';
@@ -9,9 +9,13 @@ import { motion } from 'framer-motion';
 
 // Import new components
 import AppleStyleLayout from '@/components/AppleStyleLayout';
+import RandomizerBar from '@/components/RandomizerBar';
 import useHistory from '@/hooks/useHistory';
 import useEffectLayers from '@/hooks/useEffectLayers';
+import type { EffectLayer } from '@/hooks/useEffectLayers';
 import type { ImageEditorHandle } from './ImageEditor';
+import { compose, type RecipeLayer } from '@/lib/randomizer/compose';
+import { randSeed } from '@/lib/randomizer/seed';
 
 export default function EditorApp() {
   const selectedImage = useAppStore(state => state.selectedImage);
@@ -42,10 +46,112 @@ export default function EditorApp() {
     setActiveLayer: setActiveEffectLayer,
     updateLayerSettings,
     clearLayers: clearEffectLayers,
+    setStack,
+    toggleLayerLock,
   } = useEffectLayers();
 
   // Extract effectSettings from the active effect layer
   const effectSettings = activeEffectLayer?.settings || {};
+
+  // Which effects are currently on the image — drives the contact-sheet "ON"
+  // state. (Fixes the old name-vs-UUID compare that could never be true.)
+  const appliedEffectIds = useMemo(
+    () => new Set(effectLayers.map(l => l.effectId)),
+    [effectLayers]
+  );
+
+  // ---- Smart Randomizer state ----
+  const [moodId, setMoodId] = useState('faded');
+  const [wildness, setWildness] = useState(0.42);
+  const [seed, setSeed] = useState(''); // shown only after the first roll
+  const undoStackRef = useRef<EffectLayer[][]>([]);
+
+  const snapshot = useCallback(() => {
+    undoStackRef.current.push(effectLayers.map(l => ({ ...l, settings: { ...l.settings } })));
+    if (undoStackRef.current.length > 40) undoStackRef.current.shift();
+  }, [effectLayers]);
+
+  const lockedRecipe = useCallback(
+    (): RecipeLayer[] =>
+      effectLayers
+        .filter(l => l.locked)
+        .map(l => ({
+          effectId: l.effectId,
+          settings: l.settings,
+          opacity: l.opacity,
+          locked: true,
+        })),
+    [effectLayers]
+  );
+
+  const runRandomizer = useCallback(
+    (fresh: boolean) => {
+      snapshot();
+      const locked = fresh ? [] : lockedRecipe();
+      const s = randSeed();
+      setSeed(s);
+      setStack(compose(s, moodId, locked, wildness).layers);
+    },
+    [snapshot, lockedRecipe, moodId, wildness, setStack]
+  );
+  const handleSurprise = useCallback(() => runRandomizer(true), [runRandomizer]);
+  const handleReroll = useCallback(() => runRandomizer(false), [runRandomizer]);
+
+  const handleMood = useCallback(
+    (id: string) => {
+      setMoodId(id);
+      if (effectLayers.length) {
+        snapshot();
+        const s = randSeed();
+        setSeed(s);
+        setStack(compose(s, id, lockedRecipe(), wildness).layers);
+      }
+    },
+    [effectLayers.length, snapshot, lockedRecipe, wildness, setStack]
+  );
+
+  // Live wildness: re-shape the CURRENT seed's look as you drag (no undo churn).
+  const handleWildness = useCallback(
+    (w: number) => {
+      setWildness(w);
+      if (effectLayers.length && seed) setStack(compose(seed, moodId, lockedRecipe(), w).layers);
+    },
+    [effectLayers.length, seed, moodId, lockedRecipe, setStack]
+  );
+
+  // keep latest reroll for the keydown effect so it doesn't re-subscribe per change
+  const rerollRef = useRef(handleReroll);
+  rerollRef.current = handleReroll;
+
+  // SPACEBAR = roll; Cmd/Ctrl+Z = undo. Scoped so it never fires while typing or
+  // when an interactive element is focused — avoids the destructive accidental-
+  // Space footgun on a hand-built stack, and makes every roll reversible.
+  useEffect(() => {
+    if (!selectedImage) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        const prev = undoStackRef.current.pop();
+        if (prev) {
+          e.preventDefault();
+          setStack(prev);
+        }
+        return;
+      }
+      if (e.code !== 'Space') return;
+      const el = document.activeElement as HTMLElement | null;
+      if (
+        el &&
+        el !== document.body &&
+        el.closest('button,a,input,textarea,select,[role="button"],[contenteditable="true"]')
+      ) {
+        return;
+      }
+      e.preventDefault();
+      rerollRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedImage, setStack]);
 
   useEffect(() => {
     setIsReady(true);
@@ -116,15 +222,20 @@ export default function EditorApp() {
 
   const handleEffectChange = useCallback(
     (effectName: string | null) => {
-      if (effectName) {
-        // Add as a new effect layer
+      if (!effectName) {
+        if (activeEffectLayerId) removeEffectLayer(activeEffectLayerId);
+        return;
+      }
+      // Toggle: clicking an already-applied effect peels it off instead of
+      // silently stacking a duplicate. (Apply contract from the audit.)
+      const existing = effectLayers.find(l => l.effectId === effectName);
+      if (existing) {
+        removeEffectLayer(existing.id);
+      } else {
         addEffectLayer(effectName);
-      } else if (activeEffectLayerId) {
-        // Remove the active layer
-        removeEffectLayer(activeEffectLayerId);
       }
     },
-    [addEffectLayer, removeEffectLayer, activeEffectLayerId]
+    [addEffectLayer, removeEffectLayer, activeEffectLayerId, effectLayers]
   );
 
   const handleSettingChange = useCallback(
@@ -134,6 +245,22 @@ export default function EditorApp() {
       }
     },
     [activeEffectLayerId, updateLayerSettings]
+  );
+
+  // Per-layer edits for the unified "all effects in one view" controls stack.
+  const handleLayerSettingChange = useCallback(
+    (layerId: string, settingName: string, value: number) => {
+      updateLayerSettings(layerId, settingName, value);
+    },
+    [updateLayerSettings]
+  );
+
+  const handleLayerOpacityChange = useCallback(
+    (layerId: string, opacity: number) => {
+      const layer = effectLayers.find(l => l.id === layerId);
+      if (layer) updateLayer(layerId, { ...layer, opacity });
+    },
+    [effectLayers, updateLayer]
   );
 
   const handleResetSettings = useCallback(() => {
@@ -241,39 +368,66 @@ export default function EditorApp() {
             // Effect-related props
             effectLayers={effectLayers}
             activeEffect={activeEffectLayerId}
+            appliedEffectIds={appliedEffectIds}
             effectSettings={effectSettings}
             onEffectChange={handleEffectChange}
             onSettingChange={handleSettingChange}
+            onLayerSettingChange={handleLayerSettingChange}
+            onLayerOpacityChange={handleLayerOpacityChange}
             onResetSettings={handleResetSettings}
             onClearAllEffects={handleClearAllEffects}
             onRemoveEffect={handleRemoveEffect}
+            onToggleLayerLock={toggleLayerLock}
             onSetActiveLayer={setActiveEffectLayer}
             onToggleLayerVisibility={handleToggleLayerVisibility}
             onReorderLayers={reorderLayers}
             onExport={handleExport}
             onEstimateFileSize={handleEstimateFileSize}
           >
-            <div id="main-content" className="w-full h-full">
-              {imageLoading ? (
-                <div className="h-full w-full flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-emerald-500 border-gray-200"></div>
-                  <span className="ml-3 text-gray-600">Loading image...</span>
-                </div>
-              ) : (
-                <ImageEditor
-                  ref={imageEditorRef}
-                  selectedImage={selectedImage}
-                  effectLayers={effectLayers}
+            <div id="main-content" className="w-full h-full flex flex-col">
+              <div className="flex-1 min-h-0 relative">
+                {imageLoading ? (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <div
+                      className="animate-spin rounded-full h-8 w-8 border-2"
+                      style={{ borderColor: 'rgba(255,255,255,.15)', borderTopColor: '#F53001' }}
+                    ></div>
+                    <span className="ml-3" style={{ color: '#A8A49A' }}>
+                      Loading image…
+                    </span>
+                  </div>
+                ) : (
+                  <ImageEditor
+                    ref={imageEditorRef}
+                    selectedImage={selectedImage}
+                    effectLayers={effectLayers}
+                  />
+                )}
+                {imageError && (
+                  <div
+                    className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-3 rounded-lg"
+                    role="alert"
+                    style={{
+                      background: 'rgba(245,48,1,.12)',
+                      border: '1px solid rgba(245,48,1,.4)',
+                      color: '#FF6A42',
+                    }}
+                  >
+                    <strong className="font-semibold">Error: </strong>
+                    <span className="block sm:inline">{imageError}</span>
+                  </div>
+                )}
+              </div>
+              {!imageLoading && (
+                <RandomizerBar
+                  moodId={moodId}
+                  wildness={wildness}
+                  seed={seed}
+                  onMood={handleMood}
+                  onWildness={handleWildness}
+                  onSurprise={handleSurprise}
+                  onReroll={handleReroll}
                 />
-              )}
-              {imageError && (
-                <div
-                  className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg"
-                  role="alert"
-                >
-                  <strong className="font-bold">Error: </strong>
-                  <span className="block sm:inline">{imageError}</span>
-                </div>
               )}
             </div>
           </AppleStyleLayout>

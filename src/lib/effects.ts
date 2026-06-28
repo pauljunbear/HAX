@@ -1501,29 +1501,25 @@ const createUnifiedMonoEffect = (settings: Record<string, number>) => {
 const createDuotoneEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const data = imageData.data;
-    const width = imageData.width;
-    const height = imageData.height;
-
     const color1 = settings.color1 ? hexToRgb(settings.color1) : { r: 0, g: 0, b: 255 };
     const color2 = settings.color2 ? hexToRgb(settings.color2) : { r: 255, g: 255, b: 0 };
+    const opacity = settings.opacity ?? 1;
 
-    for (let i = 0; i < data.length; i += 4) {
-      const pixelIndex = i / 4;
-      const x = pixelIndex % width;
-      const y = Math.floor(pixelIndex / width);
-
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
-
-      const newR = color1.r * (1 - brightness) + color2.r * brightness;
-      const newG = color1.g * (1 - brightness) + color2.g * brightness;
-      const newB = color1.b * (1 - brightness) + color2.b * brightness;
-
-      data[i] = Math.round(newR);
-      data[i + 1] = Math.round(newG);
-      data[i + 2] = Math.round(newB);
+    const pool = getBufferPool();
+    const original = opacity < 1 ? pool.acquire(data.length) : null;
+    try {
+      if (original) original.set(data);
+      for (let i = 0; i < data.length; i += 4) {
+        const brightness = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+        data[i] = Math.round(color1.r * (1 - brightness) + color2.r * brightness);
+        data[i + 1] = Math.round(color1.g * (1 - brightness) + color2.g * brightness);
+        data[i + 2] = Math.round(color1.b * (1 - brightness) + color2.b * brightness);
+      }
+      // Honour layer/blend opacity so the randomizer's intensity + hero envelope
+      // actually scale duotone (it has no other strength control).
+      if (original) applyOpacityBlend(data, original, opacity);
+    } finally {
+      if (original) pool.release(original);
     }
   };
 };
