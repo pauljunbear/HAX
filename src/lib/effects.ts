@@ -9,6 +9,10 @@ import {
   mulberry32,
   SRGB_TO_LINEAR,
   linearToSrgbByte,
+  rgbToOklab,
+  oklabToRgb,
+  oklabLerp,
+  type Triplet,
 } from './effects/color-space';
 // Backward-mapping bilinear sampler: routes geometric warps through sub-pixel
 // sampling instead of Math.round/floor nearest-neighbor (removes stair-step jaggies).
@@ -477,11 +481,8 @@ export const applyEffect = async (
 
   try {
     switch (effectName) {
-      case 'brightness': {
-        // Convert from percentage (-100 to 100) to Konva range (-1 to 1)
-        const brightnessValue = (settings.value ?? 0) / 100;
-        return [Konva.Filters.Brighten, { brightness: brightnessValue }];
-      }
+      case 'brightness':
+        return [createBrightnessEffect(settings), {}];
 
       case 'contrast': {
         // Contrast already uses -100 to 100 range
@@ -489,14 +490,8 @@ export const applyEffect = async (
         return [Konva.Filters.Contrast, { contrast: contrastValue }];
       }
 
-      case 'saturation': {
-        // Konva applies HSL saturation as s = 2^value. Map the -100..100
-        // percent slider to a -1..1 exponent so +100 => 2x and -100 => ~0x.
-        // (The previous /10 produced 2^10 = 1024x at +100, clipping to pure
-        // primaries and collapsing the usable range to roughly +/-5.)
-        const scaledSaturation = (settings.value ?? 0) / 100;
-        return [Konva.Filters.HSL, { saturation: scaledSaturation }];
-      }
+      case 'saturation':
+        return [createSaturationEffect(settings), {}];
 
       case 'hue': {
         const hueDegrees = settings.value !== undefined ? settings.value : 0;
@@ -533,7 +528,7 @@ export const applyEffect = async (
       }
 
       case 'grayscale':
-        return [Konva.Filters.Grayscale, {}];
+        return [createGrayscaleEffect(), {}];
 
       case 'blackAndWhite':
         return [createBlackAndWhiteEffect(settings), {}];
@@ -1536,6 +1531,77 @@ const createUnifiedPatternEffect = (settings: Record<string, number>) => {
   };
 };
 
+/**
+ * Brightness as a midtone-preserving exposure scale in LINEAR light, not the
+ * additive byte offset Konva.Filters.Brighten used (which clipped highlights to
+ * flat white and lifted blacks to flat gray). value/100 -> stops (+/-1 stop at
+ * the slider extremes): out = encode(decode(in) * 2^stops). Mid-gray moves
+ * (128 -> ~176 at +100) while black stays black and the curve rolls the
+ * highlights off instead of crushing the ends.
+ */
+const createBrightnessEffect = (settings: Record<string, number>) => {
+  const value = clamp(settings.value ?? 0, -100, 100);
+  const lut = makeExposureLUT(value / 100);
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = lut[data[i]];
+      data[i + 1] = lut[data[i + 1]];
+      data[i + 2] = lut[data[i + 2]];
+      // Alpha untouched.
+    }
+  };
+};
+
+/**
+ * Saturation as a luma-preserving chroma scale about the Rec.601 luma axis
+ * (the same 0.299/0.587/0.114 weights the rest of this file uses). The -100..100
+ * slider maps to factor 0..2: -100 collapses every channel onto luma (a TRUE
+ * grayscale), 0 is identity, +100 doubles the distance from luma (strong boost).
+ * The old path used Konva's HSL filter (s = 2^value), so -100 only halved chroma
+ * (0.5x) instead of reaching zero.
+ */
+const createSaturationEffect = (settings: Record<string, number>) => {
+  const value = clamp(settings.value ?? 0, -100, 100);
+  const factor = 1 + value / 100; // -100 -> 0 (gray), 0 -> 1 (identity), +100 -> 2 (boost)
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+      data[i] = clampByte(luma + (r - luma) * factor);
+      data[i + 1] = clampByte(luma + (g - luma) * factor);
+      data[i + 2] = clampByte(luma + (b - luma) * factor);
+    }
+  };
+};
+
+/**
+ * Grayscale via BT.709 relative luminance computed in LINEAR light:
+ * linearize -> 0.2126R + 0.7152G + 0.0722B -> re-encode. This is the
+ * perceptually correct neutral conversion. The old path dispatched to Konva's
+ * Grayscale, whose ad-hoc gamma-space weights (0.34/0.5/0.16) are neither
+ * Rec.601 nor Rec.709 and ignore the sRGB transfer curve.
+ */
+const createGrayscaleEffect = () => {
+  return function (imageData: KonvaImageData) {
+    const { data } = imageData;
+    for (let i = 0; i < data.length; i += 4) {
+      const y =
+        0.2126 * SRGB_TO_LINEAR[data[i]] +
+        0.7152 * SRGB_TO_LINEAR[data[i + 1]] +
+        0.0722 * SRGB_TO_LINEAR[data[i + 2]];
+      const gray = linearToSrgbByte(y);
+      data[i] = gray;
+      data[i + 1] = gray;
+      data[i + 2] = gray;
+      // Alpha untouched.
+    }
+  };
+};
+
 // Black & White effect with adjustable contrast and brightness
 const createBlackAndWhiteEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -1580,42 +1646,53 @@ const createUnifiedMonoEffect = (settings: Record<string, number>) => {
     const contrast = (settings.contrast ?? 100) / 100;
     const brightness = (settings.brightness ?? 0) / 100;
 
-    // Tone color mappings (for highlights and shadows)
-    const toneColors = [
-      { h: [1.0, 1.0, 1.0], s: [0.0, 0.0, 0.0] }, // Gray: neutral
-      { h: [1.1, 0.95, 0.7], s: [0.3, 0.2, 0.1] }, // Sepia: warm brown
-      { h: [0.7, 0.9, 1.1], s: [0.05, 0.1, 0.25] }, // Cyanotype: blue
-      { h: [0.85, 0.95, 1.15], s: [0.1, 0.15, 0.2] }, // Cool: slight blue
-      { h: [1.15, 1.05, 0.85], s: [0.15, 0.1, 0.05] }, // Warm: orange/red
+    // Split-tone offsets in OKLab chroma (a, b) applied around the neutral gray
+    // axis: [shadowA, shadowB, highlightA, highlightB]. Tone 0 (Gray) is all
+    // zero => a TRUE grayscale. The tints add chroma to the shadows/highlights
+    // while OKLab L (the gray's lightness) is preserved, so nothing is
+    // multiplied down -- the old `gray*(h*t + s*(1-t))` with t = gray/255
+    // crushed neutral mid-gray to gray^2/255 (128 -> 64).
+    const toneTints: Array<[number, number, number, number]> = [
+      [0, 0, 0, 0], // Gray: neutral (true grayscale)
+      [0.035, 0.045, 0.02, 0.085], // Sepia: warm-brown shadows -> warm-yellow highlights
+      [-0.02, -0.11, -0.04, -0.06], // Cyanotype: deep blue
+      [-0.015, -0.05, -0.01, -0.035], // Cool: gentle blue
+      [0.05, 0.05, 0.03, 0.075], // Warm: red shadows -> orange highlights
     ];
+    const [sa, sb, ha, hb] = toneTints[tone] || toneTints[0];
 
-    const toneConfig = toneColors[tone] || toneColors[0];
+    // The tinted output depends only on the post-tone gray byte, so precompute
+    // gray -> RGB once and keep the per-pixel path a table read.
+    const rLut = new Uint8ClampedArray(256);
+    const gLut = new Uint8ClampedArray(256);
+    const bLut = new Uint8ClampedArray(256);
+    for (let v = 0; v < 256; v++) {
+      const L = rgbToOklab([v, v, v])[0];
+      const t = v / 255; // 0 = shadow, 1 = highlight
+      const aa = sa * (1 - t) + ha * t;
+      const bb = sb * (1 - t) + hb * t;
+      const [or, og, ob] = oklabToRgb([L, aa, bb]);
+      rLut[v] = or;
+      gLut[v] = og;
+      bLut[v] = ob;
+    }
 
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
 
-      // Convert to grayscale using luminance formula
+      // Convert to grayscale, then apply brightness + contrast (centered at 128).
       let gray = r * 0.299 + g * 0.587 + b * 0.114;
-
-      // Apply brightness
       gray = gray + brightness * 255;
-
-      // Apply contrast (centered at 128)
       gray = (gray - 128) * contrast + 128;
+      const gv = clampByte(gray);
 
-      // Clamp
-      gray = clampByte(gray);
+      const outR = rLut[gv];
+      const outG = gLut[gv];
+      const outB = bLut[gv];
 
-      // Apply tone coloring based on brightness
-      const t = gray / 255; // 0 = shadow, 1 = highlight
-
-      const outR = gray * (toneConfig.h[0] * t + toneConfig.s[0] * (1 - t));
-      const outG = gray * (toneConfig.h[1] * t + toneConfig.s[1] * (1 - t));
-      const outB = gray * (toneConfig.h[2] * t + toneConfig.s[2] * (1 - t));
-
-      // Blend with original based on intensity
+      // Blend with original based on intensity.
       data[i] = clampByte(r * (1 - intensity) + outR * intensity);
       data[i + 1] = clampByte(g * (1 - intensity) + outG * intensity);
       data[i + 2] = clampByte(b * (1 - intensity) + outB * intensity);
@@ -1631,15 +1708,31 @@ const createDuotoneEffect = (settings: Record<string, number>) => {
     const color2 = settings.color2 ? hexToRgb(settings.color2) : { r: 255, g: 255, b: 0 };
     const opacity = settings.opacity ?? 1;
 
+    // Ramp shadow -> highlight in OKLab so the midtones keep their colour instead
+    // of dipping through the muddy, desaturated gray a naive sRGB lerp produces.
+    // The mapping depends only on luma, so bake it into a 256-entry LUT keyed by
+    // the Rec.601 luma byte and keep the per-pixel path a table read.
+    const a: Triplet = [color1.r, color1.g, color1.b];
+    const b: Triplet = [color2.r, color2.g, color2.b];
+    const rLut = new Uint8ClampedArray(256);
+    const gLut = new Uint8ClampedArray(256);
+    const bLut = new Uint8ClampedArray(256);
+    for (let t = 0; t < 256; t++) {
+      const [or, og, ob] = oklabLerp(a, b, t / 255);
+      rLut[t] = or;
+      gLut[t] = og;
+      bLut[t] = ob;
+    }
+
     const pool = getBufferPool();
     const original = opacity < 1 ? pool.acquire(data.length) : null;
     try {
       if (original) original.set(data);
       for (let i = 0; i < data.length; i += 4) {
-        const brightness = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
-        data[i] = Math.round(color1.r * (1 - brightness) + color2.r * brightness);
-        data[i + 1] = Math.round(color1.g * (1 - brightness) + color2.g * brightness);
-        data[i + 2] = Math.round(color1.b * (1 - brightness) + color2.b * brightness);
+        const luma = clampByte(data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+        data[i] = rLut[luma];
+        data[i + 1] = gLut[luma];
+        data[i + 2] = bLut[luma];
       }
       // Honour layer/blend opacity so the randomizer's intensity + hero envelope
       // actually scale duotone (it has no other strength control).
@@ -10400,17 +10493,29 @@ const createLensFlareEffect = (settings: Record<string, number>) => {
 // Selective Color Effect Implementation
 const createSelectiveColorEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
-    const { data, width, height } = imageData;
+    const { data } = imageData;
     const targetHue = settings.hue ?? 0; // Target hue in degrees
     const range = settings.range ?? 30; // Hue range in degrees
     const saturationBoost = settings.saturation ?? 1.5;
+    // Feather band beyond the hard range: the selection eases from full to none
+    // across it, so the edge of the kept-colour region isn't a 1px aliased step.
+    const feather = Math.max(8, range * 0.5);
+
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
 
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i] / 255;
       const g = data[i + 1] / 255;
       const b = data[i + 2] / 255;
 
-      // Convert RGB to HSL
+      // Convert RGB to HSL (for hue selection + saturation manipulation).
       const max = Math.max(r, g, b);
       const min = Math.min(r, g, b);
       const l = (max + min) / 2;
@@ -10436,38 +10541,39 @@ const createSelectiveColorEffect = (settings: Record<string, number>) => {
 
       h *= 360; // Convert to degrees
 
-      // Check if color is within target range
       let hueDiff = Math.abs(h - targetHue);
       if (hueDiff > 180) hueDiff = 360 - hueDiff;
 
+      // Smooth membership weight: 1 inside the range, smoothstep down to 0 across
+      // the feather band (replaces the old hard, aliased in/out cutoff).
+      let w: number;
       if (hueDiff <= range) {
-        // Color is within range - keep it and boost saturation
-        s = Math.min(1, s * saturationBoost);
-
-        // Convert back to RGB
-        const hue2rgb = (p: number, q: number, t: number) => {
-          if (t < 0) t += 1;
-          if (t > 1) t -= 1;
-          if (t < 1 / 6) return p + (q - p) * 6 * t;
-          if (t < 1 / 2) return q;
-          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-          return p;
-        };
-
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        const p = 2 * l - q;
-        const hNorm = h / 360;
-
-        data[i] = Math.round(hue2rgb(p, q, hNorm + 1 / 3) * 255);
-        data[i + 1] = Math.round(hue2rgb(p, q, hNorm) * 255);
-        data[i + 2] = Math.round(hue2rgb(p, q, hNorm - 1 / 3) * 255);
+        w = 1;
+      } else if (hueDiff >= range + feather) {
+        w = 0;
       } else {
-        // Color is outside range - desaturate it
-        const gray = Math.round(l * 255);
-        data[i] = gray;
-        data[i + 1] = gray;
-        data[i + 2] = gray;
+        const x = (hueDiff - range) / feather;
+        w = 1 - x * x * (3 - 2 * x);
       }
+
+      // Out-of-selection target: desaturate using Rec.601 LUMA (perceptually
+      // weighted), not HSL lightness (the simple max/min midpoint, which reads
+      // too bright for blue and too dark for yellow).
+      const grayLuma = 0.299 * r + 0.587 * g + 0.114 * b;
+
+      // In-selection target: same hue/lightness with boosted saturation.
+      const sBoost = Math.min(1, s * saturationBoost);
+      const q = l < 0.5 ? l * (1 + sBoost) : l + sBoost - l * sBoost;
+      const p = 2 * l - q;
+      const hNorm = h / 360;
+      const selR = hue2rgb(p, q, hNorm + 1 / 3);
+      const selG = hue2rgb(p, q, hNorm);
+      const selB = hue2rgb(p, q, hNorm - 1 / 3);
+
+      // Blend desaturated -> selected by the feathered weight.
+      data[i] = clampByte((grayLuma + (selR - grayLuma) * w) * 255);
+      data[i + 1] = clampByte((grayLuma + (selG - grayLuma) * w) * 255);
+      data[i + 2] = clampByte((grayLuma + (selB - grayLuma) * w) * 255);
     }
   };
 };
@@ -10590,6 +10696,26 @@ const createGradientMapEffect = (settings: Record<string, number>) => {
     const midpoint = clamp(settings.midpoint ?? 0.5, 0.1, 0.9);
     const strength = clamp(settings.strength ?? 1, 0, 1);
 
+    // Interpolate the shadow -> mid -> highlight ramp in OKLab so the midtones
+    // keep their colour rather than muddying through a naive sRGB lerp. The map
+    // depends only on luma, so bake it into a 256-entry LUT keyed by luma byte.
+    const sh: Triplet = [shadow.r, shadow.g, shadow.b];
+    const md: Triplet = [mid.r, mid.g, mid.b];
+    const hl: Triplet = [highlight.r, highlight.g, highlight.b];
+    const rLut = new Uint8ClampedArray(256);
+    const gLut = new Uint8ClampedArray(256);
+    const bLut = new Uint8ClampedArray(256);
+    for (let v = 0; v < 256; v++) {
+      const t = v / 255;
+      const mapped =
+        t <= midpoint
+          ? oklabLerp(sh, md, midpoint > 0 ? t / midpoint : 0)
+          : oklabLerp(md, hl, midpoint < 1 ? (t - midpoint) / (1 - midpoint) : 1);
+      rLut[v] = mapped[0];
+      gLut[v] = mapped[1];
+      bLut[v] = mapped[2];
+    }
+
     for (let i = 0; i < data.length; i += 4) {
       const a = data[i + 3];
       if (a === 0) continue;
@@ -10597,27 +10723,11 @@ const createGradientMapEffect = (settings: Record<string, number>) => {
       const r0 = data[i];
       const g0 = data[i + 1];
       const b0 = data[i + 2];
-      const t = (0.299 * r0 + 0.587 * g0 + 0.114 * b0) / 255;
+      const luma = clampByte(0.299 * r0 + 0.587 * g0 + 0.114 * b0);
 
-      let mr = 0;
-      let mg = 0;
-      let mb = 0;
-
-      if (t <= midpoint) {
-        const u = t / midpoint;
-        mr = lerp(shadow.r, mid.r, u);
-        mg = lerp(shadow.g, mid.g, u);
-        mb = lerp(shadow.b, mid.b, u);
-      } else {
-        const u = (t - midpoint) / (1 - midpoint);
-        mr = lerp(mid.r, highlight.r, u);
-        mg = lerp(mid.g, highlight.g, u);
-        mb = lerp(mid.b, highlight.b, u);
-      }
-
-      data[i] = clampByte(lerp(r0, mr, strength));
-      data[i + 1] = clampByte(lerp(g0, mg, strength));
-      data[i + 2] = clampByte(lerp(b0, mb, strength));
+      data[i] = clampByte(lerp(r0, rLut[luma], strength));
+      data[i + 1] = clampByte(lerp(g0, gLut[luma], strength));
+      data[i + 2] = clampByte(lerp(b0, bLut[luma], strength));
       data[i + 3] = a;
     }
   };
@@ -10629,37 +10739,41 @@ const createCinematicLutEffect = (settings: Record<string, number>) => {
     const preset = Math.floor(settings.preset ?? 0);
     const strength = clamp(settings.strength ?? 0.75, 0, 1);
 
+    // Grade at FULL intensity here; `strength` is applied exactly once, by the
+    // outer lerp toward this graded colour. Previously every preset scaled its
+    // own terms by `strength` AND the loop lerped by `strength` again -- a
+    // double-dip that made the slider behave roughly quadratically.
     const applyPreset = (r: number, g: number, b: number): [number, number, number] => {
       const l = 0.299 * r + 0.587 * g + 0.114 * b;
       const t = l / 255;
 
       switch (preset) {
         case 1: {
-          const k = 1 + 5 * strength;
+          const k = 1 + 5;
           const l2 = toneCurve01(t, k) * 255;
-          const desat = 0.65 * strength;
+          const desat = 0.65;
           const rr = lerp(r, l2, desat);
           const gg = lerp(g, l2, desat);
           const bb = lerp(b, l2, desat);
           return [rr, gg, bb];
         }
         case 2: {
-          const lift = 18 * strength;
-          const fade = 1 - 0.15 * strength;
-          const rr = r * fade + lift + (t > 0.6 ? 10 * strength : 0);
+          const lift = 18;
+          const fade = 1 - 0.15;
+          const rr = r * fade + lift + (t > 0.6 ? 10 : 0);
           const gg = g * fade + lift;
-          const bb = b * fade + lift - (t > 0.6 ? 8 * strength : 0);
+          const bb = b * fade + lift - (t > 0.6 ? 8 : 0);
           return [rr, gg, bb];
         }
         case 3: {
-          const k = Math.max(0.2, 1 - 0.6 * strength);
+          const k = Math.max(0.2, 1 - 0.6);
           const l2 = toneCurve01(t, k) * 255;
-          const sat = 1 - 0.35 * strength;
+          const sat = 1 - 0.35;
           let rr = l2 + (r - l2) * sat;
           let gg = l2 + (g - l2) * sat;
           const bb = l2 + (b - l2) * sat;
-          rr += 10 * strength;
-          gg += 4 * strength;
+          rr += 10;
+          gg += 4;
           return [rr, gg, bb];
         }
         default: {
@@ -10670,13 +10784,13 @@ const createCinematicLutEffect = (settings: Record<string, number>) => {
           let gg = g;
           let bb = b;
 
-          rr *= 1 - 0.12 * strength * shadow;
-          gg += 18 * strength * shadow;
-          bb += 28 * strength * shadow;
+          rr *= 1 - 0.12 * shadow;
+          gg += 18 * shadow;
+          bb += 28 * shadow;
 
-          rr += 34 * strength * highlight;
-          gg += 14 * strength * highlight;
-          bb *= 1 - 0.12 * strength * highlight;
+          rr += 34 * highlight;
+          gg += 14 * highlight;
+          bb *= 1 - 0.12 * highlight;
 
           return [rr, gg, bb];
         }
