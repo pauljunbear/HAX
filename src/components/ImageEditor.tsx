@@ -10,10 +10,10 @@ import React, {
 } from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from '@/hooks/useImage';
-import { applyEffect } from '@/lib/effects';
 import type { EffectLayer } from '@/hooks/useEffectLayers';
 import { PrefixRenderCache } from '@/lib/performance/LayerPipeline';
-import type { LayerSpec, PipelineFilter } from '@/lib/performance/LayerPipeline';
+import { buildSpecs } from '@/lib/effects/renderStack';
+import type { ClosureResult } from '@/lib/effects/renderStack';
 import { getWebGL2Renderer } from '@/lib/webgl/WebGL2Renderer';
 import type { GpuPass } from '@/lib/webgl/WebGL2Renderer';
 import { isGpuSupportedEffect, buildGpuPass } from '@/lib/webgl/gpuEffects';
@@ -30,8 +30,6 @@ function gpuEnabled(): boolean {
   }
 }
 
-type FilterParams = Record<string, unknown>;
-type FilterResult = [((imageData: ImageData) => void) | null, FilterParams | null];
 type KonvaImageNode = Konva.Image & Record<string, unknown>;
 type TemporaryStageResources = {
   container: HTMLDivElement;
@@ -270,7 +268,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const [error, setError] = useState<string | null>(null);
     const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 });
-    const effectCacheRef = useRef<Map<string, FilterResult>>(new Map());
+    const effectCacheRef = useRef<Map<string, ClosureResult>>(new Map());
     // Prefix cache of cumulative processed buffers, so editing layer k reuses
     // the cached result of layers [0..k-1] instead of re-running the whole stack.
     const prefixCacheRef = useRef<PrefixRenderCache>(new PrefixRenderCache());
@@ -294,42 +292,15 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
             return;
           }
 
-          // Resolve each visible layer's [filter, params] (closure-cached so we
-          // don't re-create effect closures), then run the whole stack as ONE
-          // composite filter backed by the prefix cache. Params for Konva
-          // built-ins are carried on the spec (applied via a proxy `this` inside
-          // the pipeline) instead of being mutated onto the node, so we no
-          // longer need to reset/set node filter props here.
-          const specs: LayerSpec[] = [];
-          for (const layer of effectLayers) {
-            if (layer.visible && layer.effectId) {
-              const settings = (layer.settings || {}) as Record<string, number>;
-              const cacheKey = `${layer.effectId}:${JSON.stringify(settings)}`;
-
-              let cached = effectCacheRef.current.get(cacheKey);
-              if (!cached) {
-                cached = await applyEffect(layer.effectId, settings);
-                effectCacheRef.current.set(cacheKey, cached);
-
-                if (effectCacheRef.current.size > MAX_CACHE_ENTRIES) {
-                  const firstKey = effectCacheRef.current.keys().next().value;
-                  if (firstKey) effectCacheRef.current.delete(firstKey);
-                }
-              }
-
-              const [filter, params] = cached;
-              if (filter) {
-                const opacity = layer.opacity ?? 1;
-                specs.push({
-                  // opacity in the sig so a cached prefix is invalidated when it changes
-                  sig: `${cacheKey}|o${opacity}`,
-                  effectId: layer.effectId,
-                  filter: filter as unknown as PipelineFilter,
-                  params: (params || {}) as Record<string, number>,
-                  opacity,
-                });
-              }
-            }
+          // Resolve the stack into LayerSpecs via the SHARED renderStack module
+          // (the same one the render worker uses, so main == worker byte-for-byte).
+          // effectCacheRef memoizes the built closures across renders; buildSpecs
+          // only inserts, so bound it here.
+          const specs = await buildSpecs(effectLayers, effectCacheRef.current);
+          while (effectCacheRef.current.size > MAX_CACHE_ENTRIES) {
+            const firstKey = effectCacheRef.current.keys().next().value;
+            if (!firstKey) break;
+            effectCacheRef.current.delete(firstKey);
           }
 
           if (specs.length === 0) {
