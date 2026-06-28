@@ -41,6 +41,7 @@
   <button data-k="warps" aria-pressed="false">Warps (bilinear)</button>
   <button data-k="looks" aria-pressed="false">Looks UI</button>
   <button data-k="phase5" aria-pressed="false">Color-space fixes</button>
+  <button data-k="honesty" aria-pressed="false">Honesty pass</button>
 </nav>
 <main>
   <figure data-k="portrait"><img src="./sheet-portrait.png" alt="Film stocks on a portrait" /><figcaption>Best for skin-tone rendering and the warm/cool split-tones.</figcaption></figure>
@@ -51,6 +52,7 @@
   <figure data-k="warps" class="hide"><img src="./warps.png" alt="Geometric warps via the new bilinear sampler" /><figcaption>Geometric warps now sample through a shared bilinear sampler (was nearest-neighbor → jaggies). Smooth swirl, sharp kaleidoscope mirrors, clean fisheye/spherize; pixelExplosion is backward-mapped (no holes).</figcaption></figure>
   <figure data-k="looks" class="hide"><img src="./looks-dock.png" alt="The Looks gallery dock in the live skin" /><figcaption>The new Looks gallery (curated one-click recipes) sits above the Randomizer in the dock — matching the void-darkroom pill aesthetic, never over the hero. Randomizer also shows the 3 new moods (Cinematic, Print Shop, Monochrome).</figcaption></figure>
   <figure data-k="phase5" class="hide"><img src="./phase5.png" alt="Phase 5 color-space corrections" /><figcaption>Color-space sweep (each tile has a gradient strip below to reveal midtone smoothness): Saturation −100 now reaches true gray; Brightness is midtone-preserving (no clipping); Duotone & Gradient Map interpolate in OKLab (no muddy mid); unifiedMono Gray is a true neutral; grayscale is BT.709; cinematicLut double-strength fixed.</figcaption></figure>
+  <figure data-k="honesty" class="hide"><img src="./honesty.png" alt="Honesty pass — rebuilt gimmick effects" /><figcaption>The mislabeled/content-independent effects, rebuilt to respond to the image: Relight = real normal-from-luminance directional light; Stained Glass & Crystal Facets = real grid-bucketed Voronoi (cells / facets, was a square mosaic / a no-op); Dream Flow, Holographic Foil, Liquid Chrome now follow image contours & highlights (seeded, performant).</figcaption></figure>
 </main>
 <script>
   const tabs = document.getElementById('tabs');
