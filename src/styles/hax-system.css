@@ -131,12 +131,28 @@ html.theme-hax .glass-input {
   padding-left: 34px !important;
 }
 html.theme-hax .glass-input::placeholder {
-  color: var(--ink-3) !important;
+  color: var(--ink-2) !important; /* AA contrast on void */
 }
 html.theme-hax .glass-input:focus {
   border-color: rgba(245, 48, 1, 0.55) !important;
-  outline: none !important;
   background: var(--raise-2) !important;
+}
+
+/* ---- keyboard focus: a visible Cinnabar ring everywhere (no mouse outline) ---- */
+html.theme-hax :focus:not(:focus-visible) {
+  outline: none;
+}
+html.theme-hax button:focus-visible,
+html.theme-hax a:focus-visible,
+html.theme-hax input:focus-visible,
+html.theme-hax [role='button']:focus-visible,
+html.theme-hax .glass-input:focus-visible,
+html.theme-hax .glass-button:focus-visible,
+html.theme-hax .glass-effect-button:focus-visible,
+html.theme-hax .tabs-trigger:focus-visible {
+  outline: 2px solid var(--spark) !important;
+  outline-offset: 2px !important;
+  border-radius: 6px;
 }
 
 /* ---- category header rows ---- */
@@ -316,7 +332,7 @@ html.theme-hax .hx-topbar {
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: -0.01em;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .hx-topbar-btn {
   display: inline-flex;
@@ -356,4 +372,16 @@ html.theme-hax .hx-dock {
   background: var(--panel);
   border-top: 1px solid var(--hair);
   z-index: 20;
+}
+
+/* ---- respect the OS reduced-motion preference ---- */
+@media (prefers-reduced-motion: reduce) {
+  html.theme-hax *,
+  html.theme-hax *::before,
+  html.theme-hax *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

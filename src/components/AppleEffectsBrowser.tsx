@@ -73,7 +73,7 @@ const EffectButton = memo(function EffectButton({
   onClick,
   onToggleFavorite,
 }: EffectButtonProps) {
-  const ref = useRef<HTMLButtonElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [thumb, setThumb] = useState<string | null>(null);
   const gradient = useMemo(() => getEffectGradient(effectId), [effectId]);
@@ -120,51 +120,64 @@ const EffectButton = memo(function EffectButton({
     [onToggleFavorite, effectId]
   );
 
+  // Wrapper holds the tile button + the favorite button as SIBLINGS (never
+  // nest interactive elements). The tile toggles the effect on re-click, so
+  // aria-pressed reflects the applied state.
   return (
-    <motion.button
+    <div
       ref={ref}
-      onClick={handleClick}
-      disabled={!hasImage}
-      title={label}
-      className={`group relative w-full overflow-hidden rounded-lg text-left
+      className={`group relative w-full overflow-hidden rounded-lg
         ${isActive ? 'ring-2 ring-[#F53001]' : 'ring-1 ring-white/10'}
-        ${!hasImage ? 'opacity-40 cursor-not-allowed' : ''}`}
+        ${!hasImage ? 'opacity-40' : ''}`}
       style={{ aspectRatio: '4 / 3', background: '#0c0c0e' }}
-      whileHover={hasImage && !isActive ? { y: -1 } : {}}
-      whileTap={hasImage ? { scale: 0.98 } : {}}
     >
-      {thumb ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover" />
-      ) : (
-        <div
-          className={`absolute inset-0 bg-gradient-to-br ${gradient.from} ${gradient.to} opacity-50`}
-        />
-      )}
-
-      <span
-        className="absolute inset-x-0 bottom-0 px-2 pt-5 pb-1.5 text-[11px] font-medium text-white truncate"
-        style={{ background: 'linear-gradient(180deg,transparent,rgba(0,0,0,.8))' }}
+      <motion.button
+        type="button"
+        onClick={handleClick}
+        disabled={!hasImage}
+        aria-label={`${label}${isActive ? ' (applied)' : ''}`}
+        aria-pressed={isActive}
+        title={label}
+        className={`absolute inset-0 h-full w-full text-left ${!hasImage ? 'cursor-not-allowed' : ''}`}
+        whileHover={hasImage && !isActive ? { y: -1 } : {}}
+        whileTap={hasImage ? { scale: 0.98 } : {}}
       >
-        {label}
-      </span>
+        {thumb ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumb} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <div
+            className={`absolute inset-0 bg-gradient-to-br ${gradient.from} ${gradient.to} opacity-50`}
+          />
+        )}
 
-      {isActive && (
-        <span className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#F53001]">
-          <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+        <span
+          className="absolute inset-x-0 bottom-0 truncate px-2 pb-1.5 pt-5 text-[11px] font-medium text-white"
+          style={{ background: 'linear-gradient(180deg,transparent,rgba(0,0,0,.8))' }}
+        >
+          {label}
         </span>
-      )}
 
-      <div
+        {isActive && (
+          <span className="absolute left-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#F53001]">
+            <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+          </span>
+        )}
+      </motion.button>
+
+      <button
+        type="button"
         onClick={handleFavoriteClick}
-        className={`absolute right-1 top-1 z-20 rounded p-0.5 transition-all
-          ${isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-80'} hover:scale-110`}
+        aria-label={isFavorite ? `Remove ${label} from favorites` : `Add ${label} to favorites`}
+        aria-pressed={isFavorite}
+        className={`absolute right-1 top-1 z-20 rounded p-0.5 transition-all hover:scale-110
+          ${isFavorite ? 'opacity-100' : 'opacity-0 focus-visible:opacity-100 group-hover:opacity-80'}`}
       >
         <Star
           className={`h-3.5 w-3.5 ${isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-white/80'}`}
         />
-      </div>
-    </motion.button>
+      </button>
+    </div>
   );
 });
 
@@ -338,6 +351,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
             <div key="Favorites">
               <button
                 onClick={() => toggleCategory('Favorites')}
+                aria-expanded={!collapsedCategories.has('Favorites')}
                 className={`
                   w-full flex items-center justify-between px-3 py-2.5 text-left
                   transition-all rounded-xl group relative overflow-hidden glass-effect-button
@@ -398,6 +412,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
             <div key="Recently Used">
               <button
                 onClick={() => toggleCategory('Recently Used')}
+                aria-expanded={!collapsedCategories.has('Recently Used')}
                 className={`
                   w-full flex items-center justify-between px-3 py-2.5 text-left
                   transition-all rounded-xl group relative overflow-hidden glass-effect-button
@@ -463,6 +478,7 @@ const AppleEffectsBrowser: React.FC<AppleEffectsBrowserProps> = ({
                   {/* Category Header */}
                   <button
                     onClick={() => toggleCategory(category)}
+                    aria-expanded={isExpanded}
                     className={`
                       w-full flex items-center justify-between px-3 py-2.5 text-left
                       transition-all rounded-xl group relative overflow-hidden glass-effect-button

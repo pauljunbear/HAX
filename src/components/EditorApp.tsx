@@ -16,6 +16,7 @@ import type { EffectLayer } from '@/hooks/useEffectLayers';
 import type { ImageEditorHandle } from './ImageEditor';
 import { compose, type RecipeLayer } from '@/lib/randomizer/compose';
 import { randSeed } from '@/lib/randomizer/seed';
+import { useKeyboardShortcuts, type KeyboardShortcut } from '@/hooks/useKeyboardShortcuts';
 
 export default function EditorApp() {
   const selectedImage = useAppStore(state => state.selectedImage);
@@ -342,6 +343,56 @@ export default function EditorApp() {
     []
   );
 
+  // ---- Before/after compare ----
+  const [showBeforeAfter, setShowBeforeAfter] = useState(false);
+  const [capturedEffectedUrl, setCapturedEffectedUrl] = useState<string | null>(null);
+
+  const handleToggleBeforeAfter = useCallback(() => {
+    setShowBeforeAfter(prev => {
+      const next = !prev;
+      if (next) {
+        // Capture the current effected canvas at toggle time (accept ~1 frame lag).
+        const url =
+          imageEditorRef.current?.getStage()?.toDataURL({ mimeType: 'image/png', pixelRatio: 1 }) ??
+          null;
+        setCapturedEffectedUrl(url);
+      }
+      return next;
+    });
+  }, []);
+
+  // ---- Keyboard shortcuts (Ctrl/Cmd + …). Undo (Cmd+Z) + reroll (Space) stay
+  // in the scoped manual listener above; everything safe-to-fire lives here. ----
+  const shortcuts = useMemo<KeyboardShortcut[]>(
+    () => [
+      { key: 'o', ctrlKey: true, action: handleImageSelect, description: 'Open image' },
+      { key: 'e', ctrlKey: true, action: () => handleExport('png'), description: 'Export PNG' },
+      { key: 'b', ctrlKey: true, action: handleToggleBeforeAfter, description: 'Before / after' },
+      {
+        key: 'Delete',
+        action: () => {
+          if (activeEffectLayerId) removeEffectLayer(activeEffectLayerId);
+        },
+        description: 'Remove selected effect',
+      },
+      {
+        key: 'Backspace',
+        action: () => {
+          if (activeEffectLayerId) removeEffectLayer(activeEffectLayerId);
+        },
+        description: 'Remove selected effect',
+      },
+    ],
+    [
+      handleImageSelect,
+      handleExport,
+      handleToggleBeforeAfter,
+      activeEffectLayerId,
+      removeEffectLayer,
+    ]
+  );
+  useKeyboardShortcuts({ shortcuts, enabled: !!selectedImage });
+
   if (!isReady) {
     return null; // Or a very minimal loader
   }
@@ -383,6 +434,9 @@ export default function EditorApp() {
             onReorderLayers={reorderLayers}
             onExport={handleExport}
             onEstimateFileSize={handleEstimateFileSize}
+            showBeforeAfter={showBeforeAfter}
+            onToggleBeforeAfter={handleToggleBeforeAfter}
+            capturedEffectedUrl={capturedEffectedUrl}
           >
             <div id="main-content" className="w-full h-full flex flex-col">
               <div className="flex-1 min-h-0 relative">

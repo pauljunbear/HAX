@@ -16,7 +16,6 @@ interface RandomizerBarProps {
 
 const INK = '#ECEAE3';
 const INK2 = '#A8A49A';
-const INK3 = '#6E6B62';
 const SPARK = '#F53001';
 const HAIR = 'rgba(255,255,255,.1)';
 const RAISE = 'rgba(255,255,255,.05)';
@@ -49,13 +48,14 @@ export default function RandomizerBar({
       <button
         onClick={onSurprise}
         title="Compose a fresh look (Space)"
+        aria-label="Compose a fresh look"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: 8,
-          height: 36,
-          padding: '0 16px',
-          borderRadius: 10,
+          height: 44,
+          padding: '0 20px',
+          borderRadius: 11,
           border: 0,
           cursor: 'pointer',
           background: SPARK,
@@ -72,14 +72,15 @@ export default function RandomizerBar({
       <button
         onClick={onReroll}
         title="Reroll unlocked layers (Space)"
+        aria-label="Reroll unlocked layers"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 7,
-          height: 36,
-          padding: '0 13px',
-          borderRadius: 10,
+          height: 44,
+          padding: '0 18px',
+          borderRadius: 11,
           border: `1px solid ${HAIR}`,
           background: RAISE,
           color: INK,
@@ -102,9 +103,12 @@ export default function RandomizerBar({
             <button
               key={id}
               onClick={() => onMood(id)}
+              aria-label={`${MOODS[id].name} mood`}
+              aria-pressed={on}
               style={{
                 fontSize: 12,
-                padding: '6px 12px',
+                minHeight: 44,
+                padding: '8px 16px',
                 borderRadius: 999,
                 cursor: 'pointer',
                 border: '1px solid ' + (on ? SPARK : HAIR),
@@ -123,7 +127,7 @@ export default function RandomizerBar({
       <div style={{ flex: 1, minWidth: 12 }} />
 
       {/* Wildness */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 11.5, color: INK3 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 11.5, color: INK2 }}>
         <span>calm</span>
         <input
           type="range"
@@ -133,6 +137,7 @@ export default function RandomizerBar({
           onChange={e => onWildness(Number(e.target.value) / 100)}
           style={{ width: 96, accentColor: SPARK, cursor: 'pointer' }}
           title="Wildness"
+          aria-label="Wildness"
         />
         <span>wild</span>
       </div>
@@ -142,7 +147,7 @@ export default function RandomizerBar({
         style={{
           fontFamily: 'var(--font-jetbrains, ui-monospace), Menlo, monospace',
           fontSize: 11,
-          color: INK3,
+          color: INK2,
           minWidth: 56,
           textAlign: 'right',
         }}

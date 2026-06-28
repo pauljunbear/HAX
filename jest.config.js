@@ -17,15 +17,9 @@ const customJestConfig = {
   transform: {
     '^.+\\.(ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
   },
-  transformIgnorePatterns: ['node_modules/(?!(@react-three|three)/)'],
+  transformIgnorePatterns: ['node_modules/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@react-three/fiber$': '<rootDir>/src/components/__mocks__/react-three-fiber.tsx',
-    '^@react-three/drei$': '<rootDir>/src/components/__mocks__/react-three-fiber.tsx',
-    '^three$': '<rootDir>/src/components/__mocks__/three.js',
-    '^test-module$': '<rootDir>/src/__mocks__/dynamic-modules/test-module.js',
-    '^dependency-module$': '<rootDir>/src/__mocks__/dynamic-modules/dependency-module.js',
-    '^large-module$': '<rootDir>/src/__mocks__/dynamic-modules/large-module.js',
     '\\.(css|less|sass|scss)$': 'identity-obj-proxy',
     '\\.(gif|ttf|eot|svg|png)$': '<rootDir>/src/components/__mocks__/fileMock.js',
   },
