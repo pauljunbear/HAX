@@ -379,6 +379,12 @@ export default function StudioApp() {
     [setStack]
   );
 
+  /* empty the whole stack in one move (vs ✕-ing each layer by hand) */
+  const clearAll = useCallback(() => {
+    setSeed('');
+    clearLayers();
+  }, [clearLayers]);
+
   /* Surprise (mood + calm↔wild) */
   const handleSurprise = useCallback(() => {
     const s = randSeed();
@@ -662,11 +668,37 @@ export default function StudioApp() {
               }}
             >
               <span style={{ fontWeight: 500, fontSize: 12, color: C.dim }}>Your stack</span>
-              <span style={{ fontSize: 11, color: C.dim }}>
-                {layers.length === 0
-                  ? 'empty'
-                  : `${layers.length} effect${layers.length > 1 ? 's' : ''}`}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 13 }}>
+                {layers.length > 0 ? (
+                  <button
+                    onClick={clearAll}
+                    title="Remove all effects"
+                    style={{
+                      background: 'none',
+                      border: 0,
+                      padding: 0,
+                      cursor: 'pointer',
+                      fontFamily: FONT,
+                      fontSize: 11,
+                      color: C.dim,
+                      transition: 'color .15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.color = C.spark;
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.color = C.dim;
+                    }}
+                  >
+                    Clear all
+                  </button>
+                ) : null}
+                <span style={{ fontSize: 11, color: C.dim }}>
+                  {layers.length === 0
+                    ? 'empty'
+                    : `${layers.length} effect${layers.length > 1 ? 's' : ''}`}
+                </span>
+              </div>
             </div>
             {layers.length === 0 ? (
               <div style={{ padding: '2px 0 4px' }}>
