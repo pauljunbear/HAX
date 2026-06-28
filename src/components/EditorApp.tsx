@@ -16,6 +16,8 @@ import type { EffectLayer } from '@/hooks/useEffectLayers';
 import type { ImageEditorHandle } from './ImageEditor';
 import { compose, type RecipeLayer } from '@/lib/randomizer/compose';
 import { randSeed } from '@/lib/randomizer/seed';
+import LooksGallery from '@/components/LooksGallery';
+import { LOOKS, lookToStackLayers, type Look } from '@/lib/looks/looks';
 import { useKeyboardShortcuts, type KeyboardShortcut } from '@/hooks/useKeyboardShortcuts';
 
 export default function EditorApp() {
@@ -97,6 +99,17 @@ export default function EditorApp() {
   );
   const handleSurprise = useCallback(() => runRandomizer(true), [runRandomizer]);
   const handleReroll = useCallback(() => runRandomizer(false), [runRandomizer]);
+
+  // Apply a curated Look: replace the stack with its recipe (snapshot for undo).
+  // Fully editable afterward — the stack stays decomposable.
+  const handleApplyLook = useCallback(
+    (look: Look) => {
+      snapshot();
+      setSeed('');
+      setStack(lookToStackLayers(look));
+    },
+    [snapshot, setStack]
+  );
 
   const handleMood = useCallback(
     (id: string) => {
@@ -473,15 +486,18 @@ export default function EditorApp() {
                 )}
               </div>
               {!imageLoading && (
-                <RandomizerBar
-                  moodId={moodId}
-                  wildness={wildness}
-                  seed={seed}
-                  onMood={handleMood}
-                  onWildness={handleWildness}
-                  onSurprise={handleSurprise}
-                  onReroll={handleReroll}
-                />
+                <>
+                  <LooksGallery looks={LOOKS} onApply={handleApplyLook} />
+                  <RandomizerBar
+                    moodId={moodId}
+                    wildness={wildness}
+                    seed={seed}
+                    onMood={handleMood}
+                    onWildness={handleWildness}
+                    onSurprise={handleSurprise}
+                    onReroll={handleReroll}
+                  />
+                </>
               )}
             </div>
           </AppleStyleLayout>

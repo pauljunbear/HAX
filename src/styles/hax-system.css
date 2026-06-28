@@ -374,6 +374,22 @@ html.theme-hax .hx-dock {
   z-index: 20;
 }
 
+/* ---- curated Looks chips ---- */
+html.theme-hax .hx-look-chip {
+  border: 1px solid var(--hair);
+  background: var(--raise, rgba(255, 255, 255, 0.05));
+  color: var(--ink-2);
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+html.theme-hax .hx-look-chip:hover {
+  color: var(--ink);
+  border-color: rgba(245, 48, 1, 0.5);
+  background: rgba(245, 48, 1, 0.08);
+}
+
 /* ---- respect the OS reduced-motion preference ---- */
 @media (prefers-reduced-motion: reduce) {
   html.theme-hax *,

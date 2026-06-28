@@ -10,6 +10,37 @@ import {
   SRGB_TO_LINEAR,
   linearToSrgbByte,
 } from './effects/color-space';
+// Backward-mapping bilinear sampler: routes geometric warps through sub-pixel
+// sampling instead of Math.round/floor nearest-neighbor (removes stair-step jaggies).
+import { sampleBilinear, warpImage } from './effects/sampling';
+// Real film emulation: documented characteristic-curve substrate + per-stock recipes.
+import { applyFilmStock } from './effects/film/substrate';
+import { KODAK_NEGATIVE_STOCKS } from './effects/film/stocks/kodak-negative';
+import { KODAK_SLIDE_STOCKS } from './effects/film/stocks/kodak-slide';
+import { FUJI_STOCKS } from './effects/film/stocks/fuji';
+import { CINEMA_STOCKS } from './effects/film/stocks/cinema';
+import { BW_STOCKS } from './effects/film/stocks/bw';
+// New pro-grade effect modules (separate files, each adversarially verified + unit-tested).
+import { applyClarity, CLARITY_EFFECT } from './effects/pro/clarity';
+import { applyColorBalance, COLORBALANCE_EFFECT } from './effects/pro/colorBalance';
+import { applySplitTone, SPLITTONE_EFFECT } from './effects/pro/splitTone';
+import { applyProMist, PROMIST_EFFECT } from './effects/pro/proMist';
+import { applyGradND, GRADND_EFFECT } from './effects/pro/gradND';
+import { applyHslSecondary, HSLSECONDARY_EFFECT } from './effects/pro/hslSecondary';
+import { applyExposure, EXPOSURE_EFFECT } from './effects/pro/exposure';
+import { applyChannelMixer, CHANNELMIXER_EFFECT } from './effects/pro/channelMixer';
+import { applyBleachBypass, BLEACHBYPASS_EFFECT } from './effects/pro/bleachBypass';
+import { applySurfaceBlur, SURFACEBLUR_EFFECT } from './effects/pro/surfaceBlur';
+
+// Ordered catalog of all emulated film stocks. The `preset` index of the
+// unifiedFilm effect indexes into this array; presetNames is derived from it.
+export const FILM_STOCKS = [
+  ...KODAK_NEGATIVE_STOCKS,
+  ...KODAK_SLIDE_STOCKS,
+  ...FUJI_STOCKS,
+  ...CINEMA_STOCKS,
+  ...BW_STOCKS,
+];
 
 // Define the structure for effect settings
 interface EffectSetting {
@@ -355,6 +386,73 @@ function getBrightness(
 
 // lerp function defined in utilities section above
 
+// ── Pro-effect integration helpers ────────────────────────────────────────
+// The pro/ modules export a self-contained apply<Name>(data,w,h,params) plus an
+// <NAME>_EFFECT descriptor. These two helpers adapt that uniform shape to the
+// engine's effectsConfig (metadata) and applyEffect switch (behaviour).
+type ProDescriptor = {
+  label: string;
+  category: string;
+  settings: ReadonlyArray<{
+    id: string;
+    label: string;
+    min: number;
+    max: number;
+    default: number;
+    step: number;
+    description?: string;
+  }>;
+};
+
+/** Adapt a pro descriptor into an effectsConfig entry (default → defaultValue). */
+const proConfig = (eff: ProDescriptor, category?: string): EffectConfig => ({
+  label: eff.label,
+  category: category ?? eff.category,
+  settings: eff.settings.map(s => ({
+    id: s.id,
+    label: s.label,
+    min: s.min,
+    max: s.max,
+    defaultValue: s.default,
+    step: s.step,
+    description: s.description,
+  })),
+});
+
+/** Wrap a pure pro apply(data,w,h,params) function as a Konva filter. */
+const runPro = <T>(
+  fn: (data: Uint8ClampedArray, width: number, height: number, params: T) => void,
+  settings: Record<string, number>
+): KonvaFilterFunction => {
+  return (imageData: KonvaImageData) =>
+    fn(imageData.data, imageData.width, imageData.height, settings as unknown as T);
+};
+
+/**
+ * Real unsharp-mask sharpen. The old 'sharpen' aliased Konva's Enhance (a
+ * contrast/saturation stretch — not sharpening at all). This subtracts a blurred
+ * copy to recover high-frequency detail. `value` (0..10) sets detail gain;
+ * `opacity` blends with the original.
+ */
+const createSharpenEffect = (settings: Record<string, number>): KonvaFilterFunction => {
+  const amount = settings.value ?? 1;
+  const opacity = settings.opacity ?? 1;
+  return (imageData: KonvaImageData) => {
+    const { data, width, height } = imageData;
+    if (amount <= 0) return;
+    const gain = amount * 0.7;
+    const blurred = Uint8ClampedArray.from(data);
+    stackBlur(blurred, width, height, 2);
+    for (let i = 0; i < data.length; i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const o = data[i + c];
+        const sharp = o + gain * (o - blurred[i + c]);
+        data[i + c] = clampByte(o * (1 - opacity) + sharp * opacity);
+      }
+    }
+  };
+};
+
 // Update applyEffect signature and logic
 export const applyEffect = async (
   effectName: string | null,
@@ -415,7 +513,7 @@ export const applyEffect = async (
       }
 
       case 'sharpen':
-        return [Konva.Filters.Enhance, { enhance: (settings.value ?? 0) * 0.5 }]; // Enhance seems closer to sharpen
+        return [createSharpenEffect(settings), {}];
 
       case 'pixelate':
         return [Konva.Filters.Pixelate, { pixelSize: settings.pixelSize ?? 8 }];
@@ -664,6 +762,28 @@ export const applyEffect = async (
       case 'unifiedFilm':
         return [createUnifiedFilmEffect(settings), {}];
 
+      // --- PRO-GRADE EFFECTS (separate verified modules in effects/pro/) ---
+      case 'clarity':
+        return [runPro(applyClarity, settings), {}];
+      case 'colorBalance':
+        return [runPro(applyColorBalance, settings), {}];
+      case 'splitTone':
+        return [runPro(applySplitTone, settings), {}];
+      case 'proMist':
+        return [runPro(applyProMist, settings), {}];
+      case 'gradND':
+        return [runPro(applyGradND, settings), {}];
+      case 'hslSecondary':
+        return [runPro(applyHslSecondary, settings), {}];
+      case 'exposure':
+        return [runPro(applyExposure, settings), {}];
+      case 'channelMixer':
+        return [runPro(applyChannelMixer, settings), {}];
+      case 'bleachBypass':
+        return [runPro(applyBleachBypass, settings), {}];
+      case 'surfaceBlur':
+        return [runPro(applySurfaceBlur, settings), {}];
+
       // --- TRENDING EFFECTS ---
       case 'y2kChrome':
         return [createY2kChromeEffect(settings), {}];
@@ -694,6 +814,8 @@ const createGeometricAbstraction = (settings: Record<string, number>) => {
 
     const gridSize = Math.max(1, Math.min(64, settings.gridSize || 16));
     const complexity = Math.max(0, Math.min(1, settings.complexity || 0.5));
+    // Seeded PRNG so the live preview and the export are byte-identical.
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     for (let i = 0; i < data.length; i += 4) {
       data[i] = data[i + 1] = data[i + 2] = 255;
@@ -723,7 +845,7 @@ const createGeometricAbstraction = (settings: Record<string, number>) => {
         b = Math.round(b / count);
 
         const brightness = (r + g + b) / 3 / 255;
-        const rand = Math.random();
+        const rand = rng();
 
         switch (Math.floor((rand / (1 - complexity)) * 4) % 4) {
           case 0:
@@ -811,6 +933,8 @@ const createStipplingEffect = (settings: Record<string, number>) => {
     const density = Math.max(0.1, Math.min(10, settings.density || 1));
     const dotSize = Math.max(0.5, Math.min(5, settings.dotSize || 1));
     const useHatching = settings.useHatching || 0;
+    // Seeded PRNG so the live preview and the export are byte-identical.
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     for (let i = 0; i < data.length; i += 4) {
       data[i] = data[i + 1] = data[i + 2] = 255;
@@ -820,8 +944,8 @@ const createStipplingEffect = (settings: Record<string, number>) => {
     const maxDots = Math.ceil(((width * height) / (baseSpacing * baseSpacing)) * 5);
 
     for (let i = 0; i < maxDots; i++) {
-      const x = Math.floor(Math.random() * width);
-      const y = Math.floor(Math.random() * height);
+      const x = Math.floor(rng() * width);
+      const y = Math.floor(rng() * height);
 
       const index = (y * width + x) * 4;
       const r = tempData[index];
@@ -829,7 +953,7 @@ const createStipplingEffect = (settings: Record<string, number>) => {
       const b = tempData[index + 2];
       const brightness = (r + g + b) / 3 / 255;
 
-      if (Math.random() > (1 - brightness) * density) continue;
+      if (rng() > (1 - brightness) * density) continue;
 
       if (useHatching > 0.5) {
         const lineLength = Math.floor(5 + 10 * (1 - brightness));
@@ -1073,6 +1197,8 @@ const createUnifiedSketchEffect = (settings: Record<string, number>) => {
     const contrast = (settings.contrast ?? 120) / 100;
     const invert = (settings.invert ?? 0) === 1;
     const opacity = settings.opacity ?? 1;
+    // Seeded PRNG so the live preview and the export are byte-identical (Ink Wash bleed).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const pool = getBufferPool();
     const original = pool.acquire(data.length);
@@ -1137,7 +1263,7 @@ const createUnifiedSketchEffect = (settings: Record<string, number>) => {
               const gray =
                 original[idx] * 0.299 + original[idx + 1] * 0.587 + original[idx + 2] * 0.114;
               const inkFactor = (gray / 255) * density;
-              const bleed = (Math.random() - 0.5) * 30 * (1 - density);
+              const bleed = (rng() - 0.5) * 30 * (1 - density);
               value = gray * inkFactor + bleed;
               break;
 
@@ -1951,6 +2077,8 @@ const createCrosshatchEffect = (settings: Record<string, number>) => {
     const spacingInput = settings.spacing ?? 5;
     const spacing = Math.floor(3 + ((spacingInput - 2) / 8) * 22); // 3 to 25
     const strength = settings.strength ?? 0.5;
+    // Seeded PRNG so the live preview and the export are byte-identical (paper texture).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     // Create output with paper-colored background
     const outputData = new Uint8ClampedArray(data.length);
@@ -2035,7 +2163,7 @@ const createCrosshatchEffect = (settings: Record<string, number>) => {
         }
 
         // Add subtle paper texture
-        const noise = (Math.random() - 0.5) * 6;
+        const noise = (rng() - 0.5) * 6;
         outputData[index] = clampByte(outputData[index] + noise);
         outputData[index + 1] = clampByte(outputData[index + 1] + noise);
         outputData[index + 2] = clampByte(outputData[index + 2] + noise);
@@ -2099,6 +2227,8 @@ const createOldPhotoEffect = (settings: Record<string, number>) => {
     const sepiaAmount = settings.sepia ?? 0.6;
     const noiseAmount = settings.noise ?? 0.1;
     const vignetteAmount = settings.vignette ?? 0.4;
+    // Seeded PRNG so the live preview and the export are byte-identical (film noise).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     // 1. Apply Sepia (Custom implementation)
     if (sepiaAmount > 0) {
@@ -2127,7 +2257,7 @@ const createOldPhotoEffect = (settings: Record<string, number>) => {
     if (noiseAmount > 0) {
       const noiseFactor = noiseAmount * 255 * 0.5; // Scale noise
       for (let i = 0; i < data.length; i += 4) {
-        const rand = (Math.random() - 0.5) * noiseFactor;
+        const rand = (rng() - 0.5) * noiseFactor;
         data[i] = Math.min(255, Math.max(0, data[i] + rand));
         data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + rand));
         data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + rand));
@@ -2691,15 +2821,12 @@ const createSwirlEffect = (settings: Record<string, number>) => {
             const originalAngle = Math.atan2(dy, dx);
             const newAngle = originalAngle + angleOffset;
 
-            const srcX = Math.round(centerX + Math.cos(newAngle) * distance);
-            const srcY = Math.round(centerY + Math.sin(newAngle) * distance);
+            // Float source coords + bilinear sampling (was Math.round nearest-neighbor).
+            const srcX = centerX + Math.cos(newAngle) * distance;
+            const srcY = centerY + Math.sin(newAngle) * distance;
 
             if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
-              const srcIndex = (srcY * width + srcX) * 4;
-              data[index] = tempData[srcIndex];
-              data[index + 1] = tempData[srcIndex + 1];
-              data[index + 2] = tempData[srcIndex + 2];
-              data[index + 3] = tempData[srcIndex + 3];
+              sampleBilinear(tempData, width, height, srcX, srcY, data, index);
             } else {
               data[index + 3] = 0; // Make out-of-bounds pixels transparent
             }
@@ -2793,17 +2920,13 @@ const createKaleidoscopeEffect = (settings: Record<string, number>) => {
           segmentAngle = anglePerSegment - segmentAngle;
         }
 
-        // Calculate source coordinates
-        const srcX = Math.round(centerX + Math.cos(segmentAngle) * distance);
-        const srcY = Math.round(centerY + Math.sin(segmentAngle) * distance);
+        // Calculate source coordinates (float + bilinear sampling, was nearest-neighbor)
+        const srcX = centerX + Math.cos(segmentAngle) * distance;
+        const srcY = centerY + Math.sin(segmentAngle) * distance;
         const destIndex = (y * width + x) * 4;
 
         if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
-          const srcIndex = (srcY * width + srcX) * 4;
-          data[destIndex] = tempData[srcIndex];
-          data[destIndex + 1] = tempData[srcIndex + 1];
-          data[destIndex + 2] = tempData[srcIndex + 2];
-          data[destIndex + 3] = tempData[srcIndex + 3];
+          sampleBilinear(tempData, width, height, srcX, srcY, data, destIndex);
         } else {
           data[destIndex] = 0;
           data[destIndex + 1] = 0;
@@ -3015,6 +3138,9 @@ const createUnifiedGlitchEffect = (settings: Record<string, number>) => {
     const blockSize = Math.floor(settings.blockSize ?? 8);
     const randomness = settings.randomness ?? 0.5;
     const opacity = settings.opacity ?? 1;
+    // Seeded PRNG so the live preview and the export are byte-identical (VHS jitter,
+    // digital-corruption block selection). Threaded into the stochastic sub-helpers.
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
@@ -3033,10 +3159,19 @@ const createUnifiedGlitchEffect = (settings: Record<string, number>) => {
         applyScanlines(data, width, height, intensity, blockSize);
         break;
       case 3: // VHS/Analog
-        applyVhsEffect(data, tempData, width, height, intensity, randomness);
+        applyVhsEffect(data, tempData, width, height, intensity, randomness, rng);
         break;
       case 4: // Digital Corruption
-        applyDigitalCorruption(data, tempData, width, height, intensity, blockSize, randomness);
+        applyDigitalCorruption(
+          data,
+          tempData,
+          width,
+          height,
+          intensity,
+          blockSize,
+          randomness,
+          rng
+        );
         break;
       case 5: // Databend
         applyDatabend(data, width, height, intensity, blockSize);
@@ -3153,12 +3288,13 @@ const applyVhsEffect = (
   width: number,
   height: number,
   intensity: number,
-  randomness: number
+  randomness: number,
+  rng: () => number
 ) => {
   // Horizontal line shifts
   for (let y = 0; y < height; y++) {
-    if (Math.random() < randomness * 0.1) {
-      const shift = Math.floor((Math.random() - 0.5) * width * intensity * 0.1);
+    if (rng() < randomness * 0.1) {
+      const shift = Math.floor((rng() - 0.5) * width * intensity * 0.1);
       for (let x = 0; x < width; x++) {
         const srcX = (x + shift + width) % width;
         const idx = (y * width + x) * 4;
@@ -3182,7 +3318,7 @@ const applyVhsEffect = (
 
   // Add noise
   for (let i = 0; i < data.length; i += 4) {
-    const noise = (Math.random() - 0.5) * intensity * 30;
+    const noise = (rng() - 0.5) * intensity * 30;
     data[i] = clampByte(data[i] + noise);
     data[i + 1] = clampByte(data[i + 1] + noise);
     data[i + 2] = clampByte(data[i + 2] + noise);
@@ -3196,16 +3332,17 @@ const applyDigitalCorruption = (
   height: number,
   intensity: number,
   blockSize: number,
-  randomness: number
+  randomness: number,
+  rng: () => number
 ) => {
   const blockHeight = Math.max(1, blockSize);
   const numBlocks = Math.ceil(height / blockHeight);
 
   for (let block = 0; block < numBlocks; block++) {
-    if (Math.random() < randomness * intensity) {
+    if (rng() < randomness * intensity) {
       const startY = block * blockHeight;
       const endY = Math.min(height, startY + blockHeight);
-      const shiftX = Math.floor((Math.random() - 0.5) * width * intensity * 0.2);
+      const shiftX = Math.floor((rng() - 0.5) * width * intensity * 0.2);
 
       for (let y = startY; y < endY; y++) {
         for (let x = 0; x < width; x++) {
@@ -3214,7 +3351,7 @@ const applyDigitalCorruption = (
           const srcIdx = (y * width + srcX) * 4;
 
           // Random channel corruption
-          if (Math.random() < intensity * 0.3) {
+          if (rng() < intensity * 0.3) {
             data[idx] = tempData[srcIdx];
             data[idx + 1] = tempData[(y * width + ((x + 2) % width)) * 4 + 1];
             data[idx + 2] = tempData[(y * width + ((x - 2 + width) % width)) * 4 + 2];
@@ -3364,6 +3501,8 @@ const createUnifiedVintageEffect = (settings: Record<string, number>) => {
     const fade = settings.fade ?? 0;
     const warmth = (settings.warmth ?? 0.5) - 0.5; // -0.5 to 0.5
     const opacity = settings.opacity ?? 1;
+    // Seeded PRNG so the live preview and the export are byte-identical (scratches, grain).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const pool = getBufferPool();
     const original = opacity < 1 ? pool.acquire(data.length) : null;
@@ -3388,7 +3527,7 @@ const createUnifiedVintageEffect = (settings: Record<string, number>) => {
           applyCrossProcess(data, intensity);
           break;
         case 4: // Scratched Film
-          applyScratchedFilm(data, width, height, intensity, scratches);
+          applyScratchedFilm(data, width, height, intensity, scratches, rng);
           break;
         case 5: // Instant/Polaroid
           applyPolaroid(data, intensity, warmth);
@@ -3401,7 +3540,7 @@ const createUnifiedVintageEffect = (settings: Record<string, number>) => {
       }
 
       if (grain > 0) {
-        applyFilmGrain(data, grain);
+        applyFilmGrain(data, grain, rng);
       }
 
       if (vignette > 0) {
@@ -3508,7 +3647,8 @@ const applyScratchedFilm = (
   width: number,
   height: number,
   intensity: number,
-  scratchAmount: number
+  scratchAmount: number,
+  rng: () => number
 ) => {
   // Apply base sepia
   applySepiaTone(data, intensity * 0.7);
@@ -3516,17 +3656,17 @@ const applyScratchedFilm = (
   // Add scratches
   const numScratches = Math.floor(scratchAmount * 20);
   for (let s = 0; s < numScratches; s++) {
-    const scratchX = Math.floor(Math.random() * width);
-    const scratchWidth = Math.random() < 0.5 ? 1 : 2;
+    const scratchX = Math.floor(rng() * width);
+    const scratchWidth = rng() < 0.5 ? 1 : 2;
 
     for (let y = 0; y < height; y++) {
-      if (Math.random() < 0.95) {
+      if (rng() < 0.95) {
         // Make scratches slightly discontinuous
         for (let dx = 0; dx < scratchWidth; dx++) {
           const x = scratchX + dx;
           if (x >= 0 && x < width) {
             const idx = (y * width + x) * 4;
-            const brightness = 200 + Math.floor(Math.random() * 55);
+            const brightness = 200 + Math.floor(rng() * 55);
             data[idx] = Math.min(255, data[idx] + (brightness - data[idx]) * 0.5);
             data[idx + 1] = Math.min(255, data[idx + 1] + (brightness - data[idx + 1]) * 0.5);
             data[idx + 2] = Math.min(255, data[idx + 2] + (brightness - data[idx + 2]) * 0.5);
@@ -3567,10 +3707,10 @@ const applyWarmth = (data: Uint8ClampedArray, warmth: number) => {
   }
 };
 
-const applyFilmGrain = (data: Uint8ClampedArray, amount: number) => {
+const applyFilmGrain = (data: Uint8ClampedArray, amount: number, rng: () => number) => {
   const grainStrength = amount * 40;
   for (let i = 0; i < data.length; i += 4) {
-    const noise = (Math.random() - 0.5) * grainStrength;
+    const noise = (rng() - 0.5) * grainStrength;
     data[i] = clampByte(data[i] + noise);
     data[i + 1] = clampByte(data[i + 1] + noise);
     data[i + 2] = clampByte(data[i + 2] + noise);
@@ -3619,6 +3759,8 @@ const createUnifiedWarpEffect = (settings: Record<string, number>) => {
     const segments = Math.floor(settings.segments ?? 6);
     const radius = (settings.radius ?? 0.5) * Math.min(width, height);
     const opacity = settings.opacity ?? 1;
+    // Seeded PRNG so the live preview and the export are byte-identical (shatter shards).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
@@ -3655,7 +3797,7 @@ const createUnifiedWarpEffect = (settings: Record<string, number>) => {
         applyWaveWarp(data, tempData, width, height, amount * 30, settings.frequency ?? 10);
         break;
       case 7: // Shatter
-        applyShatterWarp(data, tempData, width, height, amount);
+        applyShatterWarp(data, tempData, width, height, amount, rng);
         break;
     }
 
@@ -3729,15 +3871,15 @@ const applySwirlWarp = (
         const factor = 1 - dist / radius;
         const angle = factor * factor * amount;
 
-        const srcX = Math.round(cx + dx * Math.cos(angle) - dy * Math.sin(angle));
-        const srcY = Math.round(cy + dx * Math.sin(angle) + dy * Math.cos(angle));
+        // Float source coords + bilinear sampling (was Math.round nearest-neighbor).
+        const srcX = cx + dx * Math.cos(angle) - dy * Math.sin(angle);
+        const srcY = cy + dx * Math.sin(angle) + dy * Math.cos(angle);
 
         if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
           const idx = (y * width + x) * 4;
-          const srcIdx = (srcY * width + srcX) * 4;
-          data[idx] = tempData[srcIdx];
-          data[idx + 1] = tempData[srcIdx + 1];
-          data[idx + 2] = tempData[srcIdx + 2];
+          const a = data[idx + 3];
+          sampleBilinear(tempData, width, height, srcX, srcY, data, idx);
+          data[idx + 3] = a;
         }
       }
     }
@@ -3772,15 +3914,15 @@ const applyKaleidoscopeWarp = (
         localAngle = segmentAngle - localAngle;
       }
 
-      const srcX = Math.round(cx + dist * Math.cos(localAngle));
-      const srcY = Math.round(cy + dist * Math.sin(localAngle));
+      // Float source coords + bilinear sampling (was Math.round nearest-neighbor).
+      const srcX = cx + dist * Math.cos(localAngle);
+      const srcY = cy + dist * Math.sin(localAngle);
 
       if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
         const idx = (y * width + x) * 4;
-        const srcIdx = (srcY * width + srcX) * 4;
-        data[idx] = tempData[srcIdx];
-        data[idx + 1] = tempData[srcIdx + 1];
-        data[idx + 2] = tempData[srcIdx + 2];
+        const a = data[idx + 3];
+        sampleBilinear(tempData, width, height, srcX, srcY, data, idx);
+        data[idx + 3] = a;
       }
     }
   }
@@ -3805,15 +3947,15 @@ const applyFisheyeWarp = (
 
       if (dist < 1) {
         const factor = Math.pow(dist, amount) / dist;
-        const srcX = Math.round(cx + dx * factor * maxRadius);
-        const srcY = Math.round(cy + dy * factor * maxRadius);
+        // Float source coords + bilinear sampling (was Math.round nearest-neighbor).
+        const srcX = cx + dx * factor * maxRadius;
+        const srcY = cy + dy * factor * maxRadius;
 
         if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
           const idx = (y * width + x) * 4;
-          const srcIdx = (srcY * width + srcX) * 4;
-          data[idx] = tempData[srcIdx];
-          data[idx + 1] = tempData[srcIdx + 1];
-          data[idx + 2] = tempData[srcIdx + 2];
+          const a = data[idx + 3];
+          sampleBilinear(tempData, width, height, srcX, srcY, data, idx);
+          data[idx + 3] = a;
         }
       }
     }
@@ -3840,15 +3982,15 @@ const applySpherizeWarp = (
         const factor = dist / radius;
         const sphereFactor = Math.sqrt(1 - factor * factor) * amount + (1 - amount);
 
-        const srcX = Math.round(cx + dx * sphereFactor);
-        const srcY = Math.round(cy + dy * sphereFactor);
+        // Float source coords + bilinear sampling (was Math.round nearest-neighbor).
+        const srcX = cx + dx * sphereFactor;
+        const srcY = cy + dy * sphereFactor;
 
         if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
           const idx = (y * width + x) * 4;
-          const srcIdx = (srcY * width + srcX) * 4;
-          data[idx] = tempData[srcIdx];
-          data[idx + 1] = tempData[srcIdx + 1];
-          data[idx + 2] = tempData[srcIdx + 2];
+          const a = data[idx + 3];
+          sampleBilinear(tempData, width, height, srcX, srcY, data, idx);
+          data[idx + 3] = a;
         }
       }
     }
@@ -3875,15 +4017,15 @@ const applyPinchBulgeWarp = (
         const factor = dist / radius;
         const warpFactor = Math.pow(factor, 1 - amount);
 
-        const srcX = Math.round(cx + (dx * warpFactor) / factor);
-        const srcY = Math.round(cy + (dy * warpFactor) / factor);
+        // Float source coords + bilinear sampling (was Math.round nearest-neighbor).
+        const srcX = cx + (dx * warpFactor) / factor;
+        const srcY = cy + (dy * warpFactor) / factor;
 
         if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
           const idx = (y * width + x) * 4;
-          const srcIdx = (srcY * width + srcX) * 4;
-          data[idx] = tempData[srcIdx];
-          data[idx + 1] = tempData[srcIdx + 1];
-          data[idx + 2] = tempData[srcIdx + 2];
+          const a = data[idx + 3];
+          sampleBilinear(tempData, width, height, srcX, srcY, data, idx);
+          data[idx + 3] = a;
         }
       }
     }
@@ -3903,15 +4045,15 @@ const applyWaveWarp = (
       const offsetX = Math.sin(y / frequency) * amplitude;
       const offsetY = Math.cos(x / frequency) * amplitude;
 
-      const srcX = Math.round(x + offsetX);
-      const srcY = Math.round(y + offsetY);
+      // Float source coords + bilinear sampling (was Math.round nearest-neighbor).
+      const srcX = x + offsetX;
+      const srcY = y + offsetY;
 
       if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
         const idx = (y * width + x) * 4;
-        const srcIdx = (srcY * width + srcX) * 4;
-        data[idx] = tempData[srcIdx];
-        data[idx + 1] = tempData[srcIdx + 1];
-        data[idx + 2] = tempData[srcIdx + 2];
+        const a = data[idx + 3];
+        sampleBilinear(tempData, width, height, srcX, srcY, data, idx);
+        data[idx + 3] = a;
       }
     }
   }
@@ -3922,18 +4064,19 @@ const applyShatterWarp = (
   tempData: Uint8ClampedArray,
   width: number,
   height: number,
-  amount: number
+  amount: number,
+  rng: () => number
 ) => {
   const numShards = Math.floor(5 + amount * 20);
   const shardCenters: { x: number; y: number; offsetX: number; offsetY: number }[] = [];
 
-  // Generate random shard centers with offsets
+  // Generate random shard centers with offsets (seeded: preview == export)
   for (let i = 0; i < numShards; i++) {
     shardCenters.push({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      offsetX: (Math.random() - 0.5) * amount * 50,
-      offsetY: (Math.random() - 0.5) * amount * 50,
+      x: rng() * width,
+      y: rng() * height,
+      offsetX: (rng() - 0.5) * amount * 50,
+      offsetY: (rng() - 0.5) * amount * 50,
     });
   }
 
@@ -3951,16 +4094,15 @@ const applyShatterWarp = (
         }
       }
 
-      // Apply offset from that shard
-      const srcX = Math.round(x + nearestShard.offsetX);
-      const srcY = Math.round(y + nearestShard.offsetY);
+      // Apply offset from that shard (float coords + bilinear sampling).
+      const srcX = x + nearestShard.offsetX;
+      const srcY = y + nearestShard.offsetY;
 
       if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
         const idx = (y * width + x) * 4;
-        const srcIdx = (srcY * width + srcX) * 4;
-        data[idx] = tempData[srcIdx];
-        data[idx + 1] = tempData[srcIdx + 1];
-        data[idx + 2] = tempData[srcIdx + 2];
+        const a = data[idx + 3];
+        sampleBilinear(tempData, width, height, srcX, srcY, data, idx);
+        data[idx + 3] = a;
       }
     }
   }
@@ -4192,6 +4334,9 @@ const createUnifiedPrintEffect = (settings: Record<string, number>) => {
     const paperTexture = (settings.paperTexture ?? 50) / 100;
     const inkBleed = (settings.inkBleed ?? 30) / 100;
     const opacity = settings.opacity ?? 1;
+    // Seeded PRNG so the live preview and the export are byte-identical
+    // (riso registration offset + paper grain).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const pool = getBufferPool();
     const original = pool.acquire(data.length);
@@ -4231,7 +4376,8 @@ const createUnifiedPrintEffect = (settings: Record<string, number>) => {
             dotSize,
             registration,
             inkBleed,
-            intensity
+            intensity,
+            rng
           );
           break;
 
@@ -4271,7 +4417,7 @@ const createUnifiedPrintEffect = (settings: Record<string, number>) => {
 
       // Apply paper texture for all presets
       if (paperTexture > 0) {
-        applyPaperGrain(result, width, height, paperTexture * 0.5);
+        applyPaperGrain(result, width, height, paperTexture * 0.5, rng);
       }
 
       // Copy result back to data
@@ -4305,7 +4451,8 @@ const applyRisographEffect = (
   dotSize: number,
   registration: number,
   inkBleed: number,
-  intensity: number
+  intensity: number,
+  rng: () => number
 ) => {
   const halfDot = Math.floor(dotSize / 2);
   const activeColors = colors.slice(0, colorCount);
@@ -4349,8 +4496,8 @@ const applyRisographEffect = (
 
   // Apply registration error (color misalignment)
   if (registration > 0) {
-    const offsetX = Math.floor(registration * (Math.random() - 0.5) * 2);
-    const offsetY = Math.floor(registration * (Math.random() - 0.5) * 2);
+    const offsetX = Math.floor(registration * (rng() - 0.5) * 2);
+    const offsetY = Math.floor(registration * (rng() - 0.5) * 2);
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
@@ -4640,10 +4787,11 @@ const applyPaperGrain = (
   data: Uint8ClampedArray,
   width: number,
   height: number,
-  intensity: number
+  intensity: number,
+  rng: () => number
 ) => {
   for (let i = 0; i < data.length; i += 4) {
-    const noise = (Math.random() - 0.5) * intensity * 30;
+    const noise = (rng() - 0.5) * intensity * 30;
     data[i] = clampByte(data[i] + noise);
     data[i + 1] = clampByte(data[i + 1] + noise);
     data[i + 2] = clampByte(data[i + 2] + noise);
@@ -4658,336 +4806,64 @@ const createUnifiedFilmEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
     const preset = Math.floor(settings.preset ?? 0);
-    const grainIntensity = (settings.grain ?? 30) / 100;
-    const halation = (settings.halation ?? 20) / 100;
+    const recipe = FILM_STOCKS[preset] ?? FILM_STOCKS[0];
+    const grainScale = (settings.grain ?? 100) / 100; // % of the stock's documented grain
+    const halationScale = (settings.halation ?? 100) / 100; // % of the stock's halation
+    const strength = (settings.strength ?? 100) / 100; // blend with the original
+    const exposure = settings.exposure ?? 0; // -2..+2 stops
     const fade = (settings.fade ?? 0) / 100;
-    const exposure = settings.exposure ?? 0; // -2 to +2 stops
-    const opacity = settings.opacity ?? 1;
+    const seed = Math.floor(settings.seed ?? 1);
 
-    const pool = getBufferPool();
-    const original = pool.acquire(data.length);
-    const originalForBlend = opacity < 1 ? pool.acquire(data.length) : null;
+    // Snapshot the untouched original for the final strength blend.
+    const original = strength < 1 ? Uint8ClampedArray.from(data) : null;
 
-    try {
-      original.set(data);
-      if (originalForBlend) originalForBlend.set(data);
-
-      // Apply exposure shift first, in LINEAR light. Exposure in stops is a
-      // multiply of radiance, so it must happen on linearized values then be
-      // re-encoded; multiplying the gamma byte (the old code) blew mid-gray
-      // to white at +1 stop. Precompute a byte->byte LUT so the loop stays a
-      // single table read per channel.
-      if (exposure !== 0) {
-        const expLUT = makeExposureLUT(exposure);
-        for (let i = 0; i < data.length; i += 4) {
-          data[i] = expLUT[data[i]];
-          data[i + 1] = expLUT[data[i + 1]];
-          data[i + 2] = expLUT[data[i + 2]];
-        }
+    // Exposure pre-step in LINEAR light (a stop is a radiance multiply, so it
+    // must happen on linearized values; multiplying the gamma byte blows
+    // mid-gray to white at +1 stop). Precompute a byte->byte LUT.
+    if (exposure !== 0) {
+      const expLUT = makeExposureLUT(exposure);
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = expLUT[data[i]];
+        data[i + 1] = expLUT[data[i + 1]];
+        data[i + 2] = expLUT[data[i + 2]];
       }
+    }
 
-      switch (preset) {
-        case 0: // Portra 400 - Warm skin tones, fine grain, soft contrast
-          applyPortra400(data, width, height);
-          break;
+    // Clone the recipe so the grain/halation sliders scale the documented
+    // defaults rather than replacing them.
+    const scaled = { ...recipe };
+    if (recipe.grain) {
+      scaled.grain = {
+        ...recipe.grain,
+        intensity: (recipe.grain.intensity ?? 0) * grainScale,
+        seed,
+      };
+    }
+    if (recipe.halation) {
+      scaled.halation = {
+        ...recipe.halation,
+        intensity: (recipe.halation.intensity ?? 0) * halationScale,
+      };
+    }
 
-        case 1: // Cinestill 800T - Tungsten, RED halation
-          applyCinestill800T(data, width, height, halation);
-          break;
+    // Apply the full documented look: linear WB/matrix -> per-channel
+    // characteristic curve (toe+shoulder) -> saturation -> halation -> seeded grain.
+    applyFilmStock(data, width, height, scaled, { strength: 1, grainSeed: seed });
 
-        case 2: // Kodak Gold 200 - Warm, saturated, nostalgic
-          applyKodakGold(data, width, height);
-          break;
+    // Optional aged-film fade on top.
+    if (fade > 0) {
+      applyFilmFade(data, width, height, fade);
+    }
 
-        case 3: // Fuji Pro 400H - Cool shadows, pastel highlights
-          applyFujiPro400H(data, width, height);
-          break;
-
-        case 4: // Ilford HP5 - High-contrast B&W
-          applyIlfordHP5(data, width, height);
-          break;
-
-        case 5: // Kodachrome - Saturated, punchy, iconic
-          applyKodachrome(data, width, height);
-          break;
+    // Final strength blend with the original input.
+    if (original) {
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = data[i] * strength + original[i] * (1 - strength);
+        data[i + 1] = data[i + 1] * strength + original[i + 1] * (1 - strength);
+        data[i + 2] = data[i + 2] * strength + original[i + 2] * (1 - strength);
       }
-
-      // Apply film grain
-      if (grainIntensity > 0) {
-        applyFilmStockGrain(data, width, height, grainIntensity, preset);
-      }
-
-      // Apply fade/age effect
-      if (fade > 0) {
-        applyFilmFade(data, width, height, fade);
-      }
-
-      // Apply opacity blend
-      if (originalForBlend && opacity < 1) {
-        applyOpacityBlend(data, originalForBlend, opacity);
-      }
-    } finally {
-      pool.release(original);
-      if (originalForBlend) pool.release(originalForBlend);
     }
   };
-};
-
-// Portra 400 - Natural skin tones, slightly warm, low contrast
-const applyPortra400 = (data: Uint8ClampedArray, width: number, height: number) => {
-  for (let i = 0; i < data.length; i += 4) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
-
-    // Warm shadows, neutral highlights
-    const lum = r * 0.299 + g * 0.587 + b * 0.114;
-    const shadowLift = Math.max(0, (128 - lum) / 128) * 0.1;
-
-    // Subtle orange-red shift in shadows
-    r = clampByte(r + shadowLift * 15);
-    g = clampByte(g + shadowLift * 5);
-
-    // Soft contrast curve
-    r = clampByte(128 + (r - 128) * 0.9 + 5);
-    g = clampByte(128 + (g - 128) * 0.9 + 3);
-    b = clampByte(128 + (b - 128) * 0.88);
-
-    // Slight desaturation in highlights
-    const highlightDesat = Math.max(0, (lum - 180) / 75) * 0.15;
-    const avg = (r + g + b) / 3;
-    r = clampByte(lerp(r, avg, highlightDesat));
-    g = clampByte(lerp(g, avg, highlightDesat));
-    b = clampByte(lerp(b, avg, highlightDesat));
-
-    data[i] = r;
-    data[i + 1] = g;
-    data[i + 2] = b;
-  }
-};
-
-// Cinestill 800T - Tungsten balance, RED halation around highlights
-const applyCinestill800T = (
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  halation: number
-) => {
-  const pool = getBufferPool();
-  const highlights = pool.acquire(data.length);
-
-  try {
-    // Extract bright areas for halation
-    for (let i = 0; i < data.length; i += 4) {
-      const lum = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      if (lum > 200) {
-        highlights[i] = 255; // Red halation
-        highlights[i + 1] = 50;
-        highlights[i + 2] = 0;
-        highlights[i + 3] = 255;
-      } else {
-        highlights[i] = highlights[i + 1] = highlights[i + 2] = 0;
-        highlights[i + 3] = 255;
-      }
-    }
-
-    // Blur the highlights for halation (linear light - halation is glow)
-    if (halation > 0) {
-      gaussianBlurLinear(highlights, width, height, Math.ceil(halation * 30));
-    }
-
-    // Apply tungsten white balance + halation
-    for (let i = 0; i < data.length; i += 4) {
-      let r = data[i];
-      let g = data[i + 1];
-      let b = data[i + 2];
-
-      // Tungsten: boost blues/cyans, reduce reds/yellows
-      r = clampByte(r * 0.85);
-      g = clampByte(g * 0.95);
-      b = clampByte(b * 1.15 + 10);
-
-      // Add halation bloom
-      const halR = (highlights[i] / 255) * halation;
-      r = clampByte(r + halR * 80);
-      g = clampByte(g + halR * 20);
-
-      // Cinematic contrast
-      const lum = r * 0.299 + g * 0.587 + b * 0.114;
-      r = clampByte(128 + (r - 128) * 1.1);
-      g = clampByte(128 + (g - 128) * 1.1);
-      b = clampByte(128 + (b - 128) * 1.1);
-
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-    }
-  } finally {
-    pool.release(highlights);
-  }
-};
-
-// Kodak Gold 200 - Warm, saturated, classic consumer film
-const applyKodakGold = (data: Uint8ClampedArray, width: number, height: number) => {
-  for (let i = 0; i < data.length; i += 4) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
-
-    // Warm shift throughout
-    r = clampByte(r * 1.08 + 8);
-    g = clampByte(g * 1.02 + 3);
-    b = clampByte(b * 0.92);
-
-    // Boost saturation
-    const avg = (r + g + b) / 3;
-    r = clampByte(avg + (r - avg) * 1.25);
-    g = clampByte(avg + (g - avg) * 1.2);
-    b = clampByte(avg + (b - avg) * 1.15);
-
-    // S-curve contrast
-    const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
-    const sCurve = lum < 0.5 ? 2 * lum * lum : 1 - 2 * (1 - lum) * (1 - lum);
-    const contrastBoost = (sCurve - lum) * 30;
-
-    r = clampByte(r + contrastBoost);
-    g = clampByte(g + contrastBoost);
-    b = clampByte(b + contrastBoost);
-
-    data[i] = r;
-    data[i + 1] = g;
-    data[i + 2] = b;
-  }
-};
-
-// Fuji Pro 400H - Cool shadows, pastel highlights, low saturation
-const applyFujiPro400H = (data: Uint8ClampedArray, width: number, height: number) => {
-  for (let i = 0; i < data.length; i += 4) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
-
-    const lum = r * 0.299 + g * 0.587 + b * 0.114;
-
-    // Cool shadows (add blue/green)
-    const shadowAmount = Math.max(0, (100 - lum) / 100);
-    r = clampByte(r - shadowAmount * 5);
-    g = clampByte(g + shadowAmount * 3);
-    b = clampByte(b + shadowAmount * 10);
-
-    // Pastel highlights (desaturate, lift)
-    const highlightAmount = Math.max(0, (lum - 150) / 105);
-    const avg = (r + g + b) / 3;
-    r = clampByte(lerp(r, avg + 20, highlightAmount * 0.4));
-    g = clampByte(lerp(g, avg + 18, highlightAmount * 0.4));
-    b = clampByte(lerp(b, avg + 15, highlightAmount * 0.4));
-
-    // Lower overall saturation
-    const newAvg = (r + g + b) / 3;
-    r = clampByte(newAvg + (r - newAvg) * 0.85);
-    g = clampByte(newAvg + (g - newAvg) * 0.85);
-    b = clampByte(newAvg + (b - newAvg) * 0.85);
-
-    // Soft contrast
-    r = clampByte(128 + (r - 128) * 0.95 + 3);
-    g = clampByte(128 + (g - 128) * 0.95 + 3);
-    b = clampByte(128 + (b - 128) * 0.95 + 3);
-
-    data[i] = r;
-    data[i + 1] = g;
-    data[i + 2] = b;
-  }
-};
-
-// Ilford HP5 - Classic high-contrast B&W
-const applyIlfordHP5 = (data: Uint8ClampedArray, width: number, height: number) => {
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-
-    // B&W conversion with HP5 response (good red sensitivity)
-    let lum = r * 0.35 + g * 0.5 + b * 0.15;
-
-    // High contrast S-curve
-    lum = lum / 255;
-    lum = lum < 0.5 ? 2 * lum * lum : 1 - 2 * (1 - lum) * (1 - lum);
-    lum = lum * 255;
-
-    // Boost contrast further
-    lum = clampByte(128 + (lum - 128) * 1.3);
-
-    data[i] = lum;
-    data[i + 1] = lum;
-    data[i + 2] = lum;
-  }
-};
-
-// Kodachrome - Iconic saturated colors, punchy contrast
-const applyKodachrome = (data: Uint8ClampedArray, width: number, height: number) => {
-  for (let i = 0; i < data.length; i += 4) {
-    let r = data[i];
-    let g = data[i + 1];
-    let b = data[i + 2];
-
-    // Kodachrome's distinctive color shifts
-    // Deep reds, rich blues, slightly muted greens
-    r = clampByte(r * 1.1 + 5);
-    g = clampByte(g * 0.95);
-    b = clampByte(b * 1.05 + 8);
-
-    // High saturation
-    const avg = (r + g + b) / 3;
-    r = clampByte(avg + (r - avg) * 1.4);
-    g = clampByte(avg + (g - avg) * 1.3);
-    b = clampByte(avg + (b - avg) * 1.35);
-
-    // Punchy contrast
-    r = clampByte(128 + (r - 128) * 1.15);
-    g = clampByte(128 + (g - 128) * 1.15);
-    b = clampByte(128 + (b - 128) * 1.15);
-
-    // Lifted blacks (Kodachrome doesn't go pure black)
-    r = clampByte(Math.max(r, 10));
-    g = clampByte(Math.max(g, 8));
-    b = clampByte(Math.max(b, 12));
-
-    data[i] = r;
-    data[i + 1] = g;
-    data[i + 2] = b;
-  }
-};
-
-// Film grain helper for unified film effect - varies by film stock
-const applyFilmStockGrain = (
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  intensity: number,
-  preset: number
-) => {
-  // Different grain characteristics per film
-  const grainSize = preset === 4 ? 1.5 : 1; // HP5 has larger grain
-  const grainVariance = preset === 0 ? 0.7 : 1; // Portra has finer grain
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-
-      // Perlin-like noise for more realistic grain
-      const noiseBase = Math.random() - 0.5;
-      const noise = noiseBase * intensity * 50 * grainVariance;
-
-      // Grain is more visible in midtones
-      const lum = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      const midtoneFactor = 1 - Math.abs(lum - 128) / 128;
-      const grainAmount = noise * (0.5 + midtoneFactor * 0.5);
-
-      data[i] = clampByte(data[i] + grainAmount);
-      data[i + 1] = clampByte(data[i + 1] + grainAmount);
-      data[i + 2] = clampByte(data[i + 2] + grainAmount);
-    }
-  }
 };
 
 // Film fade/age effect
@@ -6155,6 +6031,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         description: 'Blend the effect with the original image',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
   halftone: {
@@ -6414,6 +6299,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         group: 'appearance',
         description: 'Blend the effect with the original image',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
   unifiedVintage: {
@@ -6501,6 +6395,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         group: 'appearance',
         description: 'Blend the effect with the original image',
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
       },
     ],
   },
@@ -6598,6 +6501,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         group: 'appearance',
         description: 'Blend the effect with the original image',
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
       },
     ],
   },
@@ -6767,6 +6679,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         group: 'appearance',
         description: 'Blend between original image and print result',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
 
@@ -6774,55 +6695,48 @@ export const effectsConfig: Record<string, EffectConfig> = {
   unifiedFilm: {
     label: 'Film',
     category: 'Filters',
-    presetNames: [
-      'Portra 400',
-      'Cinestill 800T',
-      'Kodak Gold',
-      'Fuji Pro 400H',
-      'Ilford HP5',
-      'Kodachrome',
-    ],
+    presetNames: FILM_STOCKS.map(s => s.displayName ?? s.name),
     settings: [
       {
         id: 'preset',
         label: 'Film Stock',
         min: 0,
-        max: 5,
+        max: FILM_STOCKS.length - 1,
         defaultValue: 0,
         step: 1,
         group: 'style',
         description:
-          'Classic film stocks: Portra (warm portraits), Cinestill (tungsten night), Kodak Gold (nostalgic), Fuji Pro (pastel), Ilford HP5 (B&W), Kodachrome (saturated)',
+          'Documented film-stock emulations: Kodak (Portra/Ektar/Gold), Kodachrome and Ektachrome, Fuji (Velvia/Provia/Pro 400H), cinema (Cinestill/Vision3/cross-process), and B&W (Tri-X/HP5/T-Max/Acros).',
+      },
+      {
+        id: 'strength',
+        label: 'Strength (%)',
+        min: 0,
+        max: 100,
+        defaultValue: 100,
+        step: 5,
+        group: 'intensity',
+        description: 'Blend between the original image and the full film look',
       },
       {
         id: 'grain',
         label: 'Film Grain (%)',
         min: 0,
-        max: 100,
-        defaultValue: 30,
+        max: 200,
+        defaultValue: 100,
         step: 5,
         group: 'intensity',
-        description: 'Authentic film grain texture - varies by film stock',
+        description: 'Scales the seeded film grain for this stock (preview matches export)',
       },
       {
         id: 'halation',
         label: 'Halation (%)',
         min: 0,
-        max: 100,
-        defaultValue: 20,
+        max: 200,
+        defaultValue: 100,
         step: 5,
         group: 'intensity',
-        description: 'Red/orange glow around bright highlights (strongest on Cinestill)',
-      },
-      {
-        id: 'fade',
-        label: 'Fade/Age (%)',
-        min: 0,
-        max: 100,
-        defaultValue: 0,
-        step: 5,
-        group: 'appearance',
-        description: 'Simulates aged, faded film with lifted blacks and color shift',
+        description: 'Scales the red/orange highlight glow (strongest on Cinestill 800T)',
       },
       {
         id: 'exposure',
@@ -6832,20 +6746,42 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 0,
         step: 0.25,
         group: 'intensity',
-        description: 'Exposure compensation in stops (-2 to +2)',
+        description: 'Exposure compensation in stops, applied in linear light',
       },
       {
-        id: 'opacity',
-        label: 'Effect Opacity',
+        id: 'fade',
+        label: 'Fade/Age (%)',
         min: 0,
-        max: 1,
-        defaultValue: 1,
-        step: 0.05,
+        max: 100,
+        defaultValue: 0,
+        step: 5,
         group: 'appearance',
-        description: 'Blend between original image and film result',
+        description: 'Aged, faded film with lifted blacks and a color shift',
+      },
+      {
+        id: 'seed',
+        label: 'Grain Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        group: 'appearance',
+        description: 'Changes the grain pattern; same seed reproduces the exact texture',
       },
     ],
   },
+
+  // ── PRO-GRADE EFFECTS (verified modules in effects/pro/) ──
+  clarity: proConfig(CLARITY_EFFECT),
+  exposure: proConfig(EXPOSURE_EFFECT),
+  colorBalance: proConfig(COLORBALANCE_EFFECT),
+  splitTone: proConfig(SPLITTONE_EFFECT),
+  hslSecondary: proConfig(HSLSECONDARY_EFFECT),
+  channelMixer: proConfig(CHANNELMIXER_EFFECT),
+  proMist: proConfig(PROMIST_EFFECT, 'Special FX'),
+  gradND: proConfig(GRADND_EFFECT, 'Special FX'),
+  bleachBypass: proConfig(BLEACHBYPASS_EFFECT, 'Special FX'),
+  surfaceBlur: proConfig(SURFACEBLUR_EFFECT, 'Special FX'),
 
   // Y2K CHROME - Metallic/Holographic Effect
   y2kChrome: {
@@ -7470,6 +7406,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         description: 'Blend between original image and geometric result',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
   stippling: {
@@ -7511,6 +7456,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 1,
         step: 0.05,
         description: 'Blend between original image and stippling result',
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
       },
     ],
   },
@@ -7587,6 +7541,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         description: 'Blend between original image and crosshatch result',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
   dotScreen: {
@@ -7652,6 +7615,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 0.4,
         step: 0.1,
         description: 'Dark corners from old camera lenses',
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
       },
     ],
   },
@@ -8026,6 +7998,31 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 1,
         description: 'How the noise combines with the image',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the noise pattern; same seed reproduces it (preview matches export)',
+      },
+    ],
+  },
+  thermalPalette: {
+    label: 'Thermal',
+    category: 'Color',
+    settings: [
+      {
+        id: 'sensitivity',
+        label: 'Sensitivity',
+        min: 0.2,
+        max: 2,
+        defaultValue: 1,
+        step: 0.05,
+        description:
+          'Maps brightness onto the thermal gradient; 1 uses the full black to blue to red to white range',
+      },
     ],
   },
   // --- NEW EFFECTS END HERE ---
@@ -8052,6 +8049,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 0,
         step: 1,
         description: 'Display cell boundaries as lines',
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
       },
     ],
   },
@@ -8183,6 +8189,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.01,
         description: 'Brightness variation simulating old projectors',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
 
@@ -8235,6 +8250,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 1,
         description: 'Number of explosion epicenters',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
 
@@ -8280,6 +8304,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 1,
         description: 'Number of horizontal glitch bands',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
   liquidMetal: {
@@ -8303,6 +8336,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 0.03,
         step: 0.01,
         description: 'Subtle flickering highlights like molten metal',
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
       },
     ],
   },
@@ -8466,6 +8508,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
         description: 'Severity of the byte manipulation artifacts',
       },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
   // --- NEW 10 EFFECTS ---
@@ -8481,6 +8532,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 5,
         step: 1,
         description: 'Number of layered paper cutout depth levels',
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
       },
     ],
   },
@@ -8571,6 +8631,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         defaultValue: 0.5,
         step: 0.05,
         description: 'Number and intensity of shatter fractures',
+      },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
       },
     ],
   },
@@ -8827,6 +8896,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
     category: 'Artistic',
     settings: [
       { id: 'weaveSize', label: 'Thread Size', min: 4, max: 16, defaultValue: 8, step: 1 },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
   bioluminescence: {
@@ -8842,6 +8920,15 @@ export const effectsConfig: Record<string, EffectConfig> = {
         step: 0.05,
       },
       { id: 'glowSpread', label: 'Glow Spread', min: 0.1, max: 1, defaultValue: 0.4, step: 0.05 },
+      {
+        id: 'seed',
+        label: 'Seed',
+        min: 1,
+        max: 9999,
+        defaultValue: 1,
+        step: 1,
+        description: 'Changes the random pattern; same seed reproduces it (preview matches export)',
+      },
     ],
   },
 
@@ -8867,9 +8954,12 @@ const createScratchedFilmEffect = (settings: Record<string, number>) => {
     const scratchDensity = settings.scratchDensity ?? 0.02;
     const dustOpacity = settings.dustOpacity ?? 0.1;
     const flicker = settings.flicker ?? 0.03;
+    // Seeded PRNG so the live preview and the export are byte-identical
+    // (flicker, scratches, dust).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     // Apply flicker (slight random brightness change per frame)
-    const flickerAmount = (Math.random() - 0.5) * flicker * 2;
+    const flickerAmount = (rng() - 0.5) * flicker * 2;
     const brightnessMultiplier = 1.0 + flickerAmount;
     for (let i = 0; i < data.length; i += 4) {
       data[i] = Math.min(255, data[i] * brightnessMultiplier);
@@ -8880,13 +8970,13 @@ const createScratchedFilmEffect = (settings: Record<string, number>) => {
     // Add scratches
     const numScratches = Math.floor(width * height * scratchDensity * 0.01); // Adjust density scaling
     for (let i = 0; i < numScratches; i++) {
-      const startX = Math.random() * width;
-      const scratchLength = height * (0.2 + Math.random() * 0.8);
-      const scratchColor = Math.random() * 50 + 20; // Darkish gray scratches
+      const startX = rng() * width;
+      const scratchLength = height * (0.2 + rng() * 0.8);
+      const scratchColor = rng() * 50 + 20; // Darkish gray scratches
       for (let y = 0; y < scratchLength; y++) {
-        const currentY = Math.floor(y + Math.random() * (height - scratchLength));
+        const currentY = Math.floor(y + rng() * (height - scratchLength));
         if (currentY < 0 || currentY >= height) continue;
-        const currentX = Math.floor(startX + (Math.random() - 0.5) * 2); // Slight horizontal jitter
+        const currentX = Math.floor(startX + (rng() - 0.5) * 2); // Slight horizontal jitter
         if (currentX < 0 || currentX >= width) continue;
 
         const index = (currentY * width + currentX) * 4;
@@ -8899,10 +8989,10 @@ const createScratchedFilmEffect = (settings: Record<string, number>) => {
     // Add dust
     const numDust = Math.floor(width * height * 0.01); // Fixed dust amount for now
     for (let i = 0; i < numDust; i++) {
-      const x = Math.floor(Math.random() * width);
-      const y = Math.floor(Math.random() * height);
+      const x = Math.floor(rng() * width);
+      const y = Math.floor(rng() * height);
       const index = (y * width + x) * 4;
-      const dustValue = Math.random() * 50; // Dark dust
+      const dustValue = rng() * 50; // Dark dust
       const alpha = dustOpacity * 255;
       // Simple blend (could be improved)
       data[index] = data[index] * (1 - dustOpacity) + dustValue * dustOpacity;
@@ -8917,15 +9007,82 @@ const createFractalNoiseEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
     const opacity = settings.opacity ?? 0.3;
-    // const scale = settings.scale ?? 0.1; // Scale not used in simple random noise
+    const scale = settings.scale ?? 0.1; // feature size as a fraction of the image
+    const blendMode = Math.floor(settings.blendMode ?? 0);
+    const seed = Math.floor(settings.seed ?? 1);
 
-    for (let i = 0; i < data.length; i += 4) {
-      // Generate simple random gray noise value
-      const noiseVal = Math.random() * 255;
-      // Blend with original pixel based on opacity (Overlay-like blend approx)
-      data[i] = lerp(data[i], noiseVal, opacity);
-      data[i + 1] = lerp(data[i + 1], noiseVal, opacity);
-      data[i + 2] = lerp(data[i + 2], noiseVal, opacity);
+    // Real fractional-Brownian-motion value noise: a seeded hashed lattice,
+    // smoothstep-interpolated, summed over octaves of halving amplitude and cell
+    // size. Seeded so the live preview matches the export (the old code used
+    // unseeded Math.random per pixel = flat white static, re-rolled every frame).
+    const minDim = Math.min(width, height);
+    const baseCell = Math.max(2, scale * minDim);
+    const octaves = 4;
+
+    const hash = (x: number, y: number, s: number): number => {
+      let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263)) ^ Math.imul(s, 2246822519);
+      h = (h ^ (h >>> 13)) >>> 0;
+      return h / 4294967296;
+    };
+    const vnoise = (px: number, py: number, cell: number, s: number): number => {
+      const fx = px / cell;
+      const fy = py / cell;
+      const ix = Math.floor(fx);
+      const iy = Math.floor(fy);
+      const tx = fx - ix;
+      const ty = fy - iy;
+      const a = hash(ix, iy, s);
+      const b = hash(ix + 1, iy, s);
+      const c = hash(ix, iy + 1, s);
+      const d = hash(ix + 1, iy + 1, s);
+      const sx = tx * tx * (3 - 2 * tx);
+      const sy = ty * ty * (3 - 2 * ty);
+      const top = a + (b - a) * sx;
+      const bot = c + (d - c) * sx;
+      return top + (bot - top) * sy;
+    };
+    const blend = (base: number, n: number): number => {
+      let out: number;
+      switch (blendMode) {
+        case 1: // multiply
+          out = (base * n) / 255;
+          break;
+        case 2: // screen
+          out = 255 - ((255 - base) * (255 - n)) / 255;
+          break;
+        case 3: // add / linear dodge
+          out = base + n;
+          break;
+        case 4: // normal (replace)
+          out = n;
+          break;
+        case 5: // difference
+          out = Math.abs(base - n);
+          break;
+        default: // overlay
+          out = base < 128 ? (2 * base * n) / 255 : 255 - (2 * (255 - base) * (255 - n)) / 255;
+      }
+      return lerp(base, out, opacity);
+    };
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let amp = 0.5;
+        let cell = baseCell;
+        let sum = 0;
+        let norm = 0;
+        for (let o = 0; o < octaves; o++) {
+          sum += amp * vnoise(x, y, cell, seed + o * 131);
+          norm += amp;
+          amp *= 0.5;
+          cell *= 0.5;
+        }
+        const noiseVal = (sum / norm) * 255;
+        const i = (y * width + x) * 4;
+        data[i] = clampByte(blend(data[i], noiseVal));
+        data[i + 1] = clampByte(blend(data[i + 1], noiseVal));
+        data[i + 2] = clampByte(blend(data[i + 2], noiseVal));
+      }
     }
   };
 };
@@ -9048,14 +9205,16 @@ const createVoronoiEffect = (settings: Record<string, number>) => {
     const { data, width, height } = imageData;
     const numPoints = Math.max(2, Math.floor(settings.numPoints ?? 100));
     const showLines = (settings.showLines ?? 0) > 0.5;
+    // Seeded PRNG so the live preview and the export are byte-identical (cell seeds).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data); // Keep original for color sampling
 
     // Generate random points
     const points: { x: number; y: number; r: number; g: number; b: number; a: number }[] = [];
     for (let i = 0; i < numPoints; i++) {
-      const px = Math.floor(Math.random() * width);
-      const py = Math.floor(Math.random() * height);
+      const px = Math.floor(rng() * width);
+      const py = Math.floor(rng() * height);
       const pIndex = (py * width + px) * 4;
       points.push({
         x: px,
@@ -9241,11 +9400,19 @@ const createPixelExplosionEffect = (settings: Record<string, number>) => {
     // For preview, use a small strength value if strength is 0
     const effectiveStrength = strength || 15;
 
+    // The original forward map pushed each source pixel radially outward from its
+    // nearest center by displacement = (dist/maxDim) * strength, which is exactly a
+    // uniform dilation about that center: target = center + (src - center) * k, with
+    // k = 1 + strength/maxDim. Forward mapping left holes (some targets never written).
+    // Backward-map instead: for every destination pixel, invert that dilation and
+    // bilinearly sample the source, so the output is hole-free and de-jaggied.
+    const k = 1 + effectiveStrength / Math.max(width, height);
+
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const srcIndex = (y * width + x) * 4;
+        const destIndex = (y * width + x) * 4;
 
-        // Find nearest center
+        // Find nearest center to this destination pixel
         let nearestDistSq = Infinity;
         let nearestCenter = centers[0];
         for (const center of centers) {
@@ -9258,29 +9425,12 @@ const createPixelExplosionEffect = (settings: Record<string, number>) => {
           }
         }
 
-        // Calculate displacement (ensure dist is not zero)
-        const dist = Math.sqrt(nearestDistSq) || 1;
-        const dx = x - nearestCenter.x;
-        const dy = y - nearestCenter.y;
-        // Normalize distance for consistent displacement feel across image sizes
-        const normalizedDist = dist / Math.max(width, height);
-        const displacement = normalizedDist * effectiveStrength;
+        // Invert the per-cell dilation to find the source coordinate.
+        const srcX = nearestCenter.x + (x - nearestCenter.x) / k;
+        const srcY = nearestCenter.y + (y - nearestCenter.y) / k;
 
-        // Calculate target coords, clamping to bounds
-        const targetX = Math.round(
-          Math.min(width - 1, Math.max(0, x + (dx / dist) * displacement))
-        );
-        const targetY = Math.round(
-          Math.min(height - 1, Math.max(0, y + (dy / dist) * displacement))
-        );
-
-        const targetIndex = (targetY * width + targetX) * 4;
-
-        // Copy pixel data from original (tempData) to the new location in output buffer
-        outputData[targetIndex] = tempData[srcIndex];
-        outputData[targetIndex + 1] = tempData[srcIndex + 1];
-        outputData[targetIndex + 2] = tempData[srcIndex + 2];
-        outputData[targetIndex + 3] = tempData[srcIndex + 3];
+        // Bilinear sample (edges clamp) into the output buffer.
+        sampleBilinear(tempData, width, height, srcX, srcY, outputData, destIndex);
       }
     }
     // Copy the result back to the original data array
@@ -9325,16 +9475,9 @@ const createFisheyeWarpEffect = (settings: Record<string, number>) => {
           srcY = centerY + Math.sin(angle) * newDist;
         }
 
-        // Clamp source coordinates and handle potential floating point issues
-        const clampedSrcX = Math.round(Math.min(width - 1, Math.max(0, srcX)));
-        const clampedSrcY = Math.round(Math.min(height - 1, Math.max(0, srcY)));
-        const srcIndex = (clampedSrcY * width + clampedSrcX) * 4;
-
-        // Copy pixel from tempData to data
-        data[index] = tempData[srcIndex];
-        data[index + 1] = tempData[srcIndex + 1];
-        data[index + 2] = tempData[srcIndex + 2];
-        data[index + 3] = tempData[srcIndex + 3];
+        // Bilinear sample at the float source coordinate (was Math.round
+        // nearest-neighbor). sampleBilinear clamps out-of-bounds to the edge.
+        sampleBilinear(tempData, width, height, srcX, srcY, data, index);
       }
     }
   };
@@ -9351,6 +9494,8 @@ const createChromaticGlitchEffect = (settings: Record<string, number>) => {
 
     // For preview, ensure we have visible effect
     const effectiveAmount = amount || 8;
+    // Seeded PRNG so the live preview and the export are byte-identical (band offsets, noise).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
@@ -9365,9 +9510,9 @@ const createChromaticGlitchEffect = (settings: Record<string, number>) => {
 
       if (isGlitchBand) {
         // Apply different offsets for each color channel
-        const rOffset = Math.floor((Math.random() - 0.5) * effectiveAmount * 2);
-        const gOffset = Math.floor((Math.random() - 0.5) * effectiveAmount);
-        const bOffset = Math.floor((Math.random() - 0.5) * effectiveAmount * 2);
+        const rOffset = Math.floor((rng() - 0.5) * effectiveAmount * 2);
+        const gOffset = Math.floor((rng() - 0.5) * effectiveAmount);
+        const bOffset = Math.floor((rng() - 0.5) * effectiveAmount * 2);
 
         for (let x = 0; x < width; x++) {
           const index = (y * width + x) * 4;
@@ -9388,10 +9533,10 @@ const createChromaticGlitchEffect = (settings: Record<string, number>) => {
           data[index + 2] = tempData[bIndex + 2];
 
           // Add random noise to glitch bands
-          if (Math.random() < 0.1) {
-            data[index] = Math.random() * 255;
-            data[index + 1] = Math.random() * 255;
-            data[index + 2] = Math.random() * 255;
+          if (rng() < 0.1) {
+            data[index] = rng() * 255;
+            data[index + 1] = rng() * 255;
+            data[index + 2] = rng() * 255;
           }
         }
       }
@@ -9408,6 +9553,8 @@ const createLiquidMetalEffect = (settings: Record<string, number>) => {
 
     // For preview, ensure we have visible effect
     const effectiveIntensity = intensity || 0.3;
+    // Seeded PRNG so the live preview and the export are byte-identical (shimmer).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
@@ -9438,7 +9585,7 @@ const createLiquidMetalEffect = (settings: Record<string, number>) => {
         data[index + 2] = Math.min(255, tempData[srcIndex + 2] * metalFactor);
 
         // Add shimmer
-        const shimmer = Math.random() * flicker * 255;
+        const shimmer = rng() * flicker * 255;
         data[index] = Math.min(255, data[index] + shimmer);
         data[index + 1] = Math.min(255, data[index + 1] + shimmer);
         data[index + 2] = Math.min(255, data[index + 2] + shimmer);
@@ -9491,10 +9638,12 @@ const createChromaticGrainEffect = (settings: Record<string, number>) => {
     const { data } = imageData;
     const grainAmount = settings.grain ?? 0.2;
     const chroma = settings.chroma ?? 0.5;
+    // Seeded PRNG so the live preview and the export are byte-identical.
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     for (let i = 0; i < data.length; i += 4) {
-      const grain = (Math.random() - 0.5) * grainAmount * 255;
-      const chromaShift = (Math.random() - 0.5) * chroma * 8;
+      const grain = (rng() - 0.5) * grainAmount * 255;
+      const chromaShift = (rng() - 0.5) * chroma * 8;
 
       data[i] = Math.min(255, Math.max(0, data[i] + grain + chromaShift));
       data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + grain - chromaShift));
@@ -9598,11 +9747,13 @@ const createInkWashEffect = (settings: Record<string, number>) => {
     const softness = settings.softness ?? 0.7;
     const bleed = settings.bleed ?? 0.5;
     const density = settings.density ?? 0.6;
+    // Seeded PRNG so the live preview and the export are byte-identical (ink bleed).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     for (let i = 0; i < data.length; i += 4) {
       const brightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
       const ink = brightness * density;
-      const bleedFactor = (Math.random() - 0.5) * bleed * 255;
+      const bleedFactor = (rng() - 0.5) * bleed * 255;
 
       data[i] = clampByte(ink + bleedFactor);
       data[i + 1] = clampByte(ink + bleedFactor * softness);
@@ -9697,6 +9848,8 @@ const createPaperReliefEffect = (settings: Record<string, number>) => {
     const { data, width, height } = imageData;
     const depth = settings.depth ?? 3;
     const texture = settings.texture ?? 0.4;
+    // Seeded PRNG so the live preview and the export are byte-identical (paper texture).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const temp = new Uint8ClampedArray(data.length);
     temp.set(data);
@@ -9713,7 +9866,7 @@ const createPaperReliefEffect = (settings: Record<string, number>) => {
 
         const relief = Math.min(255, Math.max(0, temp[index] + dx * depth + dy * depth));
 
-        const noise = (Math.random() - 0.5) * texture * 255;
+        const noise = (rng() - 0.5) * texture * 255;
 
         data[index] =
           data[index + 1] =
@@ -9877,18 +10030,13 @@ const createKaleidoscopeFractureEffect = (settings: Record<string, number>) => {
           angle = -angle;
         }
 
-        // Calculate source position
-        const srcX = Math.floor(centerX + Math.cos(angle) * distance);
-        const srcY = Math.floor(centerY + Math.sin(angle) * distance);
+        // Calculate source position (float + bilinear sampling, was nearest-neighbor)
+        const srcX = centerX + Math.cos(angle) * distance;
+        const srcY = centerY + Math.sin(angle) * distance;
 
         if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
-          const srcIndex = (srcY * width + srcX) * 4;
           const dstIndex = (y * width + x) * 4;
-
-          data[dstIndex] = tempData[srcIndex];
-          data[dstIndex + 1] = tempData[srcIndex + 1];
-          data[dstIndex + 2] = tempData[srcIndex + 2];
-          data[dstIndex + 3] = tempData[srcIndex + 3];
+          sampleBilinear(tempData, width, height, srcX, srcY, data, dstIndex);
         }
       }
     }
@@ -10104,6 +10252,9 @@ const createDatabendingEffect = (settings: Record<string, number>) => {
     const { data, width, height } = imageData;
     const amount = settings.amount ?? 0.5;
     const distortion = settings.distortion ?? 0.3;
+    // Seeded PRNG so the live preview and the export are byte-identical
+    // (block selection + corruption type).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
@@ -10114,8 +10265,8 @@ const createDatabendingEffect = (settings: Record<string, number>) => {
 
     for (let y = 0; y < height; y += blockSize) {
       for (let x = 0; x < width; x += blockSize) {
-        if (Math.random() < amount) {
-          const corruption = corruptionTypes[Math.floor(Math.random() * corruptionTypes.length)];
+        if (rng() < amount) {
+          const corruption = corruptionTypes[Math.floor(rng() * corruptionTypes.length)];
 
           for (let by = 0; by < blockSize && y + by < height; by++) {
             for (let bx = 0; bx < blockSize && x + bx < width; bx++) {
@@ -11069,6 +11220,8 @@ export const effectCategories = {
       'colorTemperature',
       'dehaze',
       'relight',
+      'clarity',
+      'exposure',
     ],
   },
 
@@ -11100,15 +11253,7 @@ export const effectCategories = {
   Stylize: {
     icon: '🖌️',
     description: 'Artistic painting and stylization',
-    effects: [
-      'watercolor',
-      'oilPainting',
-      'toon',
-      'posterEdges',
-      'cutout',
-      'stainedGlass',
-      'crystallize',
-    ],
+    effects: ['watercolor', 'oilPainting', 'toon', 'posterEdges', 'cutout', 'stainedGlass'],
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -11127,6 +11272,10 @@ export const effectCategories = {
       'heatmap',
       'thermalPalette',
       'holographicInterference',
+      'colorBalance',
+      'splitTone',
+      'hslSecondary',
+      'channelMixer',
     ],
   },
 
@@ -11172,6 +11321,10 @@ export const effectCategories = {
       'paperCutArt',
       'pixelExplosion',
       'temporalEcho',
+      'proMist',
+      'gradND',
+      'bleachBypass',
+      'surfaceBlur',
     ],
   },
 
@@ -11324,56 +11477,6 @@ export const getEffectCategory = (effectId: string): string | null => {
 
 // --- NEW 10 EFFECTS IMPLEMENTATIONS ---
 
-// Crystallize Effect
-const createCrystallizeEffect = (settings: Record<string, number>) => {
-  return function (imageData: KonvaImageData) {
-    const { data, width, height } = imageData;
-    const crystalSize = Math.max(5, Math.floor((settings.crystalSize ?? 5) * 5));
-    const tempData = new Uint8ClampedArray(data.length);
-    tempData.set(data);
-
-    // Create crystal centers
-    const crystals: { x: number; y: number; r: number; g: number; b: number }[] = [];
-    for (let y = 0; y < height; y += crystalSize) {
-      for (let x = 0; x < width; x += crystalSize) {
-        const cx = x + Math.floor(Math.random() * crystalSize);
-        const cy = y + Math.floor(Math.random() * crystalSize);
-        if (cx < width && cy < height) {
-          const idx = (cy * width + cx) * 4;
-          crystals.push({
-            x: cx,
-            y: cy,
-            r: tempData[idx],
-            g: tempData[idx + 1],
-            b: tempData[idx + 2],
-          });
-        }
-      }
-    }
-
-    // Apply Voronoi-like crystallization
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        let minDist = Infinity;
-        let nearestCrystal = crystals[0];
-
-        for (const crystal of crystals) {
-          const dist = Math.sqrt((x - crystal.x) ** 2 + (y - crystal.y) ** 2);
-          if (dist < minDist) {
-            minDist = dist;
-            nearestCrystal = crystal;
-          }
-        }
-
-        const index = (y * width + x) * 4;
-        data[index] = nearestCrystal.r;
-        data[index + 1] = nearestCrystal.g;
-        data[index + 2] = nearestCrystal.b;
-      }
-    }
-  };
-};
-
 // Thermal Palette Effect
 const createThermalPaletteEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
@@ -11426,6 +11529,8 @@ const createPaperCutArtEffect = (settings: Record<string, number>) => {
     // Map 3-8 to actual 3-12 layers for more range
     const layersInput = Math.floor(settings.layers ?? 5);
     const layers = Math.floor(3 + ((layersInput - 3) / 5) * 9); // 3 to 12
+    // Seeded PRNG so the live preview and the export are byte-identical (fiber texture).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const tempData = new Uint8ClampedArray(data.length);
 
@@ -11522,7 +11627,7 @@ const createPaperCutArtEffect = (settings: Record<string, number>) => {
     // Add paper fiber texture (only to non-transparent pixels)
     for (let i = 0; i < tempData.length; i += 4) {
       if (tempData[i + 3] > 0) {
-        const noise = (Math.random() - 0.5) * 12;
+        const noise = (rng() - 0.5) * 12;
         tempData[i] = clampByte(tempData[i] + noise);
         tempData[i + 1] = clampByte(tempData[i + 1] + noise);
         tempData[i + 2] = clampByte(tempData[i + 2] + noise);
@@ -11537,9 +11642,13 @@ const createPaperCutArtEffect = (settings: Record<string, number>) => {
 const createTiltShiftMiniatureEffect = (settings: Record<string, number>) => {
   return function (imageData: KonvaImageData) {
     const { data, width, height } = imageData;
-    const focalPoint = height / 2;
-    const focalRange = (settings.focalLength ?? 50) * 2;
-    const blurStrength = 16 / (settings.aperture ?? 5.6);
+    // Read the SETTINGS THE CONFIG ACTUALLY EXPOSES (the old code read
+    // focalLength/aperture, which the config never defines → all 4 sliders dead).
+    const focusY = (settings.focusY ?? 0.5) * height; // focus-band center, px
+    const halfBand = ((settings.focusHeight ?? 0.3) * height) / 2; // half band height, px
+    const blurStrength = Math.max(1, Math.round(settings.blurStrength ?? 10));
+    const sat = settings.saturation ?? 1.5;
+    const feather = height * 0.25;
 
     const pool = getBufferPool();
     const original = pool.acquire(data.length);
@@ -11548,22 +11657,14 @@ const createTiltShiftMiniatureEffect = (settings: Record<string, number>) => {
     try {
       original.set(data);
       blurred.set(data);
+      stackBlur(blurred, width, height, blurStrength);
 
-      // Apply a single blur pass at max strength
-      const maxBlur = Math.ceil(blurStrength);
-      if (maxBlur > 0) {
-        stackBlur(blurred, width, height, maxBlur);
-      }
-
-      // Blend based on distance from focal point
+      // Blend original↔blurred by vertical distance from the focus band.
       for (let y = 0; y < height; y++) {
-        const distance = Math.abs(y - focalPoint);
-        const blendFactor = Math.max(0, Math.min(1, (distance - focalRange) / (height * 0.3)));
-
+        const distance = Math.abs(y - focusY);
+        const blendFactor = Math.max(0, Math.min(1, (distance - halfBand) / feather));
         for (let x = 0; x < width; x++) {
           const index = (y * width + x) * 4;
-
-          // Blend between original and blurred based on distance
           data[index] = original[index] * (1 - blendFactor) + blurred[index] * blendFactor;
           data[index + 1] =
             original[index + 1] * (1 - blendFactor) + blurred[index + 1] * blendFactor;
@@ -11572,16 +11673,15 @@ const createTiltShiftMiniatureEffect = (settings: Record<string, number>) => {
         }
       }
 
-      // Add slight saturation boost for toy-like appearance
+      // Saturation boost for the toy-like look (now driven by the slider).
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
         const avg = (r + g + b) / 3;
-
-        data[i] = Math.min(255, Math.max(0, avg + (r - avg) * 1.3));
-        data[i + 1] = Math.min(255, Math.max(0, avg + (g - avg) * 1.3));
-        data[i + 2] = Math.min(255, Math.max(0, avg + (b - avg) * 1.3));
+        data[i] = clampByte(avg + (r - avg) * sat);
+        data[i + 1] = clampByte(avg + (g - avg) * sat);
+        data[i + 2] = clampByte(avg + (b - avg) * sat);
       }
     } finally {
       pool.release(original);
@@ -11696,6 +11796,8 @@ const createDispersionShatterEffect = (settings: Record<string, number>) => {
     const { data, width, height } = imageData;
     const amount = settings.dispersionAmount ?? 0.3;
     const intensity = settings.shatterIntensity ?? 0.5;
+    // Seeded PRNG so the live preview and the export are byte-identical (shatter points).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
@@ -11706,9 +11808,9 @@ const createDispersionShatterEffect = (settings: Record<string, number>) => {
 
     for (let i = 0; i < numPoints; i++) {
       shatterPoints.push({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        force: Math.random() * 100 * amount,
+        x: rng() * width,
+        y: rng() * height,
+        force: rng() * 100 * amount,
       });
     }
 
@@ -11728,16 +11830,13 @@ const createDispersionShatterEffect = (settings: Record<string, number>) => {
           totalForceY += (dy / dist) * force;
         }
 
-        const sourceX = Math.max(0, Math.min(width - 1, Math.floor(x - totalForceX)));
-        const sourceY = Math.max(0, Math.min(height - 1, Math.floor(y - totalForceY)));
+        // Float source coords + bilinear sampling (was Math.floor nearest-neighbor).
+        // sampleBilinear clamps out-of-bounds coords to the edge.
+        const sourceX = x - totalForceX;
+        const sourceY = y - totalForceY;
 
         const targetIdx = (y * width + x) * 4;
-        const sourceIdx = (sourceY * width + sourceX) * 4;
-
-        data[targetIdx] = tempData[sourceIdx];
-        data[targetIdx + 1] = tempData[sourceIdx + 1];
-        data[targetIdx + 2] = tempData[sourceIdx + 2];
-        data[targetIdx + 3] = tempData[sourceIdx + 3];
+        sampleBilinear(tempData, width, height, sourceX, sourceY, data, targetIdx);
       }
     }
   };
@@ -12562,6 +12661,8 @@ const createWeavePatternEffect = (settings: Record<string, number>) => {
     // Map 4-16 input to 8-60 pixel weave size
     const sizeInput = settings.weaveSize ?? 8;
     const weaveSize = Math.floor(8 + ((sizeInput - 4) / 12) * 52); // 8 to 60
+    // Seeded PRNG so the live preview and the export are byte-identical (fabric grain).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const tempData = new Uint8ClampedArray(data.length);
     tempData.set(data);
@@ -12625,7 +12726,7 @@ const createWeavePatternEffect = (settings: Record<string, number>) => {
         );
 
         // Subtle fabric grain noise
-        const noise = (Math.random() - 0.5) * 8;
+        const noise = (rng() - 0.5) * 8;
         data[idx] = clampByte(data[idx] + noise);
         data[idx + 1] = clampByte(data[idx + 1] + noise);
         data[idx + 2] = clampByte(data[idx + 2] + noise);
@@ -12640,6 +12741,8 @@ const createBioluminescenceEffect = (settings: Record<string, number>) => {
     const { data, width, height } = imageData;
     const glowIntensity = settings.glowIntensity ?? 0.5;
     const glowSpread = settings.glowSpread ?? 0.5;
+    // Seeded PRNG so the live preview and the export are byte-identical (sparkle particles).
+    const rng = mulberry32(Math.floor(settings.seed ?? 1) >>> 0);
 
     const pool = getBufferPool();
     const original = pool.acquire(data.length);
@@ -12707,13 +12810,13 @@ const createBioluminescenceEffect = (settings: Record<string, number>) => {
       if (glowIntensity > 0.6) {
         const particleCount = Math.floor((glowIntensity - 0.6) * 300);
         for (let i = 0; i < particleCount; i++) {
-          const px = Math.floor(Math.random() * width);
-          const py = Math.floor(Math.random() * height);
+          const px = Math.floor(rng() * width);
+          const py = Math.floor(rng() * height);
           const idx = (py * width + px) * 4;
 
           // Only sparkle where there's glow
           if (glowLayer[idx] > 20 || glowLayer[idx + 1] > 20) {
-            const sparkle = 50 + Math.random() * 100;
+            const sparkle = 50 + rng() * 100;
             data[idx] = Math.min(255, data[idx] + sparkle * 0.3);
             data[idx + 1] = Math.min(255, data[idx + 1] + sparkle);
             data[idx + 2] = Math.min(255, data[idx + 2] + sparkle * 0.8);

@@ -52,12 +52,19 @@ export function compose(
   const target = 3 + Math.round(W * 3); // 3..6 fresh layers
 
   const lockedSlots = new Set<Slot>(locked.map(l => slotOf(l.effectId)));
+  // Cross-slot exclusions (EFFECT_META.excl). Declared on the earlier-slot effect
+  // and filtered forward in SLOT_ORDER, so a film grade (own grain) suppresses a
+  // later extra-grain texture. Seeded from locked layers too.
+  const excludedIds = new Set<string>();
+  for (const l of locked) (EFFECT_META[l.effectId]?.excl || []).forEach(e => excludedIds.add(e));
   const picks: Array<{ effectId: string; t: number; opacity: number; hero?: boolean }> = [];
 
   for (const slot of SLOT_ORDER) {
     if (picks.length >= target) break;
     if (lockedSlots.has(slot)) continue; // a locked layer owns this slot
-    const pool = RANDOMIZER_EFFECT_IDS.filter(id => EFFECT_META[id].slot === slot);
+    const pool = RANDOMIZER_EFFECT_IDS.filter(
+      id => EFFECT_META[id].slot === slot && !excludedIds.has(id)
+    );
     if (!pool.length) continue;
     const prefSum = pool.reduce((s, id) => s + (mood.prefer[id] || 0), 0);
     const slotOdds = Math.min(0.95, (prefSum > 0 ? 0.6 : 0.12) + W * 0.3);
@@ -75,6 +82,7 @@ export function compose(
     }
     const t = clamp(mood.mean + gaussian(rng) * mood.sigma * (0.7 + W * 0.8), 0.12, 0.95);
     picks.push({ effectId: pick, t, opacity: 1 });
+    (EFFECT_META[pick].excl || []).forEach(e => excludedIds.add(e));
   }
 
   // Promote exactly one fresh layer to "hero" (one loud gesture + quiet support).
