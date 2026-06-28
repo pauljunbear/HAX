@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Menu, ImagePlus, SlidersHorizontal } from 'lucide-react';
+import { Menu, ImagePlus, SlidersHorizontal, Eye } from 'lucide-react';
 import AppleEffectsBrowser from './AppleEffectsBrowser';
 import AppleControlsPanel from './AppleControlsPanel';
+import { BeforeAfterSplitView } from './BeforeAfterSplitView';
 
 interface EffectLayer {
   id: string;
@@ -37,6 +38,9 @@ interface AppleStyleLayoutProps {
   onReorderLayers?: (fromIndex: number, toIndex: number) => void;
   onExport?: (format: string, quality?: number) => void;
   onEstimateFileSize?: (format: 'png' | 'jpeg', quality?: number) => Promise<number>;
+  showBeforeAfter?: boolean;
+  onToggleBeforeAfter?: () => void;
+  capturedEffectedUrl?: string | null;
 }
 
 const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
@@ -61,6 +65,9 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
   onReorderLayers,
   onExport,
   onEstimateFileSize,
+  showBeforeAfter,
+  onToggleBeforeAfter,
+  capturedEffectedUrl,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   // State for mobile side-panel drawers
@@ -97,6 +104,19 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
           <span className="hx-tagline hidden sm:inline">image effects, played not configured</span>
         </div>
         <div className="flex items-center gap-2">
+          {onToggleBeforeAfter && (
+            <button
+              className="hx-topbar-btn"
+              onClick={onToggleBeforeAfter}
+              disabled={!selectedImage}
+              aria-label="Toggle before/after comparison"
+              aria-pressed={!!showBeforeAfter}
+              title="Before / After (Ctrl+B)"
+            >
+              <Eye className="w-4 h-4" />
+              <span className="hidden sm:inline">Compare</span>
+            </button>
+          )}
           <button className="hx-topbar-btn" onClick={handleImageSelect}>
             <ImagePlus className="w-4 h-4" />
             <span className="hidden sm:inline">New image</span>
@@ -155,8 +175,18 @@ const AppleStyleLayout: React.FC<AppleStyleLayoutProps> = ({
         )}
 
         {/* Center Canvas Area */}
-        <div className="flex-1 h-full canvas-area min-w-0 glass-container">
+        <div className="flex-1 h-full canvas-area min-w-0 glass-container relative">
           <div className="glass-content h-full w-full">{children}</div>
+          {showBeforeAfter && capturedEffectedUrl && selectedImage && (
+            <BeforeAfterSplitView
+              beforeImage={selectedImage}
+              afterImage={capturedEffectedUrl}
+              width={900}
+              height={600}
+              isActive={!!showBeforeAfter}
+              onClose={() => onToggleBeforeAfter?.()}
+            />
+          )}
         </div>
 
         {/* Right Controls Panel — desktop */}

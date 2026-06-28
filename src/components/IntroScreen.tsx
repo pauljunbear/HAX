@@ -18,8 +18,8 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ onImageSelect }) => {
       transition={{ duration: 0.5 }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black"
     >
-      {/* Animated Background */}
-      <div className="absolute inset-0 flex items-center justify-center z-0">
+      {/* Animated Background (decorative) */}
+      <div className="absolute inset-0 flex items-center justify-center z-0" aria-hidden="true">
         <div className="w-[50%] h-[50%] relative overflow-hidden">
           <AnimatedLogo className="w-full h-full" />
         </div>
@@ -29,14 +29,9 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ onImageSelect }) => {
       <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-6">
         <div className="flex flex-col items-center justify-center gap-8">
           {/* Title above orb */}
-          <motion.h1
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="text-4xl md:text-5xl font-bold text-white tracking-tight"
-          >
-            HAX
-          </motion.h1>
+          <h1 className="hx-wordmark" style={{ fontSize: 'clamp(44px, 9vw, 76px)' }}>
+            HAX<span className="pt">.</span>
+          </h1>
 
           {/* Spacer for orb matching orb height to avoid tagline overlap */}
           <div className="h-[50vh]" />
@@ -46,7 +41,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ onImageSelect }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
-            className="text-base md:text-lg text-gray-300 max-w-md leading-relaxed"
+            className="text-base md:text-lg text-muted-foreground max-w-md leading-relaxed"
           >
             Add interesting effects to an image. A fun side project by Paul Jun.
           </motion.p>
@@ -60,7 +55,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ onImageSelect }) => {
           >
             <button
               onClick={onImageSelect}
-              className="group relative inline-flex items-center gap-3 px-6 py-3 bg-[#F53001] hover:bg-[#d42801] text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-150 transform hover:scale-105"
+              className="group relative inline-flex items-center gap-3 px-6 py-3 bg-[#F53001] hover:bg-[#d42801] text-primary-foreground font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-150 transform hover:scale-105"
             >
               <Upload className="w-4 h-4" />
               <span className="text-sm">Choose Image</span>

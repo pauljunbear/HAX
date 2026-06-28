@@ -20,21 +20,37 @@ export const useKeyboardShortcuts = ({ shortcuts, enabled = true }: UseKeyboardS
     (event: KeyboardEvent) => {
       if (!enabled) return;
 
+      // Never hijack keys while the user is typing in a field.
+      const el = document.activeElement as HTMLElement | null;
+      if (
+        el &&
+        el !== document.body &&
+        el.closest('input,textarea,select,[contenteditable="true"]')
+      ) {
+        return;
+      }
+
       const matched = shortcuts.filter(shortcut => {
         const keyMatch = shortcut.key.toLowerCase() === event.key.toLowerCase();
-        const ctrlMatch = shortcut.ctrlKey === undefined ? true : shortcut.ctrlKey === event.ctrlKey;
-        const shiftMatch = shortcut.shiftKey === undefined ? true : shortcut.shiftKey === event.shiftKey;
+        // Treat a requested Ctrl as Ctrl-or-Cmd so shortcuts work on macOS too.
+        const ctrlMatch =
+          shortcut.ctrlKey === undefined
+            ? true
+            : shortcut.ctrlKey === (event.ctrlKey || event.metaKey);
+        const shiftMatch =
+          shortcut.shiftKey === undefined ? true : shortcut.shiftKey === event.shiftKey;
         const altMatch = shortcut.altKey === undefined ? true : shortcut.altKey === event.altKey;
-        const metaMatch = shortcut.metaKey === undefined ? true : shortcut.metaKey === event.metaKey;
+        const metaMatch =
+          shortcut.metaKey === undefined ? true : shortcut.metaKey === event.metaKey;
         return keyMatch && ctrlMatch && shiftMatch && altMatch && metaMatch;
       });
 
       // Prefer the most specific shortcut (with the most defined modifier keys)
       const specificity = (s: KeyboardShortcut) =>
-        (Number(s.ctrlKey !== undefined) +
-         Number(s.shiftKey !== undefined) +
-         Number(s.altKey !== undefined) +
-         Number(s.metaKey !== undefined));
+        Number(s.ctrlKey !== undefined) +
+        Number(s.shiftKey !== undefined) +
+        Number(s.altKey !== undefined) +
+        Number(s.metaKey !== undefined);
 
       const matchingShortcut = matched.sort((a, b) => specificity(b) - specificity(a))[0];
 

@@ -231,6 +231,10 @@ const EffectCard: React.FC<{
           <button
             onClick={() => onToggleLayerVisibility?.(layer.id)}
             className="glass-button p-1.5"
+            aria-label={
+              hidden ? `Show ${cfg?.label || 'effect'}` : `Hide ${cfg?.label || 'effect'}`
+            }
+            aria-pressed={!hidden}
             title={hidden ? 'Show' : 'Hide'}
           >
             {hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -238,6 +242,10 @@ const EffectCard: React.FC<{
           <button
             onClick={() => onToggleLayerLock?.(layer.id)}
             className="glass-button p-1.5"
+            aria-label={
+              layer.locked ? `Unlock ${cfg?.label || 'effect'}` : `Lock ${cfg?.label || 'effect'}`
+            }
+            aria-pressed={!!layer.locked}
             title={layer.locked ? 'Locked — kept on reroll' : 'Lock this layer'}
             style={layer.locked ? { color: '#F53001' } : undefined}
           >
@@ -246,6 +254,7 @@ const EffectCard: React.FC<{
           <button
             onClick={() => onRemoveEffect?.(layer.id)}
             className="glass-button p-1.5"
+            aria-label={`Remove ${cfg?.label || 'effect'}`}
             title="Remove effect"
           >
             <X className="w-3.5 h-3.5" />

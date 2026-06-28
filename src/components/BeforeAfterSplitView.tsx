@@ -163,7 +163,7 @@ export const BeforeAfterSplitView: React.FC<BeforeAfterSplitViewProps> = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      initial={false}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="absolute inset-0 bg-black/80 z-40 flex items-center justify-center"

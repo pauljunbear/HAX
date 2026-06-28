@@ -19,5 +19,3 @@ export {
   getEffectPreviewCache,
   clearEffectPreviewCache,
 } from './EffectPreviewCache';
-export { BatchProcessor } from './BatchProcessor';
-export { DynamicModuleLoader } from './DynamicModuleLoader';
