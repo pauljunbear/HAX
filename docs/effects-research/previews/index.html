@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HAX — Film Stock Previews (28 stocks, documented science)</title>
+<style>
+  :root { --void:#0b0b0c; --ink:#eceae3; --ink2:#a8a49a; --spark:#f53001; --hair:rgba(236,234,227,.1); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--void); color:var(--ink);
+    font-family:'Hanken Grotesk',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  header { padding:32px clamp(16px,4vw,56px) 8px; }
+  h1 { font-family:Fraunces,Georgia,serif; font-weight:600; font-size:clamp(24px,4vw,40px); margin:0 0 6px; }
+  h1 .d { color:var(--spark); }
+  p.sub { color:var(--ink2); max-width:60ch; line-height:1.55; margin:0 0 4px; font-size:15px; }
+  nav { display:flex; gap:8px; padding:14px clamp(16px,4vw,56px); position:sticky; top:0;
+    background:linear-gradient(var(--void),var(--void) 70%,transparent); z-index:2; flex-wrap:wrap; }
+  nav button { background:transparent; color:var(--ink2); border:1px solid var(--hair);
+    border-radius:999px; padding:8px 16px; font:inherit; font-size:13px; cursor:pointer; }
+  nav button[aria-pressed="true"] { color:#fff; background:rgba(245,48,1,.16); border-color:var(--spark); }
+  main { padding:0 clamp(16px,4vw,56px) 64px; }
+  figure { margin:0; }
+  figure img { width:100%; height:auto; display:block; border:1px solid var(--hair); border-radius:10px; }
+  figcaption { color:var(--ink2); font-size:13px; padding:10px 2px 28px; }
+  .hide { display:none; }
+  code { font-family:'JetBrains Mono',ui-monospace,monospace; color:var(--ink); font-size:12.5px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Film stocks on the new substrate<span class="d">.</span></h1>
+  <p class="sub">28 stocks, each from documented characteristic curves, channel matrices, RMS-anchored seeded grain, and physically-correct halation — not the old ad-hoc gamma-byte channel math. Pipeline: linear WB/matrix → per-channel curve (toe + shoulder) → saturation → halation → grain.</p>
+  <p class="sub">Validations to look for: <code>Cinestill 800T</code> red halation around highlights; <code>Pro 400H</code> cyan pastel; <code>Kodachrome 64</code> warm-deep shadows + selective red (not global oversaturation); B&amp;W stocks differing by real channel-mix + grain structure.</p>
+</header>
+<nav id="tabs">
+  <button data-k="portrait" aria-pressed="true">Portrait (skin)</button>
+  <button data-k="color" aria-pressed="false">Color + highlights (halation)</button>
+  <button data-k="street" aria-pressed="false">Street</button>
+  <button data-k="pro-color" aria-pressed="false">Pro FX · color</button>
+  <button data-k="pro-portrait" aria-pressed="false">Pro FX · portrait</button>
+  <button data-k="warps" aria-pressed="false">Warps (bilinear)</button>
+  <button data-k="looks" aria-pressed="false">Looks UI</button>
+</nav>
+<main>
+  <figure data-k="portrait"><img src="./sheet-portrait.png" alt="Film stocks on a portrait" /><figcaption>Best for skin-tone rendering and the warm/cool split-tones.</figcaption></figure>
+  <figure data-k="color" class="hide"><img src="./sheet-color.png" alt="Film stocks on a warm color scene" /><figcaption>Bright bell/cup highlights show Cinestill 800T halation; warm scene exposes saturation differences.</figcaption></figure>
+  <figure data-k="street" class="hide"><img src="./sheet-street.png" alt="Film stocks on a street scene" /><figcaption>Mixed tones and detail.</figcaption></figure>
+  <figure data-k="pro-color" class="hide"><img src="./pro-color.png" alt="New pro effects on a color scene" /><figcaption>10 new pro effects at representative settings (defaults are neutral). Clarity, Color Balance, Split Tone, Pro-Mist, Graduated ND, HSL Secondary, Exposure, Channel Mixer, Bleach Bypass, Surface Blur.</figcaption></figure>
+  <figure data-k="pro-portrait" class="hide"><img src="./pro-portrait.png" alt="New pro effects on a portrait" /><figcaption>Same pro effects on a portrait.</figcaption></figure>
+  <figure data-k="warps" class="hide"><img src="./warps.png" alt="Geometric warps via the new bilinear sampler" /><figcaption>Geometric warps now sample through a shared bilinear sampler (was nearest-neighbor → jaggies). Smooth swirl, sharp kaleidoscope mirrors, clean fisheye/spherize; pixelExplosion is backward-mapped (no holes).</figcaption></figure>
+  <figure data-k="looks" class="hide"><img src="./looks-dock.png" alt="The Looks gallery dock in the live skin" /><figcaption>The new Looks gallery (curated one-click recipes) sits above the Randomizer in the dock — matching the void-darkroom pill aesthetic, never over the hero. Randomizer also shows the 3 new moods (Cinematic, Print Shop, Monochrome).</figcaption></figure>
+</main>
+<script>
+  const tabs = document.getElementById('tabs');
+  tabs.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const k = b.dataset.k;
+    [...tabs.children].forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    document.querySelectorAll('main figure').forEach(f => f.classList.toggle('hide', f.dataset.k !== k));
+  });
+</script>
+</body>
+</html>

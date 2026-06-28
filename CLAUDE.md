@@ -32,16 +32,15 @@ npm run type-check   # TypeScript check
 
 ## Tech Stack
 
-| Layer     | Technology                   |
-| --------- | ---------------------------- |
-| Framework | Next.js 14 (App Router)      |
-| UI        | React 18, Tailwind CSS       |
-| Canvas    | Konva.js, react-konva        |
-| 3D        | Three.js, @react-three/fiber |
-| State     | Zustand                      |
-| Animation | Framer Motion                |
-| Video/GIF | FFmpeg WASM, gif.js          |
-| Testing   | Jest, Cypress                |
+| Layer     | Technology              |
+| --------- | ----------------------- |
+| Framework | Next.js 14 (App Router) |
+| UI        | React 18, Tailwind CSS  |
+| Canvas    | Konva.js, react-konva   |
+| State     | Zustand                 |
+| Animation | Framer Motion           |
+| Video/GIF | FFmpeg WASM, gif.js     |
+| Testing   | Jest, Cypress           |
 
 ## Architecture Overview
 
@@ -132,18 +131,37 @@ Effects are Konva filter functions defined in `src/lib/effects.ts`. Each effect:
 2. Manipulates pixel values in-place
 3. Gets applied to Konva.Image via `image.filters([filterFn])`
 
-### Effect Categories (8 total)
+### Effect Categories (live in `effectCategories`)
 
-| Category | Effects                                           |
-| -------- | ------------------------------------------------- |
-| Adjust   | brightness, contrast, saturation, exposure, gamma |
-| Blur     | blur, gaussianBlur, motionBlur, radialBlur        |
-| Color    | duotone, grayscale, sepia, invert, posterize      |
-| Distort  | pixelate, glitch, wave, spherize                  |
-| Stylize  | halftone, dither, ASCII, scanlines                |
-| Sharpen  | sharpen, smartSharpen, clarity                    |
-| Effects  | lightLeak, orton, vignette, grain                 |
-| Math     | fractal, flowField, reactionDiffusion             |
+| Category   | Examples                                                                                              |
+| ---------- | ----------------------------------------------------------------------------------------------------- |
+| Adjust     | brightness, contrast, saturation, hue, colorTemperature, clarity, exposure                            |
+| Studios    | unifiedFilm, unifiedBlur, unifiedGlow, unifiedGlitch, unifiedVintage, unifiedPrint, advancedDithering |
+| Stylize    | watercolor, oilPainting (Kuwahara), toon, posterEdges, cutout, stainedGlass                           |
+| Color      | duotone, gradientMap, selectiveColor, colorBalance, splitTone, hslSecondary, channelMixer             |
+| Texture    | noise, fractalNoise (seeded fBm), chromaticGrain, weavePattern, cellular, voronoi                     |
+| Special FX | y2kChrome, doubleExposure, proMist, gradND, bleachBypass, surfaceBlur, anaglyph                       |
+| Utility    | threshold, posterize, edgeDetection, sharpen (real unsharp), vignette, lensFlare                      |
+
+### Film emulation (`src/lib/effects/film/`)
+
+`unifiedFilm` emulates 28 documented stocks via a real **substrate** — NOT ad-hoc channel math:
+`substrate.ts` runs `linear WB/matrix → per-channel characteristic curve (toe + shoulder) → saturation → halation → seeded grain → strength blend`. Per-stock recipes live in `film/stocks/*.ts` (kodak-negative, kodak-slide, fuji, cinema, bw). `grain.ts` = seeded structured grain (preview == export); `halation.ts` = physical red→orange highlight bloom in linear light. The ordered `FILM_STOCKS` array drives the `preset` index. Research + per-stock specs: `docs/EFFECTS_AUDIT_AND_ROADMAP.md` + `docs/effects-research/`.
+
+### Pro effects (`src/lib/effects/pro/`)
+
+10 separate, unit-tested modules (clarity, colorBalance, splitTone, proMist, gradND, hslSecondary, exposure, channelMixer, bleachBypass, surfaceBlur). Each exports `apply<Name>(data,w,h,params)` + an `<NAME>_EFFECT` descriptor; wired via the `proConfig`/`runPro` helpers in effects.ts.
+
+### Curated Looks + Randomizer
+
+`src/lib/looks/looks.ts` = 16 one-click named recipes (`LOOKS`, `lookToStackLayers`), surfaced by `LooksGallery.tsx`. The Smart Randomizer (`src/lib/randomizer/`) composes mood-weighted stacks across canonical slots; `EFFECT_META` reaches ~42 effects incl. all film stocks.
+
+### Quality invariants
+
+- **Stochastic effects are seeded** via `mulberry32` (preview == export). Add a `seed` setting to any new random effect.
+- **Geometric warps sample through `effects/sampling.ts` (`sampleBilinear`/`warpImage`)** — never nearest-neighbor (jaggies).
+- **Color-space helpers** in `effects/color-space.ts`: do exposure/blur/bloom math in LINEAR light (`SRGB_TO_LINEAR`, `linearToSrgbByte`, `makeExposureLUT`).
+- `goldenEffects.test.ts` snapshots every dispatchable effect — it must stay deterministic.
 
 ### Adding a New Effect
 

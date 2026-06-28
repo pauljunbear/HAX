@@ -60,6 +60,32 @@ export const EFFECT_META: Record<string, EffectMeta> = {
     }),
   },
   toneCurve: { slot: 'tone', weight: 0.4, settings: t => ({ amount: r2((t - 0.5) * 1.0) }) },
+  // Local-contrast "punch" — a structural mid-frequency boost. Tasteful positive
+  // range; protectTones holds skin/sky from going crunchy.
+  clarity: {
+    slot: 'tone',
+    weight: 0.5,
+    settings: t => ({
+      amount: Math.round(t * 60),
+      radius: Math.round(40 + t * 40),
+      protectTones: 50,
+    }),
+  },
+  // Per-zone CMY push. Lives in 'tone' (not 'grade') on purpose so it can stack
+  // with a 'grade' split-tone for the full teal-orange recipe. Cool shadows,
+  // warm highlights — the cinematic default.
+  colorBalance: {
+    slot: 'tone',
+    weight: 0.6,
+    settings: t => ({
+      shadowCR: -Math.round(t * 30),
+      shadowYB: Math.round(t * 30),
+      midCR: Math.round(t * 12),
+      highCR: Math.round(t * 30),
+      highYB: -Math.round(t * 30),
+      preserveLuminosity: 1,
+    }),
+  },
 
   /* ---- grade (one per stack via slot) ---- */
   duotone: {
@@ -110,6 +136,57 @@ export const EFFECT_META: Record<string, EffectMeta> = {
     slot: 'grade',
     weight: 0.5,
     settings: t => ({ sepia: r2(0.5 + t * 0.4), noise: r2(0.1 * t), vignette: r2(0.4 * t) }),
+  },
+  // Real documented film emulation. `preset` indexes FILM_STOCKS (28 stocks:
+  // kodak-negative, kodak-slide, fuji, cinema, bw — see src/lib/effects.ts).
+  // This is the single biggest unlock: film stocks can now appear in Surprise me.
+  // It carries its own grain + halation, so it excludes the extra grain effects.
+  unifiedFilm: {
+    slot: 'grade',
+    weight: 0.9,
+    excl: ['noise', 'scratchedFilm'],
+    settings: (t, _P, rng) => ({
+      preset: Math.floor(rng() * 28),
+      strength: Math.round(60 + t * 40),
+      grain: Math.round(70 + t * 60),
+      halation: Math.round(70 + t * 60),
+      exposure: 0,
+      fade: 0,
+      seed: Math.floor(rng() * 9999) + 1,
+    }),
+  },
+  // Hue into shadows + highlights. Teal shadows / warm highlights by default.
+  splitTone: {
+    slot: 'grade',
+    weight: 0.6,
+    settings: (t, _P, rng) => ({
+      shadowHue: Math.round(195 + rng() * 30),
+      shadowSat: Math.round(15 + t * 35),
+      highlightHue: Math.round(35 + rng() * 20),
+      highlightSat: Math.round(15 + t * 35),
+      balance: 0,
+    }),
+  },
+  // Silver-retention "bleach bypass" — crushed, desaturated, high local contrast.
+  bleachBypass: {
+    slot: 'grade',
+    weight: 0.5,
+    settings: t => ({
+      strength: Math.round(30 + t * 50),
+      contrast: Math.round(30 + t * 40),
+      saturation: Math.round(50 - t * 40),
+    }),
+  },
+  // Monochrome converter (R-row mix, exposure-neutral). Low base weight so it
+  // never surprises a colour mood; the 'mono' mood prefers it heavily for true B&W.
+  channelMixer: {
+    slot: 'grade',
+    weight: 0.3,
+    settings: t => {
+      const rFromR = Math.round(30 + t * 40);
+      const rFromG = Math.round(60 - t * 30);
+      return { rFromR, rFromG, rFromB: 100 - rFromR - rFromG, monochrome: 1 };
+    },
   },
 
   /* ---- stylize ---- */
@@ -162,6 +239,51 @@ export const EFFECT_META: Record<string, EffectMeta> = {
     weight: 0.4,
     settings: t => ({ pixelSize: Math.round(3 + t * 16), opacity: 1 }),
   },
+  oilPainting: {
+    slot: 'stylize',
+    weight: 0.4,
+    settings: t => ({
+      radius: Math.round(2 + t * 5),
+      intensity: r2(0.6 + t * 1.0),
+      opacity: 1,
+    }),
+  },
+  watercolor: {
+    slot: 'stylize',
+    weight: 0.4,
+    settings: t => ({
+      intensity: r2(0.4 + t * 0.5),
+      edges: r2(0.2 + t * 0.4),
+      texture: r2(0.15 + t * 0.3),
+      opacity: 1,
+    }),
+  },
+  // Print emulation (riso / newsprint / linocut / screen-print / letterpress).
+  unifiedPrint: {
+    slot: 'stylize',
+    weight: 0.7,
+    settings: (t, _P, rng) => ({
+      preset: Math.floor(rng() * 5),
+      intensity: Math.round(50 + t * 40),
+      colorCount: Math.round(2 + t * 2),
+      dotSize: Math.round(4 + t * 8),
+      registration: Math.round(t * 6),
+      paperTexture: Math.round(30 + t * 40),
+      inkBleed: Math.round(20 + t * 30),
+      opacity: 1,
+    }),
+  },
+  toon: {
+    slot: 'stylize',
+    weight: 0.4,
+    settings: t => ({
+      smoothness: Math.round(4 + t * 10),
+      levels: Math.round(8 - t * 4),
+      edgeThreshold: r2(0.15 + t * 0.2),
+      edgeStrength: r2(0.6 + t * 0.35),
+      opacity: 1,
+    }),
+  },
 
   /* ---- texture ---- */
   noise: {
@@ -204,6 +326,17 @@ export const EFFECT_META: Record<string, EffectMeta> = {
     weight: 0.4,
     settings: t => ({ glowIntensity: r2(0.3 + t * 0.6), glowSpread: r2(0.2 + t * 0.5) }),
   },
+  // Pro-Mist diffusion — blooms highlights into a soft veil while holding blacks.
+  proMist: {
+    slot: 'glow',
+    weight: 0.6,
+    settings: t => ({
+      strength: Math.round(20 + t * 50),
+      size: Math.round(30 + t * 40),
+      blackRetention: 50,
+      threshold: Math.round(40 + t * 30),
+    }),
+  },
 
   /* ---- glitch ---- */
   rgbShift: {
@@ -245,6 +378,19 @@ export const EFFECT_META: Record<string, EffectMeta> = {
 
   /* ---- frame ---- */
   vignette: { slot: 'frame', weight: 0.6, settings: t => ({ amount: r2(t * 0.7), falloff: 0.5 }) },
+  // Graduated ND — darkens the top of the frame (skies) with an optional cool tint.
+  gradND: {
+    slot: 'frame',
+    weight: 0.4,
+    settings: t => ({
+      exposure: -Math.round(20 + t * 50),
+      angle: 0,
+      position: 50,
+      softness: Math.round(40 + t * 40),
+      tintHue: 210,
+      tintStrength: Math.round(t * 30),
+    }),
+  },
 
   /* ---- warp (low odds, wild moods) ---- */
   swirl: {
@@ -401,6 +547,60 @@ export const MOODS: Record<string, Mood> = {
       contrast: 2,
       bloom: 1.5,
       chromaticAberration: 2,
+    },
+  },
+  // Teal-orange blockbuster grade: colour-balance (tone) + split-tone (grade) +
+  // pro-mist veil, on a cinema-stock base.
+  cinematic: {
+    name: 'Cinematic',
+    hue: [195, 225],
+    scheme: 'complementary',
+    mean: 0.5,
+    sigma: 0.14,
+    prefer: {
+      colorBalance: 3,
+      splitTone: 3,
+      proMist: 2.5,
+      contrast: 2,
+      unifiedFilm: 1.5,
+      clarity: 1.5,
+      vignette: 1.5,
+      bloom: 1,
+    },
+  },
+  // Ink-on-paper: print emulation + halftone + duotone, punchy and limited-palette.
+  print: {
+    name: 'Print Shop',
+    hue: [15, 210],
+    scheme: 'complementary',
+    mean: 0.6,
+    sigma: 0.14,
+    prefer: {
+      unifiedPrint: 3,
+      halftone: 3,
+      duotone: 2.5,
+      posterize: 2,
+      dotScreen: 1.5,
+      contrast: 1.5,
+      crosshatch: 1,
+      noise: 1,
+    },
+  },
+  // True black & white: channel-mixer mono conversion + clarity + grit.
+  mono: {
+    name: 'Monochrome',
+    hue: [200, 240],
+    scheme: 'analogous',
+    mean: 0.55,
+    sigma: 0.14,
+    prefer: {
+      channelMixer: 4,
+      clarity: 3,
+      contrast: 3,
+      vignette: 2.5,
+      noise: 2,
+      bleachBypass: 1.5,
+      scanLines: 0.5,
     },
   },
 };
