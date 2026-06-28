@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import { Stage, Layer, Image as KonvaImage } from 'react-konva';
 import useImage from '@/hooks/useImage';
+import type { DecodedImage } from '@/hooks/useImage';
 import type { EffectLayer } from '@/hooks/useEffectLayers';
 import { PrefixRenderCache } from '@/lib/performance/LayerPipeline';
 import { buildSpecs } from '@/lib/effects/renderStack';
@@ -52,7 +53,7 @@ interface ImageEditorProps {
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 const MAX_CACHE_ENTRIES = 50; // Reduced from 200 to prevent memory bloat
 
-const createTemporaryStage = (imageElement: HTMLImageElement): TemporaryStageResources => {
+const createTemporaryStage = (imageElement: DecodedImage): TemporaryStageResources => {
   const container = document.createElement('div');
   container.style.position = 'fixed';
   container.style.pointerEvents = 'none';
@@ -406,8 +407,8 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
               ? Math.max(0.01, Math.min(1, quality / 100))
               : JPEG_EXPORT_QUALITY
             : undefined;
-        if (!(image instanceof HTMLImageElement)) {
-          console.error('Base image element unavailable for export');
+        if (!image) {
+          console.error('Base image unavailable for export');
           return;
         }
 
