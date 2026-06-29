@@ -10,6 +10,7 @@
  */
 import { WebGL2Renderer, type GpuPass } from './WebGL2Renderer';
 import { buildExposureLUT } from '../effects/pro/exposure';
+import { makeExposureLUT } from '../effects/color-space';
 
 type UniformSetter = (
   gl: WebGL2RenderingContext,
@@ -77,6 +78,15 @@ export const GPU_EFFECTS: Record<string, GpuEffectDef> = {
   // Exposure (levels → exposure(linear) → gamma) is one composed 256-byte LUT.
   // The GPU samples the SAME buildExposureLUT table the CPU applies → byte-exact.
   exposure: { frag: lutFrag(), buildLut: s => buildExposureLUT(s) },
+
+  // Brightness is a per-channel linear-light LUT (createBrightnessEffect uses
+  // makeExposureLUT(value/100) applied independently per channel) → byte-exact
+  // via the same table. (Unlike grayscale/saturation, which couple channels and
+  // stay on CPU.)
+  brightness: {
+    frag: lutFrag(),
+    buildLut: s => makeExposureLUT(Math.max(-100, Math.min(100, s.value ?? 0)) / 100),
+  },
 };
 
 function hslFrag(): string {

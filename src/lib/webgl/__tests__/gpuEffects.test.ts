@@ -8,7 +8,7 @@ describe('GPU effect routing', () => {
     // brightness/saturation were removed — applyEffect routes them to custom
     // linear-light math the gamma-space shaders didn't match (verified at
     // /devtest/gpu: they diverged up to 74/255; the rest are ≤1, exposure 0).
-    expect(ids).toEqual(['contrast', 'exposure', 'hue', 'invert', 'sepia'].sort());
+    expect(ids).toEqual(['brightness', 'contrast', 'exposure', 'hue', 'invert', 'sepia'].sort());
   });
 
   test('isGpuSupportedEffect: true for shader-backed, false for others', () => {
