@@ -9,6 +9,7 @@
  * brightness => { brightness: value/100 }, contrast => { contrast: -100..100 }.
  */
 import { WebGL2Renderer, type GpuPass } from './WebGL2Renderer';
+import { buildExposureLUT } from '../effects/pro/exposure';
 
 type UniformSetter = (
   gl: WebGL2RenderingContext,
@@ -19,23 +20,41 @@ type UniformSetter = (
 interface GpuEffectDef {
   frag: string;
   setUniforms?: UniformSetter;
+  /** Build a 256-entry per-channel byte→byte LUT from the layer's settings. When
+   *  present, the pass samples it (u_lut) for a BYTE-IDENTICAL result — used for
+   *  closure-baked tone effects (exposure, curves) that return empty params. */
+  buildLut?: (settings: Record<string, number>) => Uint8ClampedArray;
 }
 
 const f = WebGL2Renderer.colorFrag;
+
+/** Per-channel byte→byte LUT sampler: reads the exact CPU LUT entry (NEAREST). */
+function lutFrag(): string {
+  return f(
+    `return vec3(
+      texture(u_lut, vec2((c.r * 255.0 + 0.5) / 256.0, 0.5)).r,
+      texture(u_lut, vec2((c.g * 255.0 + 0.5) / 256.0, 0.5)).r,
+      texture(u_lut, vec2((c.b * 255.0 + 0.5) / 256.0, 0.5)).r);`,
+    `uniform sampler2D u_lut;`
+  );
+}
 
 function setFloat(gl: WebGL2RenderingContext, prog: WebGLProgram, name: string, v: number): void {
   const loc = gl.getUniformLocation(prog, name);
   if (loc) gl.uniform1f(loc, v);
 }
 
+// IMPORTANT: only effects whose applyEffect() dispatches to a KONVA built-in (or a
+// byte-exact LUT) belong here. grayscale/brightness/saturation were removed —
+// applyEffect routes them to CUSTOM linear-light implementations (Rec.709 luminance,
+// etc.), NOT Konva's gamma-space math, so the old gamma-space shaders diverged from
+// the CPU by up to ~74/255 whenever the GPU fast-path was active. They now fall to
+// the (correct) CPU path. Re-add only with a shader verified ±1 at /devtest/gpu.
 export const GPU_EFFECTS: Record<string, GpuEffectDef> = {
-  // 255 - x
+  // 255 - x  (applyEffect → Konva.Filters.Invert)
   invert: { frag: f(`return 1.0 - c;`) },
 
-  // Konva Grayscale: 0.34 r + 0.5 g + 0.16 b
-  grayscale: { frag: f(`return vec3(dot(c, vec3(0.34, 0.5, 0.16)));`) },
-
-  // Konva Sepia matrix (min to 1.0 handled by colorFrag's clamp)
+  // Konva Sepia matrix (applyEffect → Konva.Filters.Sepia)
   sepia: {
     frag: f(`return vec3(
       dot(c, vec3(0.393, 0.769, 0.189)),
@@ -43,24 +62,21 @@ export const GPU_EFFECTS: Record<string, GpuEffectDef> = {
       dot(c, vec3(0.272, 0.534, 0.131)));`),
   },
 
-  // Konva Brighten: data += brightness*255  ->  in 0..1: c + brightness
-  brightness: {
-    frag: f(`return c + u_amount;`, `uniform float u_amount;`),
-    setUniforms: (gl, prog, p) => setFloat(gl, prog, 'u_amount', p.brightness ?? 0),
-  },
-
-  // Konva Contrast: adjust = ((contrast+100)/100)^2 ; (c-0.5)*adjust + 0.5
+  // Konva Contrast (applyEffect → Konva.Filters.Contrast):
+  // adjust = ((contrast+100)/100)^2 ; (c-0.5)*adjust + 0.5
   contrast: {
     frag: f(`return (c - 0.5) * u_adjust + 0.5;`, `uniform float u_adjust;`),
     setUniforms: (gl, prog, p) =>
       setFloat(gl, prog, 'u_adjust', Math.pow(((p.contrast ?? 0) + 100) / 100, 2)),
   },
 
-  // Konva HSL: a YIQ-style rotation matrix from saturation/hue/luminance.
-  // Matrix built JS-side (matches Konva exactly), applied in 0..1 (linear) plus
-  // the luminance offset l/255. Both `saturation` and `hue` dispatch here.
-  saturation: { frag: hslFrag(), setUniforms: hslUniforms },
+  // Konva HSL (applyEffect 'hue' → Konva.Filters.HSL): a YIQ-style rotation matrix
+  // from hue/luminance, built JS-side to match Konva exactly.
   hue: { frag: hslFrag(), setUniforms: hslUniforms },
+
+  // Exposure (levels → exposure(linear) → gamma) is one composed 256-byte LUT.
+  // The GPU samples the SAME buildExposureLUT table the CPU applies → byte-exact.
+  exposure: { frag: lutFrag(), buildLut: s => buildExposureLUT(s) },
 };
 
 function hslFrag(): string {
@@ -96,12 +112,17 @@ export function isGpuSupportedEffect(effectId: string): boolean {
   return Object.prototype.hasOwnProperty.call(GPU_EFFECTS, effectId);
 }
 
-export function buildGpuPass(effectId: string, params: Record<string, number>): GpuPass | null {
+export function buildGpuPass(
+  effectId: string,
+  params: Record<string, number>,
+  settings?: Record<string, number>
+): GpuPass | null {
   const def = GPU_EFFECTS[effectId];
   if (!def) return null;
   return {
     frag: def.frag,
     setUniforms: def.setUniforms ? (gl, prog) => def.setUniforms!(gl, prog, params) : undefined,
+    lut: def.buildLut ? def.buildLut(settings ?? {}) : undefined,
   };
 }
 

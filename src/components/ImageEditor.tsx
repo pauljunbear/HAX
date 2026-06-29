@@ -342,7 +342,7 @@ const ImageEditor = forwardRef<ImageEditorHandle, ImageEditorProps>(
               const renderer = getWebGL2Renderer();
               if (renderer.isSupported()) {
                 const passes = specs
-                  .map(s => buildGpuPass(s.effectId as string, s.params))
+                  .map(s => buildGpuPass(s.effectId as string, s.params, s.settings))
                   .filter((p): p is GpuPass => p !== null);
                 if (passes.length === specs.length) {
                   const out = renderer.render(imageData, passes);
