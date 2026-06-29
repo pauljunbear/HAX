@@ -31,6 +31,9 @@ export interface LayerSpec {
   filter: PipelineFilter;
   /** Params for Konva built-in filters (empty for custom closures). */
   params: Record<string, number>;
+  /** The layer's raw settings — carried so the GPU path can rebuild a LUT for
+   *  closure-baked custom effects (which return empty `params`). */
+  settings?: Record<string, number>;
   /** Layer blend opacity (0..1). <1 blends this layer's output over its input. */
   opacity?: number;
 }

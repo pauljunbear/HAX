@@ -57,6 +57,7 @@ export async function buildSpecs(
       effectId: layer.effectId,
       filter,
       params: (params || {}) as Record<string, number>,
+      settings,
       opacity,
     });
   }

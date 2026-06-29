@@ -4,14 +4,18 @@ import { getWebGL2Renderer } from '../WebGL2Renderer';
 describe('GPU effect routing', () => {
   test('supported set is the verified colour effects', () => {
     const ids = gpuEffectIds().sort();
-    expect(ids).toEqual(
-      ['brightness', 'contrast', 'grayscale', 'hue', 'invert', 'saturation', 'sepia'].sort()
-    );
+    // Only Konva-built-in-backed effects + the byte-exact LUT exposure. grayscale/
+    // brightness/saturation were removed — applyEffect routes them to custom
+    // linear-light math the gamma-space shaders didn't match (verified at
+    // /devtest/gpu: they diverged up to 74/255; the rest are ≤1, exposure 0).
+    expect(ids).toEqual(['contrast', 'exposure', 'hue', 'invert', 'sepia'].sort());
   });
 
   test('isGpuSupportedEffect: true for shader-backed, false for others', () => {
     expect(isGpuSupportedEffect('invert')).toBe(true);
-    expect(isGpuSupportedEffect('saturation')).toBe(true);
+    expect(isGpuSupportedEffect('exposure')).toBe(true);
+    // Removed (custom CPU math diverges from a gamma-space shader) → CPU path.
+    expect(isGpuSupportedEffect('saturation')).toBe(false);
     expect(isGpuSupportedEffect('bloom')).toBe(false);
     expect(isGpuSupportedEffect('glitchArt')).toBe(false);
   });

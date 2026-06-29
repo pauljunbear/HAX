@@ -18,6 +18,7 @@ const SETTINGS: Record<string, Record<string, number>> = {
   contrast: { value: 30 },
   saturation: { value: 40 },
   hue: { value: 90 },
+  exposure: { exposure: 100, gamma: 120, blackPoint: 10, whitePoint: 245 },
 };
 
 function makeImage(w = 64, h = 64): ImageData {
@@ -67,7 +68,7 @@ export default function GpuVerifyPage() {
                 filterThis((params || {}) as Record<string, number>),
                 cpu
               );
-            const pass = buildGpuPass(id, (params || {}) as Record<string, number>);
+            const pass = buildGpuPass(id, (params || {}) as Record<string, number>, SETTINGS[id]);
             const gpu = pass ? r.render(clone(base), [pass]) : null;
             if (!gpu) {
               results[id] = 'no-gpu';

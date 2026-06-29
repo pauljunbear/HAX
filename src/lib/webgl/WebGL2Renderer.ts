@@ -18,6 +18,14 @@ export interface GpuPass {
   frag: string;
   /** Set uniforms for this pass (program is already in use). */
   setUniforms?: (gl: WebGL2RenderingContext, program: WebGLProgram) => void;
+  /**
+   * Optional 256-entry per-channel byte→byte lookup table, uploaded as a 256×1
+   * texture and bound to sampler `u_lut` on unit 1. The shader samples it with
+   * NEAREST at `(c*255+0.5)/256`, reading the exact CPU LUT entry — so any
+   * effect expressed as a per-channel byte LUT (exposure, tone curves, film
+   * characteristic curves) is GPU-rendered BYTE-IDENTICALLY to the CPU.
+   */
+  lut?: Uint8ClampedArray;
 }
 
 const VERT = `#version 300 es
@@ -141,6 +149,27 @@ export class WebGL2Renderer {
     return tex;
   }
 
+  /** A 256×1 RGBA8 texture holding a per-channel byte→byte LUT, NEAREST-sampled. */
+  private makeLutTexture(gl: WebGL2RenderingContext, lut: Uint8ClampedArray): WebGLTexture | null {
+    const tex = gl.createTexture();
+    if (!tex) return null;
+    const rgba = new Uint8Array(256 * 4);
+    for (let i = 0; i < 256; i++) {
+      const v = lut[i] ?? 0;
+      rgba[i * 4] = v;
+      rgba[i * 4 + 1] = v;
+      rgba[i * 4 + 2] = v;
+      rgba[i * 4 + 3] = 255;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+    return tex;
+  }
+
   /**
    * Run the pass chain over `source`. Returns a NEW ImageData, or null if GPU
    * is unavailable / anything fails (caller falls back to CPU). The caller may
@@ -156,6 +185,7 @@ export class WebGL2Renderer {
     let texA: WebGLTexture | null = null;
     let texB: WebGLTexture | null = null;
     let fbo: WebGLFramebuffer | null = null;
+    let lutTex: WebGLTexture | null = null;
     try {
       texA = this.makeTexture(gl, w, h, source);
       texB = this.makeTexture(gl, w, h, null);
@@ -184,7 +214,21 @@ export class WebGL2Renderer {
         const uRes = gl.getUniformLocation(prog, 'u_resolution');
         if (uRes) gl.uniform2f(uRes, w, h);
         if (pass.setUniforms) pass.setUniforms(gl, prog);
+        if (pass.lut) {
+          // Switch to unit 1 BEFORE creating the LUT texture — makeLutTexture binds
+          // on the active unit, and binding on unit 0 would clobber the source.
+          gl.activeTexture(gl.TEXTURE1);
+          lutTex = this.makeLutTexture(gl, pass.lut);
+          if (!lutTex) return null;
+          const uLut = gl.getUniformLocation(prog, 'u_lut');
+          if (uLut) gl.uniform1i(uLut, 1);
+          gl.activeTexture(gl.TEXTURE0);
+        }
         gl.drawArrays(gl.TRIANGLES, 0, 3);
+        if (lutTex) {
+          gl.deleteTexture(lutTex);
+          lutTex = null;
+        }
         const t = src;
         src = dst;
         dst = t;
@@ -201,6 +245,7 @@ export class WebGL2Renderer {
     } finally {
       if (texA) gl.deleteTexture(texA);
       if (texB) gl.deleteTexture(texB);
+      if (lutTex) gl.deleteTexture(lutTex);
       if (fbo) gl.deleteFramebuffer(fbo);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
